@@ -6,13 +6,14 @@ import { tools } from "./tools";
 import { workflowRuns } from "./workflows";
 import { runStatusEnum, messageRoleEnum, toolCallStatusEnum } from "./enums";
 
-export const agentRuns = pgTable(
-  "agent_runs",
+export const agentSessions = pgTable(
+  "agent_sessions",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     agentId: uuid("agent_id").notNull().references(() => agents.id, { onDelete: "cascade" }),
     workflowRunId: uuid("workflow_run_id").references(() => workflowRuns.id, { onDelete: "set null" }),
+    channel: text("channel").notNull().default("studio"),
     triggerType: text("trigger_type").notNull().default("manual"),
     triggerData: jsonb("trigger_data").notNull().default({}),
     status: runStatusEnum("status").notNull().default("pending"),
@@ -28,23 +29,24 @@ export const agentRuns = pgTable(
     providerUsed: text("provider_used"),
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     triggeredBy: uuid("triggered_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index("idx_agent_runs_tenant").on(table.tenantId),
-    index("idx_agent_runs_agent").on(table.agentId),
-    index("idx_agent_runs_status").on(table.tenantId, table.status),
-    index("idx_agent_runs_created").on(table.tenantId, table.createdAt),
+    index("idx_agent_sessions_tenant").on(table.tenantId),
+    index("idx_agent_sessions_agent").on(table.agentId),
+    index("idx_agent_sessions_status").on(table.tenantId, table.status),
+    index("idx_agent_sessions_created").on(table.tenantId, table.createdAt),
   ]
 );
 
-export const agentRunMessages = pgTable(
-  "agent_run_messages",
+export const agentSessionMessages = pgTable(
+  "agent_session_messages",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-    agentRunId: uuid("agent_run_id").notNull().references(() => agentRuns.id, { onDelete: "cascade" }),
+    agentSessionId: uuid("agent_session_id").notNull().references(() => agentSessions.id, { onDelete: "cascade" }),
     role: messageRoleEnum("role").notNull(),
     content: text("content").notNull().default(""),
     toolCalls: jsonb("tool_calls"),
@@ -53,17 +55,17 @@ export const agentRunMessages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index("idx_arm_run").on(table.agentRunId),
-    index("idx_arm_tenant").on(table.tenantId),
+    index("idx_asm_session").on(table.agentSessionId),
+    index("idx_asm_tenant").on(table.tenantId),
   ]
 );
 
-export const agentRunToolCalls = pgTable(
-  "agent_run_tool_calls",
+export const agentSessionToolCalls = pgTable(
+  "agent_session_tool_calls",
   {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-    agentRunId: uuid("agent_run_id").notNull().references(() => agentRuns.id, { onDelete: "cascade" }),
+    agentSessionId: uuid("agent_session_id").notNull().references(() => agentSessions.id, { onDelete: "cascade" }),
     toolId: uuid("tool_id").references(() => tools.id, { onDelete: "set null" }),
     toolName: text("tool_name").notNull(),
     arguments: jsonb("arguments").notNull().default({}),
@@ -75,8 +77,8 @@ export const agentRunToolCalls = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
-    index("idx_artc_run").on(table.agentRunId),
-    index("idx_artc_tenant").on(table.tenantId),
-    index("idx_artc_tool").on(table.toolName),
+    index("idx_astc_session").on(table.agentSessionId),
+    index("idx_astc_tenant").on(table.tenantId),
+    index("idx_astc_tool").on(table.toolName),
   ]
 );

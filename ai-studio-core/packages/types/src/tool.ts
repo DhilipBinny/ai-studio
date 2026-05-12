@@ -10,7 +10,7 @@
  * the registry auto-wraps legacy shapes into the envelope downstream.
  */
 
-import type { Session } from './session.js';
+import type { Session } from './session';
 
 /**
  * JSON Schema object describing a tool's parameters.

@@ -1,10 +1,18 @@
 import { z } from "zod";
 
+const personaSchema = z.object({
+  identity: z.string().max(2000).optional(),
+  instructions: z.string().max(5000).optional(),
+  tone: z.string().max(2000).optional(),
+  context: z.string().max(5000).optional(),
+}).optional();
+
 export const createAgentSchema = z.object({
   name: z.string().min(1).max(255),
   slug: z.string().min(1).max(255).regex(/^[a-z][a-z0-9-]*$/, "Slug must be lowercase with hyphens"),
   description: z.string().max(2000).optional(),
-  systemPrompt: z.string().optional(),
+  systemPrompt: z.string().max(32000).optional(),
+  persona: personaSchema,
   rules: z.array(z.object({ rule: z.string(), priority: z.number().int().optional() })).optional(),
   providerModelId: z.string().uuid().optional().nullable(),
   temperature: z.number().min(0).max(2).optional(),
@@ -16,7 +24,8 @@ export const createAgentSchema = z.object({
 export const updateAgentSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   description: z.string().max(2000).optional(),
-  systemPrompt: z.string().optional(),
+  systemPrompt: z.string().max(32000).optional(),
+  persona: personaSchema,
   rules: z.array(z.object({ rule: z.string(), priority: z.number().int().optional() })).optional(),
   modelConfig: z.record(z.unknown()).optional(),
   providerModelId: z.string().uuid().optional().nullable(),

@@ -14,6 +14,7 @@ export const agents = pgTable(
     slug: text("slug").notNull(),
     description: text("description").default(""),
     systemPrompt: text("system_prompt").notNull().default(""),
+    persona: jsonb("persona").notNull().default({}),
     rules: jsonb("rules").notNull().default([]),
     modelConfig: jsonb("model_config").notNull().default({}),
     providerModelId: uuid("provider_model_id").references(() => providerModels.id, { onDelete: "set null" }),

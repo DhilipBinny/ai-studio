@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { users, profiles } from "@ais-app/database";
-import { hashPassword } from "@ais-app/auth";
+import { hashPassword, validatePassword, checkBreached } from "@ais-app/auth";
 import { createUserSchema, paginationSchema } from "@ais-app/validation";
 import { eq, and, count, asc, desc, ilike } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
@@ -85,6 +85,20 @@ export const POST = withRBAC("USERS", 20, async (request, auth) => {
     if (!profile) {
       return errorResponse("Profile not found", "PROFILE_NOT_FOUND", 404);
     }
+  }
+
+  const validation = validatePassword(password, [email]);
+  if (!validation.valid) {
+    return errorResponse(validation.errors[0] || "Password too weak", "WEAK_PASSWORD", 400);
+  }
+
+  const breach = await checkBreached(password);
+  if (breach.breached) {
+    return errorResponse(
+      "This password has appeared in data breaches. Choose a different one.",
+      "BREACHED_PASSWORD",
+      400
+    );
   }
 
   const passwordHash = await hashPassword(password);

@@ -22,6 +22,9 @@ export const GET = withRBAC("AGENTS", 10, async (request, auth) => {
   const [data, [{ total }]] = await Promise.all([
     db.select({
       id: agents.id, name: agents.name, slug: agents.slug, description: agents.description,
+      systemPrompt: agents.systemPrompt, persona: agents.persona, rules: agents.rules,
+      providerModelId: agents.providerModelId,
+      temperature: agents.temperature, maxTurns: agents.maxTurns, maxTokensPerTurn: agents.maxTokensPerTurn,
       status: agents.status, version: agents.version, tags: agents.tags, createdAt: agents.createdAt,
     }).from(agents).where(where).orderBy(desc(agents.createdAt)).limit(pagination.pageSize).offset((pagination.page - 1) * pagination.pageSize),
     db.select({ total: count() }).from(agents).where(where),
@@ -46,6 +49,7 @@ export const POST = withRBAC("AGENTS", 20, async (request, auth) => {
     slug: parsed.data.slug,
     description: parsed.data.description || "",
     systemPrompt: parsed.data.systemPrompt || "",
+    persona: parsed.data.persona || {},
     rules: parsed.data.rules || [],
     providerModelId: parsed.data.providerModelId || null,
     temperature: parsed.data.temperature?.toString() || "0.7",

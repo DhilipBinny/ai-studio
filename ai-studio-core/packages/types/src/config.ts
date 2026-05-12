@@ -365,13 +365,13 @@ export interface AgentConfig {
 /** Model capabilities — auto-fetched from provider APIs + admin overrides. */
 export interface ModelsCatalogConfig {
   /** Model capabilities keyed by model ID (e.g. "claude-opus-4-7", "gpt-4o"). */
-  capabilities: Record<string, Partial<import('./provider.js').ModelCapabilities>>;
+  capabilities: Record<string, Partial<import('./provider').ModelCapabilities>>;
 }
 
 /** MCP server configuration section. */
 export interface MCPSectionConfig {
   /** MCP servers keyed by server ID. */
-  servers: Record<string, import('./mcp.js').MCPServerConfig>;
+  servers: Record<string, import('./mcp').MCPServerConfig>;
 }
 
 // ──────────────────────────────────────────────

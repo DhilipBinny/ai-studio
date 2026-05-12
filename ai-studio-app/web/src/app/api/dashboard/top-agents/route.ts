@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
-import { agentRuns, agents } from "@ais-app/database";
+import { agentSessions, agents } from "@ais-app/database";
 import { eq, count, sum, desc, sql } from "drizzle-orm";
 import { withRBAC } from "@/lib/api-utils";
 
@@ -9,16 +9,16 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
 
   const data = await db
     .select({
-      agentId: agentRuns.agentId,
+      agentId: agentSessions.agentId,
       agentName: agents.name,
-      runCount: count(agentRuns.id).as("run_count"),
-      totalCost: sum(agentRuns.totalCostUsd).as("total_cost"),
+      sessionCount: count(agentSessions.id).as("session_count"),
+      totalCost: sum(agentSessions.totalCostUsd).as("total_cost"),
     })
-    .from(agentRuns)
-    .innerJoin(agents, eq(agentRuns.agentId, agents.id))
-    .where(eq(agentRuns.tenantId, auth.tenantId))
-    .groupBy(agentRuns.agentId, agents.name)
-    .orderBy(desc(sql`count(${agentRuns.id})`))
+    .from(agentSessions)
+    .innerJoin(agents, eq(agentSessions.agentId, agents.id))
+    .where(eq(agentSessions.tenantId, auth.tenantId))
+    .groupBy(agentSessions.agentId, agents.name)
+    .orderBy(desc(sql`count(${agentSessions.id})`))
     .limit(10);
 
   return NextResponse.json({ data });

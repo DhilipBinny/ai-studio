@@ -26,6 +26,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  if (pathname.startsWith("/api/v1/")) {
+    return NextResponse.next();
+  }
+
   const token = request.cookies.get("access_token")?.value;
 
   if (!token) {

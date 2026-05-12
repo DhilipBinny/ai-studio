@@ -77,14 +77,13 @@ export function PasswordInput({ value, onChange, label = "Password", userInputs 
     }
   }, []);
 
+  const shouldCheckBreach = touched && value.length >= MIN_LENGTH;
+
   useEffect(() => {
-    if (!touched || value.length < MIN_LENGTH) {
-      setBreachStatus("idle");
-      return;
-    }
+    if (!shouldCheckBreach) return;
     const timer = setTimeout(() => checkBreach(value), 800);
     return () => clearTimeout(timer);
-  }, [value, touched, checkBreach]);
+  }, [value, shouldCheckBreach, checkBreach]);
 
   return (
     <div className="space-y-2">
@@ -131,13 +130,13 @@ export function PasswordInput({ value, onChange, label = "Password", userInputs 
           <div className="space-y-1">
             <Requirement met={meetsLength} text={`At least ${MIN_LENGTH} characters`} />
             {meetsLength && <Requirement met={meetsStrength} text="Good or Strong strength" />}
-            {meetsLength && breachStatus === "checking" && (
+            {shouldCheckBreach && breachStatus === "checking" && (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Loader2 className="h-3 w-3 animate-spin" /> Checking breach database...
               </div>
             )}
-            {breachStatus === "safe" && <Requirement met={true} text="Not found in breach databases" />}
-            {breachStatus === "breached" && (
+            {shouldCheckBreach && breachStatus === "safe" && <Requirement met={true} text="Not found in breach databases" />}
+            {shouldCheckBreach && breachStatus === "breached" && (
               <div className="flex items-center gap-1.5 text-xs text-red-600">
                 <X className="h-3 w-3" /> Found in {breachCount.toLocaleString()} data breaches — choose a different password
               </div>

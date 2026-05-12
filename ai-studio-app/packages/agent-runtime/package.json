@@ -1,0 +1,23 @@
+{
+  "name": "@ais-app/agent-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ais/agent-core": "workspace:*",
+    "@ais/tool-platform": "workspace:*",
+    "@ais/security": "workspace:*",
+    "@ais/memory-engine": "workspace:*",
+    "@ais/provider-bridge": "workspace:*",
+    "@ais/types": "workspace:*",
+    "@ais-app/database": "workspace:*",
+    "@ais-app/types": "workspace:*",
+    "@anthropic-ai/sdk": "^0.95.2",
+    "openai": "^6.37.0",
+    "drizzle-orm": "^0.44.2"
+  }
+}

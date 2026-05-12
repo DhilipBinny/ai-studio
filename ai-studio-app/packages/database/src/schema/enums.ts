@@ -74,6 +74,7 @@ export const workflowNodeTypeEnum = pgEnum("workflow_node_type", [
 export const runStatusEnum = pgEnum("run_status", [
   "pending",
   "running",
+  "waiting",
   "completed",
   "failed",
   "cancelled",

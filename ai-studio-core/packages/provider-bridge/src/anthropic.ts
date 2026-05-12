@@ -1,10 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { ProviderInterface, ProviderResponse, ChatArgs } from './types.js';
-import type { ProviderOptions } from './types.js';
+import type { ProviderInterface, ProviderResponse, ChatArgs } from './types';
+import type { ProviderOptions } from './types';
 import type { GatewayConfig, ToolCall, ThinkingBlock, StructuredSystemPrompt, AgwLogger } from '@ais/types';
 import { noopLogger } from '@ais/types';
-import { getModelCapabilities } from './models.js';
-import { createStreamingTimeout } from './streaming-timeout.js';
+import { getModelCapabilities } from './models';
+import { createStreamingTimeout } from './streaming-timeout';
 
 export class AnthropicProvider implements ProviderInterface {
   readonly name = 'anthropic';

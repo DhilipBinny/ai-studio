@@ -1,9 +1,9 @@
 import OpenAI from 'openai';
-import type { ProviderInterface, ProviderResponse, ChatArgs } from './types.js';
-import type { ProviderOptions } from './types.js';
+import type { ProviderInterface, ProviderResponse, ChatArgs } from './types';
+import type { ProviderOptions } from './types';
 import type { GatewayConfig, ToolCall, AgwLogger } from '@ais/types';
 import { noopLogger } from '@ais/types';
-import { createStreamingTimeout } from './streaming-timeout.js';
+import { createStreamingTimeout } from './streaming-timeout';
 
 export class OpenAIProvider implements ProviderInterface {
   readonly name: string;

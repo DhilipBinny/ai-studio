@@ -1,18 +1,18 @@
-export { ProviderRegistry, type SecretsResolver, type ProviderInfo } from './registry.js';
-export { AnthropicProvider } from './anthropic.js';
-export { OpenAIProvider } from './openai.js';
-export { createStreamingTimeout, type StreamingTimeout, type StreamingTimeoutOptions } from './streaming-timeout.js';
+export { ProviderRegistry, type SecretsResolver, type ProviderInfo } from './registry';
+export { AnthropicProvider } from './anthropic';
+export { OpenAIProvider } from './openai';
+export { createStreamingTimeout, type StreamingTimeout, type StreamingTimeoutOptions } from './streaming-timeout';
 export {
   classifyError, logClassifiedError, getBackoffDelay, setErrorsLogger,
   type ErrorType, type RecoveryAction, type ClassifiedError,
-} from './errors.js';
-export type { ProviderOptions } from './types.js';
-export type { ProviderInterface, ProviderResponse, ChatArgs } from './types.js';
+} from './errors';
+export type { ProviderOptions } from './types';
+export type { ProviderInterface, ProviderResponse, ChatArgs } from './types';
 export {
   MODEL_DEFAULTS, getModelCapabilities, estimateCost, stripProviderPrefix,
   parseAnthropicModels, parseOllamaModel, mergeCapabilities,
-} from './models.js';
+} from './models';
 export {
   testProviderConnection,
   type TestResult, type DiscoveredModel, type ProviderTestConfig,
-} from './test-connection.js';
+} from './test-connection';

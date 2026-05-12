@@ -8,7 +8,7 @@ export function AccessDenied() {
       </div>
       <h3 className="mt-4 text-sm font-semibold">Access Denied</h3>
       <p className="mt-1 text-sm text-muted-foreground">
-        You don't have permission to view this page.
+        You don&apos;t have permission to view this page.
       </p>
     </div>
   );

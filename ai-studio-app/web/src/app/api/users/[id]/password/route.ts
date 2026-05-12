@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { users, sessions } from "@ais-app/database";
-import { hashPassword, verifyPassword } from "@ais-app/auth";
+import { hashPassword, verifyPassword, validatePassword, checkBreached, canManage } from "@ais-app/auth";
 import { changePasswordSchema } from "@ais-app/validation";
 import { eq, and, isNull } from "drizzle-orm";
 import { withAuth, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
-import { canManage } from "@ais-app/auth";
 
 export const PATCH = withAuth(async (request, auth, params) => {
   const id = params?.id;
@@ -41,6 +40,16 @@ export const PATCH = withAuth(async (request, auth, params) => {
       return errorResponse("Current password is incorrect", "WRONG_PASSWORD", 401);
     }
 
+    const validation = validatePassword(parsed.data.newPassword);
+    if (!validation.valid) {
+      return errorResponse(validation.errors[0] || "Password too weak", "WEAK_PASSWORD", 400);
+    }
+
+    const breach = await checkBreached(parsed.data.newPassword);
+    if (breach.breached) {
+      return errorResponse("This password has appeared in data breaches. Choose a different one.", "BREACHED_PASSWORD", 400);
+    }
+
     const newHash = await hashPassword(parsed.data.newPassword);
     await db
       .update(users)
@@ -48,9 +57,20 @@ export const PATCH = withAuth(async (request, auth, params) => {
       .where(and(eq(users.id, id), eq(users.tenantId, auth.tenantId)));
   } else {
     const newPassword = body.newPassword;
-    if (!newPassword || newPassword.length < 8 || newPassword.length > 64) {
-      return errorResponse("Password must be between 8 and 64 characters", "VALIDATION_ERROR", 400);
+    if (!newPassword || typeof newPassword !== "string") {
+      return errorResponse("Password is required", "VALIDATION_ERROR", 400);
     }
+
+    const validation = validatePassword(newPassword);
+    if (!validation.valid) {
+      return errorResponse(validation.errors[0] || "Password too weak", "WEAK_PASSWORD", 400);
+    }
+
+    const breach = await checkBreached(newPassword);
+    if (breach.breached) {
+      return errorResponse("This password has appeared in data breaches. Choose a different one.", "BREACHED_PASSWORD", 400);
+    }
+
     const newHash = await hashPassword(newPassword);
     await db
       .update(users)

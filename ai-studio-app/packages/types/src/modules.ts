@@ -4,7 +4,7 @@ export const MODULES = [
   { id: "TOOLS",      label: "Tools",            section: "build",   href: "/tools" },
   { id: "KNOWLEDGE",  label: "Knowledge Bases",  section: "build",   href: "/knowledge" },
   { id: "WORKFLOWS",  label: "Workflows",        section: "build",   href: "/workflows" },
-  { id: "RUNS",       label: "Runs",             section: "operate", href: "/runs" },
+  { id: "RUNS",       label: "Sessions",          section: "operate", href: "/runs" },
   { id: "CONNECTORS", label: "Connectors",       section: "operate", href: "/connectors" },
   { id: "PROVIDERS",  label: "Providers",        section: "operate", href: "/providers" },
   { id: "USERS",      label: "Users",            section: "admin",   href: "/users" },

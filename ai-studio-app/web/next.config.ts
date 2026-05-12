@@ -1,12 +1,21 @@
 import type { NextConfig } from "next";
+import { resolve } from "path";
 
 const nextConfig: NextConfig = {
+  outputFileTracingRoot: resolve(__dirname, "../../"),
   transpilePackages: [
+    "@ais-app/agent-runtime",
     "@ais-app/auth",
     "@ais-app/database",
     "@ais-app/email",
     "@ais-app/types",
     "@ais-app/validation",
+    "@ais/agent-core",
+    "@ais/memory-engine",
+    "@ais/provider-bridge",
+    "@ais/security",
+    "@ais/tool-platform",
+    "@ais/types",
   ],
   serverExternalPackages: [
     "@node-rs/argon2",

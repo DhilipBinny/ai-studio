@@ -13,7 +13,14 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@ais-app/agent-runtime": "workspace:*",
     "@ais-app/auth": "workspace:*",
+    "@ais/agent-core": "workspace:*",
+    "@ais/memory-engine": "workspace:*",
+    "@ais/provider-bridge": "workspace:*",
+    "@ais/security": "workspace:*",
+    "@ais/tool-platform": "workspace:*",
+    "@ais/types": "workspace:*",
     "@ais-app/database": "workspace:*",
     "@ais-app/email": "workspace:*",
     "@ais-app/types": "workspace:*",
@@ -32,6 +39,8 @@
     "openai": "^6.37.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.3.0",
     "zod": "^3.25.3"
   },

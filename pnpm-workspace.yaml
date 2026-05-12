@@ -1,0 +1,4 @@
+packages:
+  - "ai-studio-core/packages/*"
+  - "ai-studio-app/packages/*"
+  - "ai-studio-app/web"
