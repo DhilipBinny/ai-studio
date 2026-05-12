@@ -17,7 +17,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 
-interface User { id: string; email: string; name: string; role: string; profileId: string | null; profileName: string | null; isLocked: boolean; lastLoginAt: string | null; createdAt: string; }
+interface User { id: string; email: string; name: string; role: string; profileId: string | null; profileName: string | null; isActive: boolean; isLocked: boolean; lastLoginAt: string | null; createdAt: string; }
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -28,15 +28,17 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editUser, setEditUser] = useState<User | null>(null);
+  const [showAll, setShowAll] = useState(false);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), pageSize: "20" });
     if (search) params.set("search", search);
+    if (showAll) params.set("showAll", "true");
     const res = await fetch(`/api/users?${params}`);
     if (res.ok) { const d = await res.json(); setUsers(d.data); setTotal(d.total); setTotalPages(d.totalPages); }
     setLoading(false);
-  }, [page, search]);
+  }, [page, search, showAll]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
@@ -51,6 +53,10 @@ export default function UsersPage() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search by email..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} className="pl-9" />
         </div>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer">
+          <input type="checkbox" checked={showAll} onChange={(e) => { setShowAll(e.target.checked); setPage(1); }} className="accent-brand" />
+          Show inactive
+        </label>
       </div>
 
       {!loading && users.length === 0 ? (
@@ -71,17 +77,28 @@ export default function UsersPage() {
             </TableHeader>
             <TableBody>
               {loading ? <TableSkeleton columns={7} /> : users.map((u) => (
-                <TableRow key={u.id}>
+                <TableRow key={u.id} className={!u.isActive ? "opacity-50" : ""}>
                   <TableCell className="font-medium">{u.name || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{u.email}</TableCell>
                   <TableCell><Badge variant="secondary">{u.role.replace("_", " ")}</Badge></TableCell>
                   <TableCell className="text-muted-foreground">{u.profileName || "—"}</TableCell>
-                  <TableCell>{u.isLocked ? <Badge variant="error">Locked</Badge> : <Badge variant="success">Active</Badge>}</TableCell>
+                  <TableCell>
+                    {!u.isActive ? <Badge variant="secondary">Inactive</Badge> : u.isLocked ? <Badge variant="error">Locked</Badge> : <Badge variant="success">Active</Badge>}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : "Never"}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditUser(u)}>
-                      <Pencil className="h-3 w-3" />
-                    </Button>
+                    {u.isActive ? (
+                      <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditUser(u)}>
+                        <Pencil className="h-3 w-3" />
+                      </Button>
+                    ) : (
+                      <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={async () => {
+                        await fetch(`/api/users/${u.id}/reactivate`, { method: "POST" });
+                        fetchUsers();
+                      }}>
+                        Reactivate
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

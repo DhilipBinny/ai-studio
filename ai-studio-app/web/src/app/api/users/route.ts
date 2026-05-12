@@ -13,10 +13,10 @@ export const GET = withRBAC("USERS", 10, async (request, auth) => {
   const pagination = paginationSchema.parse(Object.fromEntries(url.searchParams));
   const search = url.searchParams.get("search");
 
-  const conditions = [eq(users.tenantId, auth.tenantId), eq(users.isActive, true)];
-  if (search) {
-    conditions.push(ilike(users.email, `%${search}%`));
-  }
+  const showAll = url.searchParams.get("showAll") === "true";
+  const conditions = [eq(users.tenantId, auth.tenantId)];
+  if (!showAll) conditions.push(eq(users.isActive, true));
+  if (search) conditions.push(ilike(users.email, `%${search}%`));
 
   const where = and(...conditions);
   const orderBy = pagination.sortOrder === "asc" ? asc(users.createdAt) : desc(users.createdAt);
@@ -30,6 +30,7 @@ export const GET = withRBAC("USERS", 10, async (request, auth) => {
         role: users.role,
         profileId: users.profileId,
         profileName: profiles.name,
+        isActive: users.isActive,
         isLocked: users.isLocked,
         lastLoginAt: users.lastLoginAt,
         createdAt: users.createdAt,
