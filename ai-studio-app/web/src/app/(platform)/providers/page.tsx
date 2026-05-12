@@ -361,12 +361,10 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
   );
 }
 
-const DEFAULT_URLS: Record<string, string> = {
-  anthropic: "https://api.anthropic.com",
-  openai: "https://api.openai.com/v1",
-  ollama: "http://localhost:11434",
-  openai_compatible: "",
-};
+import { PROVIDER_DEFAULTS } from "@ais-app/auth";
+const DEFAULT_URLS: Record<string, string> = Object.fromEntries(
+  Object.entries(PROVIDER_DEFAULTS).map(([k, v]) => [k, v.baseUrl])
+);
 
 const KEY_PLACEHOLDERS: Record<string, string> = {
   anthropic: "sk-ant-...",

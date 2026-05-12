@@ -137,9 +137,9 @@ export default function LoginPage() {
                 {state === "loading" ? "Signing in..." : "Sign in"}
               </Button>
               <div className="text-center">
-                <button type="button" className="text-xs text-muted-foreground hover:text-brand transition-colors">
+                <a href="/forgot-password" className="text-xs text-muted-foreground hover:text-brand transition-colors">
                   Forgot password?
-                </button>
+                </a>
               </div>
             </form>
           ) : (

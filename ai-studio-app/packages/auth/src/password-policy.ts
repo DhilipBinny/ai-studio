@@ -2,6 +2,7 @@ import { zxcvbn, zxcvbnOptions } from "@zxcvbn-ts/core";
 import * as zxcvbnCommonPackage from "@zxcvbn-ts/language-common";
 import * as zxcvbnEnPackage from "@zxcvbn-ts/language-en";
 import { createHash } from "node:crypto";
+import { AUTH_CONFIG, EXTERNAL_URLS } from "./config";
 
 zxcvbnOptions.setOptions({
   translations: zxcvbnEnPackage.translations,
@@ -12,11 +13,7 @@ zxcvbnOptions.setOptions({
   },
 });
 
-export const PASSWORD_POLICY = {
-  minLength: 12,
-  maxLength: 128,
-  minStrength: 3,
-} as const;
+export const PASSWORD_POLICY = AUTH_CONFIG.password;
 
 export interface PasswordValidationResult {
   valid: boolean;
@@ -61,7 +58,7 @@ export async function checkBreached(password: string): Promise<{ breached: boole
   const suffix = sha1.slice(5);
 
   try {
-    const res = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
+    const res = await fetch(`${EXTERNAL_URLS.hibpApi}/${prefix}`, {
       headers: { "Add-Padding": "true" },
     });
     if (!res.ok) return { breached: false, count: 0 };

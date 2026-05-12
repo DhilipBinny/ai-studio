@@ -23,17 +23,15 @@ export default function SettingsPage() {
   const [tab, setTab] = useState("general");
   return (
     <RequirePermission module="SETTINGS"><>
-      <PageHeader title="Settings" description="Configure platform settings, profiles, and account preferences." />
+      <PageHeader title="Settings" description="Configure platform settings and access profiles." />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="profiles">Profiles</TabsTrigger>
-          <TabsTrigger value="account">Account</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
         </TabsList>
         <TabsContent value="general"><GeneralTab /></TabsContent>
         <TabsContent value="profiles"><ProfilesTab /></TabsContent>
-        <TabsContent value="account"><AccountTab /></TabsContent>
         <TabsContent value="audit"><AuditLogTab /></TabsContent>
       </Tabs>
     </></RequirePermission>
@@ -277,37 +275,6 @@ function ProfilesTab() {
         </div>
       </Card>
     </div>
-  );
-}
-
-function AccountTab() {
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  async function handleChangePassword(e: React.FormEvent) {
-    e.preventDefault(); setMessage(""); setSubmitting(true);
-    const me = await fetch("/api/auth/me").then((r) => r.json());
-    const userId = me?.user?.id;
-    if (!userId) { setMessage("Could not determine user ID"); setSubmitting(false); return; }
-    const res = await fetch(`/api/users/${userId}/password`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ currentPassword, newPassword }) });
-    const data = await res.json();
-    setMessage(res.ok ? "Password changed successfully." : (data.error || "Failed"));
-    setSubmitting(false);
-    if (res.ok) { setCurrentPassword(""); setNewPassword(""); }
-  }
-  return (
-    <Card>
-      <CardHeader><CardTitle className="text-base">Change Password</CardTitle></CardHeader>
-      <CardContent>
-        {message && <div className={`mb-4 rounded-lg px-3 py-2 text-sm ${message.includes("success") ? "bg-green-50 text-green-700 border border-green-200" : "bg-destructive/5 text-destructive border border-destructive/20"}`}>{message}</div>}
-        <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
-          <div className="space-y-2"><Label>Current Password</Label><Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required /></div>
-          <PasswordInput value={newPassword} onChange={setNewPassword} label="New Password" />
-          <Button type="submit" disabled={submitting}>{submitting ? "Changing..." : "Change Password"}</Button>
-        </form>
-      </CardContent>
-    </Card>
   );
 }
 

@@ -1,4 +1,5 @@
 import { hash, verify } from "@node-rs/argon2";
+import { AUTH_CONFIG } from "./config";
 
 const ARGON2_CONFIG = {
   memoryCost: 19456,
@@ -8,8 +9,8 @@ const ARGON2_CONFIG = {
 };
 
 export async function hashPassword(password: string): Promise<string> {
-  if (password.length < 12 || password.length > 128) {
-    throw new Error("Password must be between 12 and 128 characters");
+  if (password.length < AUTH_CONFIG.password.minLength || password.length > AUTH_CONFIG.password.maxLength) {
+    throw new Error(`Password must be between ${AUTH_CONFIG.password.minLength} and ${AUTH_CONFIG.password.maxLength} characters`);
   }
   return hash(password, ARGON2_CONFIG);
 }
