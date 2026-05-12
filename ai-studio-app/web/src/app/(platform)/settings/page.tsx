@@ -35,28 +35,119 @@ export default function SettingsPage() {
   );
 }
 
+const CONFIG_LABELS: Record<string, string> = {
+  auth: "Authentication",
+  general: "General",
+  limits: "Agent Limits",
+  default_model: "Default Model",
+};
+
+const CONFIG_DESCRIPTIONS: Record<string, string> = {
+  auth: "2FA, OTP settings, lockout policy",
+  general: "App name, timezone",
+  limits: "Default agent turn limits and token budgets",
+  default_model: "Pre-selected model for new agents",
+};
+
 function GeneralTab() {
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    fetch("/api/settings").then((r) => r.ok ? r.json() : null).then((d) => { setConfigs(d?.data || []); setLoading(false); });
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+
+  const fetchConfigs = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch("/api/settings");
+    if (res.ok) { const d = await res.json(); setConfigs(d?.data || []); }
+    setLoading(false);
   }, []);
+
+  useEffect(() => { fetchConfigs(); }, [fetchConfigs]);
+
+  function startEdit(config: SystemConfig) {
+    setEditingKey(config.key);
+    setEditValue(JSON.stringify(config.value, null, 2));
+    setMessage(null);
+  }
+
+  async function saveEdit(key: string) {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const parsed = JSON.parse(editValue);
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: [{ key, value: parsed }] }),
+      });
+      if (res.ok) {
+        setMessage({ text: "Saved", ok: true });
+        setEditingKey(null);
+        fetchConfigs();
+      } else {
+        const d = await res.json();
+        setMessage({ text: d.error || "Failed to save", ok: false });
+      }
+    } catch {
+      setMessage({ text: "Invalid JSON", ok: false });
+    }
+    setSaving(false);
+  }
+
   return (
-    <Card>
-      <CardHeader><CardTitle className="text-base">System Configuration</CardTitle></CardHeader>
-      <CardContent>
-        {loading ? <div className="space-y-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-12 w-full" />)}</div> : configs.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No configuration entries.</p>
-        ) : (
-          <div className="space-y-4">{configs.map((c) => (
-            <div key={c.id} className="flex items-start justify-between border-b border-border pb-3 last:border-0">
-              <div><p className="text-sm font-medium">{c.key}</p><pre className="mt-1 text-xs text-muted-foreground max-w-lg overflow-auto">{JSON.stringify(c.value, null, 2)}</pre></div>
-              <span className="text-xs text-muted-foreground shrink-0">{new Date(c.updatedAt).toLocaleDateString()}</span>
-            </div>
-          ))}</div>
-        )}
-      </CardContent>
-    </Card>
+    <div className="space-y-4">
+      {message && (
+        <div className={`rounded-md px-3 py-2 text-xs ${message.ok ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"}`}>
+          {message.text}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="space-y-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}</div>
+      ) : configs.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No configuration entries.</p>
+      ) : (
+        configs.map((c) => {
+          const isEditing = editingKey === c.key;
+          return (
+            <Card key={c.id} className="p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold">{CONFIG_LABELS[c.key] || c.key}</p>
+                  <p className="text-xs text-muted-foreground">{CONFIG_DESCRIPTIONS[c.key] || ""}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-muted-foreground">{new Date(c.updatedAt).toLocaleDateString()}</span>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => isEditing ? setEditingKey(null) : startEdit(c)}>
+                    {isEditing ? "Cancel" : "Edit"}
+                  </Button>
+                </div>
+              </div>
+
+              {isEditing ? (
+                <div className="mt-3 space-y-2">
+                  <textarea
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 bg-background px-3 py-2 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+                    rows={Math.min(editValue.split("\n").length + 1, 12)}
+                  />
+                  <Button size="sm" onClick={() => saveEdit(c.key)} disabled={saving}>
+                    {saving ? "Saving..." : "Save"}
+                  </Button>
+                </div>
+              ) : (
+                <pre className="mt-2 rounded-md bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground overflow-auto max-h-32">
+                  {JSON.stringify(c.value, null, 2)}
+                </pre>
+              )}
+            </Card>
+          );
+        })
+      )}
+    </div>
   );
 }
 
