@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
     tenantId: user.tenantId,
     userId: user.id,
     action: "auth.login",
-    details: {},
+    details: { email: user.email, role: user.role },
     ipAddress: ip,
     userAgent: request.headers.get("user-agent"),
   });

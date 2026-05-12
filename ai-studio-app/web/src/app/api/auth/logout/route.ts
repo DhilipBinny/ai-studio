@@ -22,7 +22,9 @@ export const POST = withAuth(async (request: NextRequest, auth) => {
     tenantId: auth.tenantId,
     userId: auth.userId,
     action: "auth.logout",
-    details: {},
+    details: { sessionRevoked: !!refreshToken },
+    ipAddress: request.headers.get("x-real-ip") || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null,
+    userAgent: request.headers.get("user-agent"),
   });
 
   const response = NextResponse.json({ success: true });
