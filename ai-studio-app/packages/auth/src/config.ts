@@ -11,6 +11,7 @@ export const AUTH_CONFIG = {
     maxLength: 128,
     minStrength: 3,
     historyCount: 5,
+    resetTokenExpiryMinutes: 30,
   },
   otp: {
     validitySeconds: 300,

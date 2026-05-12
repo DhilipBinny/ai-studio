@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { users, passwordResetRequests } from "@ais-app/database";
 import { passwordResetRequestSchema } from "@ais-app/validation";
-import { hashToken } from "@ais-app/auth";
+import { hashToken, AUTH_CONFIG } from "@ais-app/auth";
 import { sendEmail } from "@ais-app/email";
 import { eq, and } from "drizzle-orm";
 import { errorResponse } from "@/lib/api-utils";
@@ -39,7 +39,7 @@ export async function POST(request: Request) {
     tenantId: user.tenantId,
     userId: user.id,
     tokenHash,
-    expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+    expiresAt: new Date(Date.now() + AUTH_CONFIG.password.resetTokenExpiryMinutes * 60 * 1000),
   });
 
   const origin = new URL(request.url).origin;
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
               Reset Password
             </a>
           </p>
-          <p style="color: #666; font-size: 13px;">This link expires in 30 minutes. If you didn't request this, you can safely ignore this email.</p>
+          <p style="color: #666; font-size: 13px;">This link expires in ${AUTH_CONFIG.password.resetTokenExpiryMinutes} minutes. If you didn't request this, you can safely ignore this email.</p>
           <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 24px 0;" />
           <p style="color: #999; font-size: 11px;">Echol Technology Pte Ltd</p>
         </div>
