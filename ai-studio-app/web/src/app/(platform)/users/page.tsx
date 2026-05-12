@@ -2,7 +2,7 @@
 import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Users, Search } from "lucide-react";
+import { Plus, Users, Search, Pencil, Loader2 } from "lucide-react";
 import { PasswordInput } from "@/components/password-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,7 +17,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 
-interface User { id: string; email: string; name: string; role: string; profileId: string | null; isLocked: boolean; lastLoginAt: string | null; createdAt: string; }
+interface User { id: string; email: string; name: string; role: string; profileId: string | null; profileName: string | null; isLocked: boolean; lastLoginAt: string | null; createdAt: string; }
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -27,6 +27,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [editUser, setEditUser] = useState<User | null>(null);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
@@ -65,10 +66,11 @@ export default function UsersPage() {
                 <TableHead>Profile</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last Login</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? <TableSkeleton columns={6} /> : users.map((u) => (
+              {loading ? <TableSkeleton columns={7} /> : users.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.name || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{u.email}</TableCell>
@@ -76,6 +78,11 @@ export default function UsersPage() {
                   <TableCell className="text-muted-foreground">{u.profileName || "—"}</TableCell>
                   <TableCell>{u.isLocked ? <Badge variant="error">Locked</Badge> : <Badge variant="success">Active</Badge>}</TableCell>
                   <TableCell className="text-muted-foreground">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : "Never"}</TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditUser(u)}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -89,6 +96,13 @@ export default function UsersPage() {
         <DialogContent onClose={() => setShowCreate(false)}>
           <DialogHeader><DialogTitle>Add User</DialogTitle></DialogHeader>
           <CreateUserForm onCreated={() => { setShowCreate(false); fetchUsers(); }} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editUser} onOpenChange={(open) => { if (!open) setEditUser(null); }}>
+        <DialogContent onClose={() => setEditUser(null)}>
+          <DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader>
+          {editUser && <EditUserForm user={editUser} onSaved={() => { setEditUser(null); fetchUsers(); }} />}
         </DialogContent>
       </Dialog>
     </></RequirePermission>
@@ -147,6 +161,122 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
         <p className="text-xs text-muted-foreground">Determines what the user can access.</p>
       </div>
       <Button type="submit" className="w-full" disabled={submitting}>{submitting ? "Creating..." : "Create"}</Button>
+    </form>
+  );
+}
+
+function EditUserForm({ user, onSaved }: { user: User; onSaved: () => void }) {
+  const [form, setForm] = useState({ name: user.name, role: user.role, profileId: user.profileId || "" });
+  const [profiles, setProfiles] = useState<Array<{ id: string; name: string }>>([]);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [deactivating, setDeactivating] = useState(false);
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/profiles")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const list = d?.data || d || [];
+        if (Array.isArray(list)) setProfiles(list);
+      })
+      .catch(() => {});
+  }, []);
+
+  async function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    setSubmitting(true);
+
+    const body: Record<string, unknown> = {};
+    if (form.name !== user.name) body.name = form.name;
+    if (form.role !== user.role) body.role = form.role;
+    if (form.profileId !== (user.profileId || "")) body.profileId = form.profileId || null;
+
+    if (Object.keys(body).length === 0) {
+      setMessage("No changes to save.");
+      setSubmitting(false);
+      return;
+    }
+
+    const res = await fetch(`/api/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) {
+      onSaved();
+    } else {
+      const d = await res.json();
+      setError(d.error || "Failed to update");
+    }
+    setSubmitting(false);
+  }
+
+  async function handleDeactivate() {
+    setDeactivating(true);
+    const res = await fetch(`/api/users/${user.id}/deactivate`, { method: "POST" });
+    if (res.ok) {
+      onSaved();
+    } else {
+      const d = await res.json();
+      setError(d.error || "Failed to deactivate");
+    }
+    setDeactivating(false);
+    setConfirmDeactivate(false);
+  }
+
+  return (
+    <form onSubmit={handleSave} className="space-y-4">
+      {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
+      {message && <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">{message}</div>}
+
+      <div className="space-y-1">
+        <p className="text-sm text-muted-foreground">{user.email}</p>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Name</Label>
+        <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Role</Label>
+        <Select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}>
+          <option value="viewer">Viewer</option>
+          <option value="member">Member</option>
+          <option value="admin">Admin</option>
+          <option value="super_admin">Super Admin</option>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Profile</Label>
+        <Select value={form.profileId} onChange={(e) => setForm((f) => ({ ...f, profileId: e.target.value }))}>
+          <option value="">No profile</option>
+          {profiles.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </Select>
+      </div>
+
+      <div className="flex gap-2">
+        <Button type="submit" className="flex-1" disabled={submitting}>
+          {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Save Changes"}
+        </Button>
+        {!confirmDeactivate ? (
+          <Button type="button" variant="outline" onClick={() => setConfirmDeactivate(true)}>
+            Deactivate
+          </Button>
+        ) : (
+          <Button type="button" variant="destructive" onClick={handleDeactivate} disabled={deactivating}>
+            {deactivating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Deactivate"}
+          </Button>
+        )}
+      </div>
     </form>
   );
 }
