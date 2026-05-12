@@ -1,5 +1,6 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
+import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Bot } from "lucide-react";
@@ -43,7 +44,7 @@ export default function AgentsPage() {
 
   const fetchAgents = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), pageSize: "20" });
+    const params = new URLSearchParams({ page: String(page), pageSize: String(DEFAULT_PAGE_SIZE) });
     if (statusFilter) params.set("status", statusFilter);
     const res = await fetch(`/api/agents?${params}`);
     if (res.ok) {
@@ -109,7 +110,7 @@ export default function AgentsPage() {
         </Card>
       )}
 
-      <Pagination page={page} pageSize={20} total={total} totalPages={totalPages} onPageChange={setPage} />
+      <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent onClose={() => setShowCreate(false)}>

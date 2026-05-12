@@ -1,5 +1,6 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
+import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 
 import { useState, useEffect, useCallback } from "react";
 import { Play } from "lucide-react";
@@ -28,7 +29,7 @@ export default function RunsPage() {
 
   const fetchRuns = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), pageSize: "20" });
+    const params = new URLSearchParams({ page: String(page), pageSize: String(DEFAULT_PAGE_SIZE) });
     if (statusFilter) params.set("status", statusFilter);
     const res = await fetch(`/api/runs?${params}`);
     if (res.ok) { const d = await res.json(); setRuns(d.data); setTotal(d.total); setTotalPages(d.totalPages); }
@@ -77,7 +78,7 @@ export default function RunsPage() {
         </Card>
       )}
 
-      <Pagination page={page} pageSize={20} total={total} totalPages={totalPages} onPageChange={setPage} />
+      <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
     </></RequirePermission>
   );
 }

@@ -54,7 +54,7 @@ export default function ProvidersPage() {
 
   const fetchProviders = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/providers?page=1&pageSize=50");
+    const res = await fetch(`/api/providers?page=1&pageSize=${DEFAULT_PAGE_SIZE}`);
     if (res.ok) {
       const d = await res.json();
       setProviders(d.data);
@@ -361,7 +361,7 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
   );
 }
 
-import { PROVIDER_DEFAULTS } from "@/lib/client-config";
+import { PROVIDER_DEFAULTS, DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 const DEFAULT_URLS: Record<string, string> = Object.fromEntries(
   Object.entries(PROVIDER_DEFAULTS).map(([k, v]) => [k, v.baseUrl])
 );

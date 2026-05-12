@@ -1,5 +1,6 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
+import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 
 import { useState, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
@@ -28,7 +29,7 @@ export default function AuditLogPage() {
 
   const fetchAudit = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/audit-log?page=${page}&pageSize=25`);
+    const res = await fetch(`/api/audit-log?page=${page}&pageSize=${DEFAULT_PAGE_SIZE}`);
     if (res.ok) {
       const d = await res.json();
       setEntries(d.data);
@@ -80,7 +81,7 @@ export default function AuditLogPage() {
         </Table>
       </Card>
 
-      <Pagination page={page} pageSize={25} total={total} totalPages={totalPages} onPageChange={setPage} />
+      <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
     </></RequirePermission>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
+import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Users, Search, Pencil, Loader2 } from "lucide-react";
@@ -32,7 +33,7 @@ export default function UsersPage() {
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), pageSize: "20" });
+    const params = new URLSearchParams({ page: String(page), pageSize: String(DEFAULT_PAGE_SIZE) });
     if (search) params.set("search", search);
     if (showAll) params.set("showAll", "true");
     const res = await fetch(`/api/users?${params}`);
@@ -107,7 +108,7 @@ export default function UsersPage() {
         </Card>
       )}
 
-      <Pagination page={page} pageSize={20} total={total} totalPages={totalPages} onPageChange={setPage} />
+      <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent onClose={() => setShowCreate(false)}>

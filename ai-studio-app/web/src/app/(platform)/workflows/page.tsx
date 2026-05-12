@@ -1,5 +1,6 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
+import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, GitBranch } from "lucide-react";
@@ -28,7 +29,7 @@ export default function WorkflowsPage() {
 
   const fetchWorkflows = useCallback(async () => {
     setLoading(true);
-    const res = await fetch(`/api/workflows?page=${page}&pageSize=20`);
+    const res = await fetch(`/api/workflows?page=${page}&pageSize=${DEFAULT_PAGE_SIZE}`);
     if (res.ok) { const d = await res.json(); setWorkflows(d.data); setTotal(d.total); setTotalPages(d.totalPages); }
     setLoading(false);
   }, [page]);
@@ -57,7 +58,7 @@ export default function WorkflowsPage() {
           </TableBody>
         </Table></Card>
       )}
-      <Pagination page={page} pageSize={20} total={total} totalPages={totalPages} onPageChange={setPage} />
+      <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
         <DialogContent onClose={() => setShowCreate(false)}>
           <DialogHeader><DialogTitle>Create Workflow</DialogTitle></DialogHeader>
