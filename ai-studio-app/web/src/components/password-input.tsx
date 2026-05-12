@@ -7,7 +7,7 @@ import { Check, X, Loader2, Eye, EyeOff } from "lucide-react";
 import { zxcvbn, zxcvbnOptions } from "@zxcvbn-ts/core";
 import * as zxcvbnCommonPackage from "@zxcvbn-ts/language-common";
 import * as zxcvbnEnPackage from "@zxcvbn-ts/language-en";
-import { AUTH_CONFIG, EXTERNAL_URLS } from "@ais-app/auth";
+import { PASSWORD_CONFIG, HIBP_API_URL } from "@/lib/client-config";
 
 zxcvbnOptions.setOptions({
   translations: zxcvbnEnPackage.translations,
@@ -18,8 +18,8 @@ zxcvbnOptions.setOptions({
   },
 });
 
-const MIN_LENGTH = AUTH_CONFIG.password.minLength;
-const MIN_STRENGTH = AUTH_CONFIG.password.minStrength;
+const MIN_LENGTH = PASSWORD_CONFIG.minLength;
+const MIN_STRENGTH = PASSWORD_CONFIG.minStrength;
 
 const STRENGTH_LABELS = ["Weak", "Weak", "Fair", "Good", "Strong"];
 const STRENGTH_COLORS = ["bg-red-500", "bg-red-500", "bg-amber-500", "bg-green-500", "bg-emerald-500"];
@@ -57,7 +57,7 @@ export function PasswordInput({ value, onChange, label = "Password", userInputs 
       const prefix = sha1.slice(0, 5);
       const suffix = sha1.slice(5);
 
-      const res = await fetch(`${EXTERNAL_URLS.hibpApi}/${prefix}`);
+      const res = await fetch(`${HIBP_API_URL}/${prefix}`);
       if (!res.ok) { setBreachStatus("safe"); return; }
       const text = await res.text();
       for (const line of text.split("\n")) {
