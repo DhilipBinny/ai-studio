@@ -3,6 +3,7 @@ import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Users, Search } from "lucide-react";
+import { PasswordInput } from "@/components/password-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -126,7 +127,11 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
       {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
       <div className="space-y-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required /></div>
       <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} required /></div>
-      <div className="space-y-2"><Label>Password</Label><Input type="password" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} required minLength={8} /></div>
+      <PasswordInput
+        value={form.password}
+        onChange={(v) => setForm((f) => ({ ...f, password: v }))}
+        userInputs={[form.email, form.name].filter(Boolean)}
+      />
       <div className="space-y-2"><Label>Role</Label>
         <Select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}>
           <option value="viewer">Viewer</option><option value="member">Member</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option>

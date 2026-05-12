@@ -8,8 +8,8 @@ const ARGON2_CONFIG = {
 };
 
 export async function hashPassword(password: string): Promise<string> {
-  if (password.length < 8 || password.length > 64) {
-    throw new Error("Password must be between 8 and 64 characters");
+  if (password.length < 12 || password.length > 128) {
+    throw new Error("Password must be between 12 and 128 characters");
   }
   return hash(password, ARGON2_CONFIG);
 }

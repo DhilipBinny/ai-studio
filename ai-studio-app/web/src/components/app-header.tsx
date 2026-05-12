@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LogOut, User, KeyRound, Loader2 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { PasswordInput } from "@/components/password-input";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -108,6 +109,12 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
 
     if (!user) { setMessage({ text: "Not logged in", ok: false }); setSubmitting(false); return; }
 
+    if (newPassword.length < 12) {
+      setMessage({ text: "Password must be at least 12 characters", ok: false });
+      setSubmitting(false);
+      return;
+    }
+
     const res = await fetch(`/api/users/${user.id}/password`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -137,12 +144,13 @@ function ChangePasswordForm({ onDone }: { onDone: () => void }) {
         <Label>Current Password</Label>
         <Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required />
       </div>
-      <div className="space-y-2">
-        <Label>New Password</Label>
-        <Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
-        <p className="text-xs text-muted-foreground">Minimum 8 characters.</p>
-      </div>
-      <Button type="submit" className="w-full" disabled={submitting}>
+      <PasswordInput
+        value={newPassword}
+        onChange={setNewPassword}
+        label="New Password"
+        userInputs={user ? [user.email, user.name] : []}
+      />
+      <Button type="submit" className="w-full" disabled={submitting || newPassword.length < 12}>
         {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Changing...</> : "Change Password"}
       </Button>
     </form>

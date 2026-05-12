@@ -14,8 +14,8 @@ export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required"),
   newPassword: z
     .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(64, "Password must be at most 64 characters"),
+    .min(12, "Password must be at least 12 characters")
+    .max(128, "Password must be at most 128 characters"),
 });
 
 export const passwordResetRequestSchema = z.object({
@@ -26,6 +26,6 @@ export const passwordResetSchema = z.object({
   token: z.string().min(1, "Reset token is required"),
   newPassword: z
     .string()
-    .min(8, "Password must be at least 8 characters")
-    .max(64, "Password must be at most 64 characters"),
+    .min(12, "Password must be at least 12 characters")
+    .max(128, "Password must be at most 128 characters"),
 });

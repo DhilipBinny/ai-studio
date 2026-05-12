@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/password-input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -302,7 +303,7 @@ function AccountTab() {
         {message && <div className={`mb-4 rounded-lg px-3 py-2 text-sm ${message.includes("success") ? "bg-green-50 text-green-700 border border-green-200" : "bg-destructive/5 text-destructive border border-destructive/20"}`}>{message}</div>}
         <form onSubmit={handleChangePassword} className="space-y-4 max-w-sm">
           <div className="space-y-2"><Label>Current Password</Label><Input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required /></div>
-          <div className="space-y-2"><Label>New Password</Label><Input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} /></div>
+          <PasswordInput value={newPassword} onChange={setNewPassword} label="New Password" />
           <Button type="submit" disabled={submitting}>{submitting ? "Changing..." : "Change Password"}</Button>
         </form>
       </CardContent>
