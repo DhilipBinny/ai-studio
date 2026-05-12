@@ -361,7 +361,7 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
   );
 }
 
-import { PROVIDER_DEFAULTS } from "@ais-app/auth";
+import { PROVIDER_DEFAULTS } from "@/lib/client-config";
 const DEFAULT_URLS: Record<string, string> = Object.fromEntries(
   Object.entries(PROVIDER_DEFAULTS).map(([k, v]) => [k, v.baseUrl])
 );
