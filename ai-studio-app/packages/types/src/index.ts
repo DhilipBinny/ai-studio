@@ -1,16 +1,4 @@
-export type Module =
-  | "DASHBOARD"
-  | "AGENTS"
-  | "TOOLS"
-  | "KNOWLEDGE"
-  | "WORKFLOWS"
-  | "CONNECTORS"
-  | "RUNS"
-  | "PROVIDERS"
-  | "USERS"
-  | "PROFILES"
-  | "AUDIT"
-  | "SETTINGS";
+export { MODULES, MODULE_IDS, SECTION_LABELS, type Module, type Section } from "./modules";
 
 export type PermissionLevel = 0 | 10 | 20;
 

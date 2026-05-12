@@ -64,7 +64,8 @@ function GeneralTab() {
   );
 }
 
-const MODULES = ["DASHBOARD", "AGENTS", "TOOLS", "KNOWLEDGE", "WORKFLOWS", "CONNECTORS", "RUNS", "PROVIDERS", "USERS", "PROFILES", "AUDIT", "SETTINGS"] as const;
+import { MODULES } from "@ais-app/types";
+const MODULE_IDS = MODULES.map((m) => m.id);
 const LEVELS = [0, 10, 20] as const;
 const LEVEL_LABELS: Record<number, string> = { 0: "None", 10: "View", 20: "Full" };
 const LEVEL_VARIANTS: Record<number, "success" | "warning" | "secondary"> = { 20: "success", 10: "warning", 0: "secondary" };
@@ -83,7 +84,7 @@ function ProfilesTab() {
   const [showCreate, setShowCreate] = useState(false);
   const [createName, setCreateName] = useState("");
   const [createRights, setCreateRights] = useState<Record<string, number>>(
-    Object.fromEntries(MODULES.map((m) => [m, 0]))
+    Object.fromEntries(MODULE_IDS.map((m) => [m, 0]))
   );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
@@ -141,7 +142,7 @@ function ProfilesTab() {
       setMessage({ text: "Profile created", ok: true });
       setShowCreate(false);
       setCreateName("");
-      setCreateRights(Object.fromEntries(MODULES.map((m) => [m, 0])));
+      setCreateRights(Object.fromEntries(MODULE_IDS.map((m) => [m, 0])));
       fetchProfiles();
     } else {
       const d = await res.json();
@@ -188,14 +189,14 @@ function ProfilesTab() {
               <table className="w-full text-xs">
                 <thead>
                   <tr>
-                    {MODULES.map((m) => (
+                    {MODULE_IDS.map((m) => (
                       <th key={m} className="px-2 py-1 text-center font-medium text-muted-foreground">{m.slice(0, 6)}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    {MODULES.map((m) => {
+                    {MODULE_IDS.map((m) => {
                       const val = createRights[m] ?? 0;
                       return (
                         <td key={m} className="px-2 py-1 text-center">
@@ -220,14 +221,14 @@ function ProfilesTab() {
             <TableHeader>
               <TableRow>
                 <TableHead className="min-w-[140px]">Profile</TableHead>
-                {MODULES.map((m) => (
+                {MODULE_IDS.map((m) => (
                   <TableHead key={m} className="text-center text-[10px] min-w-[52px] px-1">{m.slice(0, 6)}</TableHead>
                 ))}
                 <TableHead className="text-center min-w-[80px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? <TableSkeleton columns={MODULES.length + 2} rows={4} /> : profiles.map((p) => {
+              {loading ? <TableSkeleton columns={MODULE_IDS.length + 2} rows={4} /> : profiles.map((p) => {
                 const isEditing = editingId === p.id;
                 const rights = isEditing ? editRights : (p.accessRights as Record<string, number>);
                 return (
@@ -238,7 +239,7 @@ function ProfilesTab() {
                         {p.isSystem && <Badge variant="outline" className="text-[10px] px-1 py-0">System</Badge>}
                       </div>
                     </TableCell>
-                    {MODULES.map((m) => {
+                    {MODULE_IDS.map((m) => {
                       const val = rights[m] ?? 0;
                       return (
                         <TableCell key={m} className="text-center px-1">

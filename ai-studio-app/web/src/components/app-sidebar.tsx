@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useAuth, type Module } from "@/lib/auth-context";
+import { useAuth } from "@/lib/auth-context";
+import { MODULES, SECTION_LABELS, type Module, type Section } from "@ais-app/types";
 import {
   LayoutDashboard,
   Bot,
@@ -18,36 +19,30 @@ import {
   PanelLeftClose,
   PanelLeft,
   Users,
+  Shield,
+  FileText,
 } from "lucide-react";
 
-interface NavItemDef {
-  name: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  module: Module;
-}
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  DASHBOARD: LayoutDashboard,
+  AGENTS: Bot,
+  TOOLS: Wrench,
+  KNOWLEDGE: BookOpen,
+  WORKFLOWS: GitBranch,
+  RUNS: Play,
+  CONNECTORS: Plug,
+  PROVIDERS: Server,
+  USERS: Users,
+  PROFILES: Shield,
+  AUDIT: FileText,
+  SETTINGS: Settings,
+};
 
-const mainNav: NavItemDef[] = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, module: "DASHBOARD" },
-];
+const SIDEBAR_MODULES = MODULES.filter((m) =>
+  !["PROFILES", "AUDIT"].includes(m.id)
+);
 
-const buildNav: NavItemDef[] = [
-  { name: "Agents", href: "/agents", icon: Bot, module: "AGENTS" },
-  { name: "Tools", href: "/tools", icon: Wrench, module: "TOOLS" },
-  { name: "Knowledge Bases", href: "/knowledge", icon: BookOpen, module: "KNOWLEDGE" },
-  { name: "Workflows", href: "/workflows", icon: GitBranch, module: "WORKFLOWS" },
-];
-
-const operateNav: NavItemDef[] = [
-  { name: "Runs", href: "/runs", icon: Play, module: "RUNS" },
-  { name: "Connectors", href: "/connectors", icon: Plug, module: "CONNECTORS" },
-  { name: "Providers", href: "/providers", icon: Server, module: "PROVIDERS" },
-];
-
-const adminNav: NavItemDef[] = [
-  { name: "Users", href: "/users", icon: Users, module: "USERS" },
-  { name: "Settings", href: "/settings", icon: Settings, module: "SETTINGS" },
-];
+const SECTIONS = ["main", "build", "operate", "admin"] as const;
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -73,9 +68,11 @@ function NavItem({ item, collapsed, isActive }: { item: { name: string; href: st
   );
 }
 
-function NavSection({ label, items, collapsed, pathname, canView }: { label: string; items: NavItemDef[]; collapsed: boolean; pathname: string; canView: (m: Module) => boolean }) {
-  const visible = items.filter((item) => canView(item.module));
-  if (visible.length === 0) return null;
+function NavSection({ section, collapsed, pathname, canView }: { section: Section; collapsed: boolean; pathname: string; canView: (m: Module) => boolean }) {
+  const items = SIDEBAR_MODULES.filter((m) => m.section === section && canView(m.id));
+  if (items.length === 0) return null;
+
+  const label = SECTION_LABELS[section];
 
   return (
     <div className="space-y-0.5">
@@ -85,14 +82,17 @@ function NavSection({ label, items, collapsed, pathname, canView }: { label: str
         </p>
       )}
       {collapsed && label && <div className="my-2 mx-2 border-t border-sidebar-border" />}
-      {visible.map((item) => (
-        <NavItem
-          key={item.href}
-          item={item}
-          collapsed={collapsed}
-          isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
-        />
-      ))}
+      {items.map((mod) => {
+        const Icon = ICON_MAP[mod.id] || Settings;
+        return (
+          <NavItem
+            key={mod.href}
+            item={{ name: mod.label, href: mod.href, icon: Icon }}
+            collapsed={collapsed}
+            isActive={pathname === mod.href || pathname.startsWith(mod.href + "/")}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -120,10 +120,9 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-2">
-        <NavSection label="" items={mainNav} collapsed={collapsed} pathname={pathname} canView={canView} />
-        <NavSection label="Build" items={buildNav} collapsed={collapsed} pathname={pathname} canView={canView} />
-        <NavSection label="Operate" items={operateNav} collapsed={collapsed} pathname={pathname} canView={canView} />
-        <NavSection label="Admin" items={adminNav} collapsed={collapsed} pathname={pathname} canView={canView} />
+        {SECTIONS.map((section) => (
+          <NavSection key={section} section={section} collapsed={collapsed} pathname={pathname} canView={canView} />
+        ))}
       </nav>
 
       <div className="shrink-0 border-t border-sidebar-border px-2 py-2">

@@ -1,11 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
-
-type Module =
-  | "DASHBOARD" | "AGENTS" | "TOOLS" | "KNOWLEDGE" | "WORKFLOWS"
-  | "CONNECTORS" | "RUNS" | "PROVIDERS" | "USERS" | "PROFILES"
-  | "AUDIT" | "SETTINGS";
+import type { Module } from "@ais-app/types";
 
 type PermissionLevel = 0 | 10 | 20;
 type AccessRights = Record<Module, PermissionLevel>;
