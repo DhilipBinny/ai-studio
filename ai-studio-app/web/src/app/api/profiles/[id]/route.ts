@@ -26,8 +26,8 @@ export const PATCH = withRBAC("PROFILES", 20, async (request, auth, params) => {
 
   if (!existing) return errorResponse("Profile not found", "NOT_FOUND", 404);
 
-  if (existing.isSystem && parsed.data.accessRights) {
-    return errorResponse("Cannot modify system profile permissions", "SYSTEM_PROFILE", 400);
+  if (existing.isSystem && parsed.data.name && parsed.data.name !== existing.name) {
+    return errorResponse("Cannot rename system profile", "SYSTEM_PROFILE", 400);
   }
 
   const updateData: Record<string, unknown> = {};
