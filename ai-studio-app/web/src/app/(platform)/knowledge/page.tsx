@@ -1,4 +1,5 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, BookOpen } from "lucide-react";
@@ -34,7 +35,7 @@ export default function KnowledgePage() {
   useEffect(() => { fetchKbs(); }, [fetchKbs]);
 
   return (
-    <>
+    <RequirePermission module="KNOWLEDGE"><>
       <PageHeader title="Knowledge Bases" description="Manage document collections for RAG-powered agents.">
         <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Create KB</Button>
       </PageHeader>
@@ -66,7 +67,7 @@ export default function KnowledgePage() {
           <CreateKBForm onCreated={() => { setShowCreate(false); fetchKbs(); }} />
         </DialogContent>
       </Dialog>
-    </>
+    </></RequirePermission>
   );
 }
 

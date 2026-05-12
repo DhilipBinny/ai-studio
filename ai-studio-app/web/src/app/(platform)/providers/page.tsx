@@ -1,4 +1,5 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, TestTube, Check, Loader2, ExternalLink, Trash2, Key, Globe, ChevronDown, ChevronRight, Star, Send } from "lucide-react";
@@ -74,7 +75,7 @@ export default function ProvidersPage() {
   const hasAvailableTypes = PROVIDER_TYPES.length > 0;
 
   return (
-    <>
+    <RequirePermission module="PROVIDERS"><>
       <PageHeader title="Providers" description="Manage LLM providers and model configurations.">
         {hasAvailableTypes && (
           <Button onClick={() => setShowAdd(true)}>
@@ -115,7 +116,7 @@ export default function ProvidersPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </></RequirePermission>
   );
 }
 

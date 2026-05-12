@@ -29,11 +29,13 @@ export const GET = withRBAC("USERS", 10, async (request, auth) => {
         name: users.name,
         role: users.role,
         profileId: users.profileId,
+        profileName: profiles.name,
         isLocked: users.isLocked,
         lastLoginAt: users.lastLoginAt,
         createdAt: users.createdAt,
       })
       .from(users)
+      .leftJoin(profiles, eq(users.profileId, profiles.id))
       .where(where)
       .orderBy(orderBy)
       .limit(pagination.pageSize)

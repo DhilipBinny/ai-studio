@@ -1,4 +1,5 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect, useCallback } from "react";
 import { Play } from "lucide-react";
@@ -37,7 +38,7 @@ export default function RunsPage() {
   useEffect(() => { fetchRuns(); }, [fetchRuns]);
 
   return (
-    <>
+    <RequirePermission module="RUNS"><>
       <PageHeader title="Runs" description="View agent execution history and results." />
 
       <div className="flex items-center gap-3">
@@ -77,6 +78,6 @@ export default function RunsPage() {
       )}
 
       <Pagination page={page} pageSize={20} total={total} totalPages={totalPages} onPageChange={setPage} />
-    </>
+    </></RequirePermission>
   );
 }

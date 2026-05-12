@@ -1,4 +1,5 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -20,7 +21,7 @@ interface AuditEntry { id: number; action: string; resourceType: string | null; 
 export default function SettingsPage() {
   const [tab, setTab] = useState("general");
   return (
-    <>
+    <RequirePermission module="SETTINGS"><>
       <PageHeader title="Settings" description="Configure platform settings, profiles, and account preferences." />
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
@@ -34,7 +35,7 @@ export default function SettingsPage() {
         <TabsContent value="account"><AccountTab /></TabsContent>
         <TabsContent value="audit"><AuditLogTab /></TabsContent>
       </Tabs>
-    </>
+    </></RequirePermission>
   );
 }
 

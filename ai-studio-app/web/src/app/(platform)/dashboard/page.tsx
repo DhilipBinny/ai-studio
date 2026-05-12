@@ -1,4 +1,5 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect } from "react";
 import { Bot, Wrench, Play, GitBranch, TrendingUp, CheckCircle } from "lucide-react";
@@ -42,7 +43,7 @@ export default function DashboardPage() {
   ];
 
   return (
-    <>
+    <RequirePermission module="DASHBOARD"><>
       <PageHeader title="Dashboard" description="Overview of your AI agents, runs, and usage metrics." />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -118,6 +119,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-    </>
+    </></RequirePermission>
   );
 }

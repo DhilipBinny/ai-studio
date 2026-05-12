@@ -1,4 +1,5 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Bot } from "lucide-react";
@@ -57,7 +58,7 @@ export default function AgentsPage() {
   useEffect(() => { fetchAgents(); }, [fetchAgents]);
 
   return (
-    <>
+    <RequirePermission module="AGENTS"><>
       <PageHeader title="Agents" description="Configure and manage your AI agents.">
         <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Create Agent</Button>
       </PageHeader>
@@ -116,7 +117,7 @@ export default function AgentsPage() {
           <CreateAgentForm onCreated={() => { setShowCreate(false); fetchAgents(); }} />
         </DialogContent>
       </Dialog>
-    </>
+    </></RequirePermission>
   );
 }
 

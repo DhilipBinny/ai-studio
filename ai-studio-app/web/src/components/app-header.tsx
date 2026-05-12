@@ -1,29 +1,10 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { ChevronRight, LogOut, User } from "lucide-react";
-
-interface UserInfo {
-  name: string;
-  email: string;
-  role: string;
-}
-
-const PAGE_NAMES: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/agents": "Agents",
-  "/tools": "Tools",
-  "/knowledge": "Knowledge Bases",
-  "/workflows": "Workflows",
-  "/connectors": "Connectors",
-  "/runs": "Runs",
-  "/providers": "Providers",
-  "/users": "Users",
-  "/settings": "Settings",
-};
+import { LogOut, User } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super Admin",
@@ -33,27 +14,13 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export function AppHeader() {
-  const pathname = usePathname();
-  const [user, setUser] = useState<UserInfo | null>(null);
+  const { user } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/auth/me")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data?.user) setUser(data.user); })
-      .catch(() => {});
-  }, []);
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
   }
-
-  const segments = pathname.split("/").filter(Boolean);
-  const breadcrumbs = segments.map((_, i) => {
-    const path = "/" + segments.slice(0, i + 1).join("/");
-    return { label: PAGE_NAMES[path] || segments[i], path };
-  });
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-background px-6">
@@ -61,7 +28,7 @@ export function AppHeader() {
 
       <div className="relative">
         <button
-          onClick={() => setDropdownOpen((o) => !o)}
+          onClick={(e) => { e.stopPropagation(); setDropdownOpen((o) => !o); }}
           className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition-colors hover:bg-muted"
         >
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand/10 text-brand">

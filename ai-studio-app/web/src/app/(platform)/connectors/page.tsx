@@ -1,4 +1,5 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Plug } from "lucide-react";
@@ -36,7 +37,7 @@ export default function ConnectorsPage() {
   useEffect(() => { fetchConnectors(); }, [fetchConnectors]);
 
   return (
-    <>
+    <RequirePermission module="CONNECTORS"><>
       <PageHeader title="Connectors" description="Connect to external systems like TK3 and MVMS.">
         <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Add Connector</Button>
       </PageHeader>
@@ -64,7 +65,7 @@ export default function ConnectorsPage() {
           <CreateConnectorForm onCreated={() => { setShowCreate(false); fetchConnectors(); }} />
         </DialogContent>
       </Dialog>
-    </>
+    </></RequirePermission>
   );
 }
 

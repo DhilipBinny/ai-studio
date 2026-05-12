@@ -1,4 +1,5 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, GitBranch } from "lucide-react";
@@ -35,7 +36,7 @@ export default function WorkflowsPage() {
   useEffect(() => { fetchWorkflows(); }, [fetchWorkflows]);
 
   return (
-    <>
+    <RequirePermission module="WORKFLOWS"><>
       <PageHeader title="Workflows" description="Build and manage multi-step agent workflows.">
         <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Create Workflow</Button>
       </PageHeader>
@@ -63,7 +64,7 @@ export default function WorkflowsPage() {
           <CreateWorkflowForm onCreated={() => { setShowCreate(false); fetchWorkflows(); }} />
         </DialogContent>
       </Dialog>
-    </>
+    </></RequirePermission>
   );
 }
 

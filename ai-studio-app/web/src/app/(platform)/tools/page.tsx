@@ -1,4 +1,5 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Wrench } from "lucide-react";
@@ -35,7 +36,7 @@ export default function ToolsPage() {
   useEffect(() => { fetchTools(); }, [fetchTools]);
 
   return (
-    <>
+    <RequirePermission module="TOOLS"><>
       <PageHeader title="Tools" description="Register and manage tools that agents can use.">
         <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Add Tool</Button>
       </PageHeader>
@@ -78,7 +79,7 @@ export default function ToolsPage() {
           <CreateToolForm onCreated={() => { setShowCreate(false); fetchTools(); }} />
         </DialogContent>
       </Dialog>
-    </>
+    </></RequirePermission>
   );
 }
 

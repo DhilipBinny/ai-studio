@@ -23,5 +23,8 @@ CLAUDE.md
 CLAUDE.local.md
 .mcp.json
 
+# Playwright MCP artifacts
+.playwright-mcp/
+
 # OS
 .DS_Store

@@ -1,4 +1,5 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Users, Search } from "lucide-react";
@@ -38,7 +39,7 @@ export default function UsersPage() {
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   return (
-    <>
+    <RequirePermission module="USERS"><>
       <PageHeader title="Users" description="Manage user accounts and permissions.">
         <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Add User</Button>
       </PageHeader>
@@ -60,16 +61,18 @@ export default function UsersPage() {
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
+                <TableHead>Profile</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Last Login</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? <TableSkeleton columns={5} /> : users.map((u) => (
+              {loading ? <TableSkeleton columns={6} /> : users.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.name || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">{u.email}</TableCell>
                   <TableCell><Badge variant="secondary">{u.role.replace("_", " ")}</Badge></TableCell>
+                  <TableCell className="text-muted-foreground">{u.profileName || "—"}</TableCell>
                   <TableCell>{u.isLocked ? <Badge variant="error">Locked</Badge> : <Badge variant="success">Active</Badge>}</TableCell>
                   <TableCell className="text-muted-foreground">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : "Never"}</TableCell>
                 </TableRow>
@@ -87,19 +90,32 @@ export default function UsersPage() {
           <CreateUserForm onCreated={() => { setShowCreate(false); fetchUsers(); }} />
         </DialogContent>
       </Dialog>
-    </>
+    </></RequirePermission>
   );
 }
 
 function CreateUserForm({ onCreated }: { onCreated: () => void }) {
-  const [form, setForm] = useState({ email: "", name: "", password: "", role: "member" });
+  const [form, setForm] = useState({ email: "", name: "", password: "", role: "member", profileId: "" });
+  const [profiles, setProfiles] = useState<Array<{ id: string; name: string }>>([]);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/profiles")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const list = d?.data || d || [];
+        if (Array.isArray(list)) setProfiles(list);
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(""); setSubmitting(true);
-    const res = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+    const body: Record<string, unknown> = { ...form };
+    if (!form.profileId) delete body.profileId;
+    const res = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
     if (res.ok) onCreated();
     else { const d = await res.json(); setError(d.error || "Failed"); }
     setSubmitting(false);
@@ -115,6 +131,15 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
         <Select value={form.role} onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}>
           <option value="viewer">Viewer</option><option value="member">Member</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option>
         </Select>
+      </div>
+      <div className="space-y-2"><Label>Profile <span className="text-destructive">*</span></Label>
+        <Select value={form.profileId} onChange={(e) => setForm((f) => ({ ...f, profileId: e.target.value }))} required>
+          <option value="">Select a profile...</option>
+          {profiles.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </Select>
+        <p className="text-xs text-muted-foreground">Determines what the user can access.</p>
       </div>
       <Button type="submit" className="w-full" disabled={submitting}>{submitting ? "Creating..." : "Create"}</Button>
     </form>

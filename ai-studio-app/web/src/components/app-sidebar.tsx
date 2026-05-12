@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useAuth, type Module } from "@/lib/auth-context";
 import {
   LayoutDashboard,
   Bot,
@@ -19,26 +20,33 @@ import {
   Users,
 } from "lucide-react";
 
-const mainNav = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+interface NavItemDef {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  module: Module;
+}
+
+const mainNav: NavItemDef[] = [
+  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, module: "DASHBOARD" },
 ];
 
-const buildNav = [
-  { name: "Agents", href: "/agents", icon: Bot },
-  { name: "Tools", href: "/tools", icon: Wrench },
-  { name: "Knowledge Bases", href: "/knowledge", icon: BookOpen },
-  { name: "Workflows", href: "/workflows", icon: GitBranch },
+const buildNav: NavItemDef[] = [
+  { name: "Agents", href: "/agents", icon: Bot, module: "AGENTS" },
+  { name: "Tools", href: "/tools", icon: Wrench, module: "TOOLS" },
+  { name: "Knowledge Bases", href: "/knowledge", icon: BookOpen, module: "KNOWLEDGE" },
+  { name: "Workflows", href: "/workflows", icon: GitBranch, module: "WORKFLOWS" },
 ];
 
-const operateNav = [
-  { name: "Runs", href: "/runs", icon: Play },
-  { name: "Connectors", href: "/connectors", icon: Plug },
-  { name: "Providers", href: "/providers", icon: Server },
+const operateNav: NavItemDef[] = [
+  { name: "Runs", href: "/runs", icon: Play, module: "RUNS" },
+  { name: "Connectors", href: "/connectors", icon: Plug, module: "CONNECTORS" },
+  { name: "Providers", href: "/providers", icon: Server, module: "PROVIDERS" },
 ];
 
-const adminNav = [
-  { name: "Users", href: "/users", icon: Users },
-  { name: "Settings", href: "/settings", icon: Settings },
+const adminNav: NavItemDef[] = [
+  { name: "Users", href: "/users", icon: Users, module: "USERS" },
+  { name: "Settings", href: "/settings", icon: Settings, module: "SETTINGS" },
 ];
 
 interface AppSidebarProps {
@@ -65,7 +73,10 @@ function NavItem({ item, collapsed, isActive }: { item: { name: string; href: st
   );
 }
 
-function NavSection({ label, items, collapsed, pathname }: { label: string; items: typeof mainNav; collapsed: boolean; pathname: string }) {
+function NavSection({ label, items, collapsed, pathname, canView }: { label: string; items: NavItemDef[]; collapsed: boolean; pathname: string; canView: (m: Module) => boolean }) {
+  const visible = items.filter((item) => canView(item.module));
+  if (visible.length === 0) return null;
+
   return (
     <div className="space-y-0.5">
       {!collapsed && label && (
@@ -74,7 +85,7 @@ function NavSection({ label, items, collapsed, pathname }: { label: string; item
         </p>
       )}
       {collapsed && label && <div className="my-2 mx-2 border-t border-sidebar-border" />}
-      {items.map((item) => (
+      {visible.map((item) => (
         <NavItem
           key={item.href}
           item={item}
@@ -88,6 +99,7 @@ function NavSection({ label, items, collapsed, pathname }: { label: string; item
 
 export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
   const pathname = usePathname();
+  const { canView } = useAuth();
 
   return (
     <aside
@@ -108,10 +120,10 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-2">
-        <NavSection label="" items={mainNav} collapsed={collapsed} pathname={pathname} />
-        <NavSection label="Build" items={buildNav} collapsed={collapsed} pathname={pathname} />
-        <NavSection label="Operate" items={operateNav} collapsed={collapsed} pathname={pathname} />
-        <NavSection label="Admin" items={adminNav} collapsed={collapsed} pathname={pathname} />
+        <NavSection label="" items={mainNav} collapsed={collapsed} pathname={pathname} canView={canView} />
+        <NavSection label="Build" items={buildNav} collapsed={collapsed} pathname={pathname} canView={canView} />
+        <NavSection label="Operate" items={operateNav} collapsed={collapsed} pathname={pathname} canView={canView} />
+        <NavSection label="Admin" items={adminNav} collapsed={collapsed} pathname={pathname} canView={canView} />
       </nav>
 
       <div className="shrink-0 border-t border-sidebar-border px-2 py-2">
