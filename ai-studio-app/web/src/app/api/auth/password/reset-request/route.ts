@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { users, passwordResetRequests } from "@ais-app/database";
 import { passwordResetRequestSchema } from "@ais-app/validation";
-import { hashToken, APP_CONFIG } from "@ais-app/auth";
+import { hashToken } from "@ais-app/auth";
 import { sendEmail } from "@ais-app/email";
 import { eq, and } from "drizzle-orm";
 import { errorResponse } from "@/lib/api-utils";
@@ -42,7 +42,8 @@ export async function POST(request: Request) {
     expiresAt: new Date(Date.now() + 30 * 60 * 1000),
   });
 
-  const resetUrl = `${APP_CONFIG.baseUrl}/reset-password?token=${token}`;
+  const origin = new URL(request.url).origin;
+  const resetUrl = `${origin}/reset-password?token=${token}`;
 
   try {
     await sendEmail({
