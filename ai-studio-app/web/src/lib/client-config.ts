@@ -6,7 +6,7 @@ export const PASSWORD_CONFIG = {
 
 export const HIBP_API_URL = "https://api.pwnedpasswords.com/range";
 
-export const DEFAULT_PAGE_SIZE = 20;
+export const DEFAULT_PAGE_SIZE = 15;
 
 export const PROVIDER_DEFAULTS = {
   anthropic: { baseUrl: "https://api.anthropic.com" },
