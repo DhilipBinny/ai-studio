@@ -4,6 +4,7 @@ import { systemConfig } from "@ais-app/database";
 import { eq } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
+import { validateConfigValue, SYSTEM_CONFIG_SCHEMA } from "@ais-app/types";
 
 export const GET = withRBAC("SETTINGS", 10, async (_request, auth) => {
   const db = getDb();
@@ -32,6 +33,14 @@ export const PATCH = withRBAC("SETTINGS", 20, async (request, auth) => {
   const db = getDb();
 
   for (const entry of entries) {
+    const schema = SYSTEM_CONFIG_SCHEMA.find((s) => s.key === entry.key);
+    if (schema && typeof entry.value === "object" && entry.value !== null) {
+      const validation = validateConfigValue(entry.key, entry.value as Record<string, unknown>);
+      if (!validation.valid) {
+        return errorResponse(validation.errors[0], "VALIDATION_ERROR", 400, { errors: validation.errors });
+      }
+    }
+
     await db
       .insert(systemConfig)
       .values({

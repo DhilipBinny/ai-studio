@@ -35,25 +35,16 @@ export default function SettingsPage() {
   );
 }
 
-const CONFIG_LABELS: Record<string, string> = {
-  auth: "Authentication",
-  general: "General",
-  limits: "Agent Limits",
-  default_model: "Default Model",
-};
-
-const CONFIG_DESCRIPTIONS: Record<string, string> = {
-  auth: "2FA, OTP settings, lockout policy",
-  general: "App name, timezone",
-  limits: "Default agent turn limits and token budgets",
-  default_model: "Pre-selected model for new agents",
-};
+import { SYSTEM_CONFIG_SCHEMA, type ConfigSectionDef, type ConfigFieldDef } from "@ais-app/types";
+import { Select } from "@/components/ui/select";
+import { Loader2 } from "lucide-react";
 
 function GeneralTab() {
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState("");
+  const [editForm, setEditForm] = useState<Record<string, unknown>>({});
+  const [editJson, setEditJson] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
@@ -66,34 +57,47 @@ function GeneralTab() {
 
   useEffect(() => { fetchConfigs(); }, [fetchConfigs]);
 
+  function getSchema(key: string): ConfigSectionDef | undefined {
+    return SYSTEM_CONFIG_SCHEMA.find((s) => s.key === key);
+  }
+
   function startEdit(config: SystemConfig) {
     setEditingKey(config.key);
-    setEditValue(JSON.stringify(config.value, null, 2));
+    setEditForm({ ...(config.value as Record<string, unknown>) });
+    setEditJson(JSON.stringify(config.value, null, 2));
     setMessage(null);
   }
 
-  async function saveEdit(key: string) {
+  async function saveConfig(key: string, value: Record<string, unknown>) {
     setSaving(true);
     setMessage(null);
+    const res = await fetch("/api/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entries: [{ key, value }] }),
+    });
+    if (res.ok) {
+      setMessage({ text: "Saved", ok: true });
+      setEditingKey(null);
+      fetchConfigs();
+    } else {
+      const d = await res.json();
+      setMessage({ text: d.error || "Failed to save", ok: false });
+    }
+    setSaving(false);
+  }
+
+  async function saveStructured(key: string) {
+    await saveConfig(key, editForm);
+  }
+
+  async function saveJson(key: string) {
     try {
-      const parsed = JSON.parse(editValue);
-      const res = await fetch("/api/settings", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entries: [{ key, value: parsed }] }),
-      });
-      if (res.ok) {
-        setMessage({ text: "Saved", ok: true });
-        setEditingKey(null);
-        fetchConfigs();
-      } else {
-        const d = await res.json();
-        setMessage({ text: d.error || "Failed to save", ok: false });
-      }
+      const parsed = JSON.parse(editJson);
+      await saveConfig(key, parsed);
     } catch {
       setMessage({ text: "Invalid JSON", ok: false });
     }
-    setSaving(false);
   }
 
   return (
@@ -106,17 +110,17 @@ function GeneralTab() {
 
       {loading ? (
         <div className="space-y-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}</div>
-      ) : configs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No configuration entries.</p>
       ) : (
         configs.map((c) => {
+          const schema = getSchema(c.key);
           const isEditing = editingKey === c.key;
+
           return (
             <Card key={c.id} className="p-4">
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-sm font-semibold">{CONFIG_LABELS[c.key] || c.key}</p>
-                  <p className="text-xs text-muted-foreground">{CONFIG_DESCRIPTIONS[c.key] || ""}</p>
+                  <p className="text-sm font-semibold">{schema?.label || c.key}</p>
+                  <p className="text-xs text-muted-foreground">{schema?.description || ""}</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-muted-foreground">{new Date(c.updatedAt).toLocaleDateString()}</span>
@@ -126,17 +130,45 @@ function GeneralTab() {
                 </div>
               </div>
 
-              {isEditing ? (
+              {isEditing && schema ? (
+                <div className="mt-3 space-y-3">
+                  {schema.fields.map((field) => (
+                    <ConfigField
+                      key={field.key}
+                      field={field}
+                      value={editForm[field.key]}
+                      onChange={(val) => setEditForm((f) => ({ ...f, [field.key]: val }))}
+                    />
+                  ))}
+                  <Button size="sm" onClick={() => saveStructured(c.key)} disabled={saving}>
+                    {saving ? <><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Saving...</> : "Save"}
+                  </Button>
+                </div>
+              ) : isEditing ? (
                 <div className="mt-3 space-y-2">
                   <textarea
-                    value={editValue}
-                    onChange={(e) => setEditValue(e.target.value)}
+                    value={editJson}
+                    onChange={(e) => setEditJson(e.target.value)}
                     className="w-full rounded-md border border-slate-300 bg-background px-3 py-2 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
-                    rows={Math.min(editValue.split("\n").length + 1, 12)}
+                    rows={Math.min(editJson.split("\n").length + 1, 12)}
                   />
-                  <Button size="sm" onClick={() => saveEdit(c.key)} disabled={saving}>
-                    {saving ? "Saving..." : "Save"}
+                  <Button size="sm" onClick={() => saveJson(c.key)} disabled={saving}>
+                    {saving ? <><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Saving...</> : "Save"}
                   </Button>
+                </div>
+              ) : schema ? (
+                <div className="mt-3 space-y-1.5">
+                  {schema.fields.map((field) => {
+                    const val = (c.value as Record<string, unknown>)[field.key];
+                    return (
+                      <div key={field.key} className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">{field.label}</span>
+                        <span className="font-medium">
+                          {field.type === "boolean" ? (val ? "Enabled" : "Disabled") : String(val ?? "—")}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <pre className="mt-2 rounded-md bg-muted/50 px-3 py-2 font-mono text-xs text-muted-foreground overflow-auto max-h-32">
@@ -147,6 +179,73 @@ function GeneralTab() {
           );
         })
       )}
+    </div>
+  );
+}
+
+function ConfigField({ field, value, onChange }: { field: ConfigFieldDef; value: unknown; onChange: (val: unknown) => void }) {
+  if (field.type === "boolean") {
+    return (
+      <label className="flex items-center justify-between cursor-pointer">
+        <div>
+          <p className="text-sm">{field.label}</p>
+          {field.description && <p className="text-xs text-muted-foreground">{field.description}</p>}
+        </div>
+        <input
+          type="checkbox"
+          checked={!!value}
+          onChange={(e) => onChange(e.target.checked)}
+          className="h-4 w-4 accent-brand"
+        />
+      </label>
+    );
+  }
+
+  if (field.type === "select") {
+    return (
+      <div className="space-y-1">
+        <Label className="text-xs">{field.label}</Label>
+        <Select value={String(value || field.default || "")} onChange={(e) => onChange(e.target.value)} className="h-9">
+          {field.options?.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+        </Select>
+      </div>
+    );
+  }
+
+  if (field.type === "number") {
+    return (
+      <div className="space-y-1">
+        <Label className="text-xs">{field.label}</Label>
+        {field.description && <p className="text-[10px] text-muted-foreground">{field.description}</p>}
+        <Input
+          type="number"
+          value={value !== null && value !== undefined ? String(value) : ""}
+          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
+          min={field.min}
+          max={field.max}
+          className="h-9 max-w-[200px]"
+        />
+      </div>
+    );
+  }
+
+  if (field.type === "readonly") {
+    return (
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-muted-foreground">{field.label}</span>
+        <span className="font-mono">{String(value || "—")}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs">{field.label}</Label>
+      <Input
+        value={String(value || "")}
+        onChange={(e) => onChange(e.target.value)}
+        className="h-9"
+      />
     </div>
   );
 }
