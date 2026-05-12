@@ -1,0 +1,22 @@
+{
+  "name": "ai-studio-app",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm -r test:unit",
+    "test:integration": "pnpm -r test:integration",
+    "db:migrate": "pnpm --filter @ais-app/database migrate",
+    "db:seed": "pnpm --filter @ais-app/database seed",
+    "lint": "pnpm --filter web lint"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild", "sharp", "@node-rs/argon2"]
+  }
+}

@@ -1,0 +1,28 @@
+# PostgreSQL data (local volume mount)
+.data/
+
+# Node
+node_modules/
+
+# Build output
+dist/
+.next/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.*
+
+# Test
+coverage/
+
+# Claude Code
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+
+# MCP config
+.mcp.json
+
+# OS
+.DS_Store

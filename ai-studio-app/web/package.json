@@ -1,0 +1,46 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run --config vitest.config.ts",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@ais-app/auth": "workspace:*",
+    "@ais-app/database": "workspace:*",
+    "@ais-app/email": "workspace:*",
+    "@ais-app/types": "workspace:*",
+    "@ais-app/validation": "workspace:*",
+    "@anthropic-ai/sdk": "^0.95.2",
+    "@base-ui/react": "^1.4.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "drizzle-orm": "^0.44.7",
+    "jose": "^6.2.3",
+    "lucide-react": "^0.511.0",
+    "next": "^15.3.2",
+    "openai": "^6.37.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "tailwind-merge": "^3.3.0",
+    "zod": "^3.25.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.7",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "node-loader": "^2.1.0",
+    "tailwindcss": "^4.1.7",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.1"
+  }
+}

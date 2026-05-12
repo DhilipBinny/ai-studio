@@ -1,0 +1,8 @@
+{
+  "name": "ai-studio-core",
+  "private": true,
+  "scripts": {
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

@@ -1,0 +1,27 @@
+# Local data
+.data/
+AiStudio-App/.data/
+
+# Local reference docs (research, audits — not for git)
+_local_reference/
+
+# Node
+node_modules/
+
+# Build output
+dist/
+.next/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.*
+
+# Claude Code
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+.mcp.json
+
+# OS
+.DS_Store

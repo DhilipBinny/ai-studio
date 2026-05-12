@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: aistudio-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5480}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aistudio}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aistudio_dev_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-aistudio}
+    volumes:
+      - ../.data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-aistudio}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
