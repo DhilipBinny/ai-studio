@@ -72,18 +72,15 @@ export default function AuditLogPage() {
           <TableBody>
             {loading ? <TableSkeleton columns={5} rows={10} /> : entries.map((e) => {
               const isExpanded = expandedId === e.id;
-              const hasDetails = e.details && Object.keys(e.details).length > 0;
               return (
                 <>
                   <TableRow
                     key={e.id}
-                    className={hasDetails ? "cursor-pointer hover:bg-muted/50" : ""}
-                    onClick={() => hasDetails && setExpandedId(isExpanded ? null : e.id)}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => setExpandedId(isExpanded ? null : e.id)}
                   >
                     <TableCell className="w-8 px-2">
-                      {hasDetails && (
-                        isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-                      )}
+                      {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
                     </TableCell>
                     <TableCell>
                       <Badge variant={actionCategory(e.action) as "success" | "warning" | "error" | "secondary"} className="font-mono text-xs">
