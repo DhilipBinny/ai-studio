@@ -8,9 +8,9 @@ export const MODULES = [
   { id: "CONNECTORS", label: "Connectors",       section: "operate", href: "/connectors" },
   { id: "PROVIDERS",  label: "Providers",        section: "operate", href: "/providers" },
   { id: "USERS",      label: "Users",            section: "admin",   href: "/users" },
-  { id: "PROFILES",   label: "Profiles",         section: "admin",   href: "/settings" },
-  { id: "AUDIT",      label: "Audit Log",        section: "admin",   href: "/settings" },
+  { id: "AUDIT",      label: "Audit Log",        section: "admin",   href: "/audit-log" },
   { id: "SETTINGS",   label: "Settings",         section: "admin",   href: "/settings" },
+  { id: "PROFILES",   label: "Profiles",         section: "hidden",  href: "/settings" },
 ] as const;
 
 export type Module = typeof MODULES[number]["id"];
@@ -22,4 +22,5 @@ export const SECTION_LABELS: Record<Section, string> = {
   build: "Build",
   operate: "Operate",
   admin: "Admin",
+  hidden: "",
 };

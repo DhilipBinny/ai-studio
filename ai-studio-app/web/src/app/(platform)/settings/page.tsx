@@ -17,7 +17,6 @@ import { Pagination } from "@/components/pagination";
 
 interface SystemConfig { id: string; key: string; value: Record<string, unknown>; updatedAt: string; }
 interface Profile { id: string; name: string; description: string; accessRights: Record<string, number>; isSystem: boolean; }
-interface AuditEntry { id: number; action: string; resourceType: string | null; createdAt: string; }
 
 export default function SettingsPage() {
   const [tab, setTab] = useState("general");
@@ -28,11 +27,9 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="profiles">Profiles</TabsTrigger>
-          <TabsTrigger value="audit">Audit Log</TabsTrigger>
         </TabsList>
         <TabsContent value="general"><GeneralTab /></TabsContent>
         <TabsContent value="profiles"><ProfilesTab /></TabsContent>
-        <TabsContent value="audit"><AuditLogTab /></TabsContent>
       </Tabs>
     </></RequirePermission>
   );
@@ -278,36 +275,3 @@ function ProfilesTab() {
   );
 }
 
-function AuditLogTab() {
-  const [entries, setEntries] = useState<AuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  const fetchAudit = useCallback(async () => {
-    setLoading(true);
-    const res = await fetch(`/api/audit-log?page=${page}&pageSize=20`);
-    if (res.ok) { const d = await res.json(); setEntries(d.data); setTotal(d.total); setTotalPages(d.totalPages); }
-    setLoading(false);
-  }, [page]);
-  useEffect(() => { fetchAudit(); }, [fetchAudit]);
-  return (
-    <>
-      <Card>
-        <Table>
-          <TableHeader><TableRow><TableHead>Action</TableHead><TableHead>Resource</TableHead><TableHead>Timestamp</TableHead></TableRow></TableHeader>
-          <TableBody>
-            {loading ? <TableSkeleton columns={3} rows={10} /> : entries.map((e) => (
-              <TableRow key={e.id}>
-                <TableCell className="font-medium font-mono text-xs">{e.action}</TableCell>
-                <TableCell className="text-muted-foreground">{e.resourceType || "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{new Date(e.createdAt).toLocaleString()}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </Card>
-      <Pagination page={page} pageSize={20} total={total} totalPages={totalPages} onPageChange={setPage} />
-    </>
-  );
-}

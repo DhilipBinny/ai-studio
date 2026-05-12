@@ -39,7 +39,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
 };
 
 const SIDEBAR_MODULES = MODULES.filter((m) =>
-  !["PROFILES", "AUDIT"].includes(m.id)
+  m.section !== "hidden"
 );
 
 const SECTIONS = ["main", "build", "operate", "admin"] as const;
