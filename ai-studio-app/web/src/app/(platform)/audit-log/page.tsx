@@ -9,6 +9,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { PageHeader } from "@/components/page-header";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface AuditEntry {
   id: number;
@@ -16,7 +17,11 @@ interface AuditEntry {
   resourceType: string | null;
   resourceId: string | null;
   userId: string | null;
+  details: Record<string, unknown>;
   ipAddress: string | null;
+  userAgent: string | null;
+  prevHash: string;
+  entryHash: string;
   createdAt: string;
 }
 
@@ -26,6 +31,7 @@ export default function AuditLogPage() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const fetchAudit = useCallback(async () => {
     setLoading(true);
@@ -56,6 +62,7 @@ export default function AuditLogPage() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8"></TableHead>
               <TableHead>Action</TableHead>
               <TableHead>Resource</TableHead>
               <TableHead>IP Address</TableHead>
@@ -63,20 +70,69 @@ export default function AuditLogPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {loading ? <TableSkeleton columns={4} rows={10} /> : entries.map((e) => (
-              <TableRow key={e.id}>
-                <TableCell>
-                  <Badge variant={actionCategory(e.action) as "success" | "warning" | "error" | "secondary"} className="font-mono text-xs">
-                    {e.action}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {e.resourceType ? `${e.resourceType}${e.resourceId ? ` / ${e.resourceId.slice(0, 8)}...` : ""}` : "—"}
-                </TableCell>
-                <TableCell className="text-muted-foreground font-mono text-xs">{e.ipAddress || "—"}</TableCell>
-                <TableCell className="text-muted-foreground">{new Date(e.createdAt).toLocaleString()}</TableCell>
-              </TableRow>
-            ))}
+            {loading ? <TableSkeleton columns={5} rows={10} /> : entries.map((e) => {
+              const isExpanded = expandedId === e.id;
+              const hasDetails = e.details && Object.keys(e.details).length > 0;
+              return (
+                <>
+                  <TableRow
+                    key={e.id}
+                    className={hasDetails ? "cursor-pointer hover:bg-muted/50" : ""}
+                    onClick={() => hasDetails && setExpandedId(isExpanded ? null : e.id)}
+                  >
+                    <TableCell className="w-8 px-2">
+                      {hasDetails && (
+                        isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={actionCategory(e.action) as "success" | "warning" | "error" | "secondary"} className="font-mono text-xs">
+                        {e.action}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {e.resourceType ? `${e.resourceType}${e.resourceId ? ` / ${e.resourceId.slice(0, 8)}...` : ""}` : "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground font-mono text-xs">{e.ipAddress || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{new Date(e.createdAt).toLocaleString()}</TableCell>
+                  </TableRow>
+                  {isExpanded && (
+                    <TableRow key={`${e.id}-detail`}>
+                      <TableCell colSpan={5} className="bg-muted/30 px-6 py-3">
+                        <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
+                          <div>
+                            <span className="font-medium text-muted-foreground">User ID:</span>
+                            <span className="ml-2 font-mono">{e.userId || "—"}</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground">Resource ID:</span>
+                            <span className="ml-2 font-mono">{e.resourceId || "—"}</span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="font-medium text-muted-foreground">User Agent:</span>
+                            <span className="ml-2 text-muted-foreground">{e.userAgent ? (e.userAgent.length > 80 ? e.userAgent.slice(0, 80) + "..." : e.userAgent) : "—"}</span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="font-medium text-muted-foreground">Details:</span>
+                            <pre className="mt-1 rounded-md bg-background border border-border p-2 font-mono text-xs overflow-auto max-h-32">
+                              {JSON.stringify(e.details, null, 2)}
+                            </pre>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground">Entry Hash:</span>
+                            <span className="ml-2 font-mono text-[10px] text-muted-foreground">{e.entryHash?.slice(0, 16)}...</span>
+                          </div>
+                          <div>
+                            <span className="font-medium text-muted-foreground">Prev Hash:</span>
+                            <span className="ml-2 font-mono text-[10px] text-muted-foreground">{e.prevHash?.slice(0, 16)}...</span>
+                          </div>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
+              );
+            })}
           </TableBody>
         </Table>
       </Card>
