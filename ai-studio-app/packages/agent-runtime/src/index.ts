@@ -11,3 +11,5 @@ export type { SessionInput, SessionResult, AgentConfig, ProviderConfig, Persona,
 export type { ToolDefinition, ToolCall, ToolResult, ToolContext } from "./tool-executor";
 export type { SearchResult } from "./knowledge-search";
 export type { LLMToolCall, LLMCallResult } from "./llm-caller";
+export { triggerWorkflow, resumeWorkflow } from "./workflow-engine";
+export type { WorkflowRunResult } from "./workflow-engine";
