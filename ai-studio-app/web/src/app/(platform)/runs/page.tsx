@@ -63,11 +63,15 @@ interface SessionToolCall {
   status: string;
   durationMs: number | null;
   errorMessage: string | null;
+  requiresApproval: boolean;
+  approvalStatus: string | null;
+  approvedBy: string | null;
+  approvedAt: string | null;
   createdAt: string;
 }
 
 const STATUS_VARIANT: Record<string, "info" | "success" | "error" | "warning" | "secondary"> = {
-  pending: "secondary", running: "info", waiting: "info", completed: "success", failed: "error", cancelled: "warning", timeout: "error",
+  pending: "secondary", running: "info", waiting: "info", waiting_approval: "warning", completed: "success", failed: "error", cancelled: "warning", timeout: "error",
 };
 
 const CHANNEL_LABEL: Record<string, string> = {
@@ -206,20 +210,33 @@ function SessionDetailView({ sessionId, onBack }: { sessionId: string; onBack: (
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [approving, setApproving] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      const res = await fetch(`/api/runs/${sessionId}`);
-      if (res.ok) {
-        setSession(await res.json());
-      } else {
-        setError("Failed to load session");
-      }
-      setLoading(false);
+  const loadSession = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`/api/runs/${sessionId}`);
+    if (res.ok) {
+      setSession(await res.json());
+    } else {
+      setError("Failed to load session");
     }
-    load();
+    setLoading(false);
   }, [sessionId]);
+
+  useEffect(() => { loadSession(); }, [loadSession]);
+
+  async function handleApproval(toolCallId: number, action: "approve" | "deny") {
+    setApproving(true);
+    const res = await fetch(`/api/runs/${sessionId}/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toolCallId: String(toolCallId), action }),
+    });
+    if (res.ok) {
+      await loadSession();
+    }
+    setApproving(false);
+  }
 
   if (loading) {
     return (
@@ -274,6 +291,40 @@ function SessionDetailView({ sessionId, onBack }: { sessionId: string; onBack: (
           </div>
         </div>
       )}
+
+      {session.status === "waiting_approval" && (() => {
+        const pendingCalls = session.toolCalls.filter((tc) => tc.requiresApproval && !tc.approvalStatus);
+        if (pendingCalls.length === 0) return null;
+        return (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 space-y-3">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Approval Required</p>
+                <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-0.5">
+                  {pendingCalls.length} dangerous tool call{pendingCalls.length > 1 ? "s" : ""} waiting for admin approval.
+                </p>
+              </div>
+            </div>
+            {pendingCalls.map((tc) => (
+              <div key={tc.id} className="flex items-center justify-between rounded-md border border-amber-200 bg-white dark:bg-card px-3 py-2">
+                <div>
+                  <span className="text-sm font-mono font-medium">{tc.toolName}</span>
+                  <pre className="text-[11px] text-muted-foreground mt-1 max-h-16 overflow-y-auto">{JSON.stringify(tc.arguments, null, 2)}</pre>
+                </div>
+                <div className="flex gap-2 shrink-0 ml-4">
+                  <Button size="sm" variant="outline" disabled={approving} onClick={() => handleApproval(tc.id, "deny")}>
+                    <XCircle className="h-3 w-3 mr-1" /> Deny
+                  </Button>
+                  <Button size="sm" disabled={approving} onClick={() => handleApproval(tc.id, "approve")}>
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> Approve
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       <div className="border rounded-lg">
         <div className="px-4 py-3 border-b bg-muted/30">

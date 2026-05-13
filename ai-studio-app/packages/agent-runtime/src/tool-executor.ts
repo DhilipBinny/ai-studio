@@ -1,6 +1,6 @@
 import { getDb } from "@ais-app/database";
-import { agentTools, tools, agentSessionToolCalls, agentKnowledgeBases } from "@ais-app/database";
-import { eq, and } from "drizzle-orm";
+import { agentTools, tools, agentSessionToolCalls, agentKnowledgeBases, agentSessions } from "@ais-app/database";
+import { eq, and, desc } from "drizzle-orm";
 import { LoopDetector } from "@ais/tool-platform";
 import { loadMCPTools, executeMCPTool } from "./mcp-executor";
 import {
@@ -303,6 +303,41 @@ export async function executeTool(
   let result: string;
   let status: "pending" | "success" | "error" | "denied" | "timeout" = "success";
   let errorMessage: string | null = null;
+
+  const toolRisk = BUILTIN_TOOL_RISK[call.name];
+  if (toolRisk === "dangerous") {
+    const [pendingCall] = await db
+      .select({ id: agentSessionToolCalls.id, approvalStatus: agentSessionToolCalls.approvalStatus })
+      .from(agentSessionToolCalls)
+      .where(and(
+        eq(agentSessionToolCalls.agentSessionId, sessionId),
+        eq(agentSessionToolCalls.toolName, call.name),
+        eq(agentSessionToolCalls.requiresApproval, true),
+      ))
+      .orderBy(desc(agentSessionToolCalls.createdAt))
+      .limit(1);
+
+    if (!pendingCall || pendingCall.approvalStatus !== "approved") {
+      await db.insert(agentSessionToolCalls).values({
+        tenantId,
+        agentSessionId: sessionId,
+        toolName: call.name,
+        arguments: call.input,
+        result: "Awaiting human approval",
+        status: "pending",
+        requiresApproval: true,
+        durationMs: 0,
+      });
+
+      await db.update(agentSessions).set({ status: "waiting_approval" }).where(eq(agentSessions.id, sessionId));
+
+      return {
+        tool_use_id: call.id,
+        content: "This tool requires human approval before execution. The session is paused until an admin approves or denies this tool call. Tell the user their request needs admin approval for the dangerous operation.",
+        is_error: false,
+      };
+    }
+  }
 
   const isMCP = call.name.startsWith("mcp__") && mcpConnectorMap;
   const contextExecutor = CONTEXT_EXECUTORS[call.name];

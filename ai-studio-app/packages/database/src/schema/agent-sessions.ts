@@ -1,4 +1,5 @@
 import { pgTable, uuid, text, boolean, timestamp, jsonb, integer, numeric, bigserial, index } from "drizzle-orm/pg-core";
+
 import { tenants } from "./tenants";
 import { users } from "./users";
 import { agents } from "./agents";
@@ -73,7 +74,10 @@ export const agentSessionToolCalls = pgTable(
     status: toolCallStatusEnum("status").notNull().default("pending"),
     durationMs: integer("duration_ms"),
     errorMessage: text("error_message"),
+    requiresApproval: boolean("requires_approval").notNull().default(false),
+    approvalStatus: text("approval_status"),
     approvedBy: uuid("approved_by").references(() => users.id, { onDelete: "set null" }),
+    approvedAt: timestamp("approved_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

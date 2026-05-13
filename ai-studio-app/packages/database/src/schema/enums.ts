@@ -75,6 +75,7 @@ export const runStatusEnum = pgEnum("run_status", [
   "pending",
   "running",
   "waiting",
+  "waiting_approval",
   "completed",
   "failed",
   "cancelled",
