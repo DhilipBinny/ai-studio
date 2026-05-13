@@ -2,19 +2,24 @@ import { pgTable, uuid, text, boolean, timestamp, jsonb, integer, bigint, bigser
 import { tenants } from "./tenants";
 import { users } from "./users";
 import { agents } from "./agents";
+import { providers } from "./providers";
 import { documentStatusEnum } from "./enums";
 
 const vector = customType<{ data: number[]; driverParam: string }>({
   dataType() {
-    return "vector(1536)";
+    return "vector";
   },
   toDriver(value: number[]) {
     return `[${value.join(",")}]`;
   },
-  fromDriver(value: string) {
-    return JSON.parse(value);
+  fromDriver(value: unknown) {
+    return JSON.parse(value as string);
   },
 });
+
+// tsvector column is managed by a PostgreSQL trigger (trg_chunks_search_vector).
+// We don't include it in the Drizzle schema to avoid insert conflicts —
+// the trigger auto-populates it from the content column on INSERT/UPDATE.
 
 export const knowledgeBases = pgTable(
   "knowledge_bases",
@@ -23,8 +28,10 @@ export const knowledgeBases = pgTable(
     tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     description: text("description").default(""),
-    embeddingModel: text("embedding_model").notNull().default("text-embedding-3-small"),
-    embeddingDimension: integer("embedding_dimension").notNull().default(1536),
+    embeddingSource: text("embedding_source").notNull().default("builtin"),
+    embeddingProviderId: uuid("embedding_provider_id").references(() => providers.id, { onDelete: "set null" }),
+    embeddingModel: text("embedding_model").notNull().default("Xenova/bge-small-en-v1.5"),
+    embeddingDimension: integer("embedding_dimension").notNull().default(384),
     chunkConfig: jsonb("chunk_config").notNull().default({}),
     documentCount: integer("document_count").notNull().default(0),
     chunkCount: integer("chunk_count").notNull().default(0),

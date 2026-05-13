@@ -7,7 +7,7 @@ import { loadToolDefinitions, executeTool, createLoopDetector } from "./tool-exe
 import { checkAndCompact } from "./compaction";
 import { sanitizeInput, detectPromptInjection } from "@ais/security";
 import type { SessionInput, SessionResult, AgentConfig, ProviderConfig } from "./types";
-import type { ToolCall } from "./tool-executor";
+import type { ToolCall, ToolContext } from "./tool-executor";
 import type Anthropic from "@anthropic-ai/sdk";
 
 const MAX_TOOL_ROUNDS = 10;
@@ -114,6 +114,7 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
     const toolDefs = await loadToolDefinitions(input.agentId, input.tenantId);
     const systemPrompt = buildSystemPrompt(agentConfig, { timezone: "Asia/Singapore" });
     const loopDetector = createLoopDetector();
+    const toolContext: ToolContext = { agentId: input.agentId, tenantId: input.tenantId, sessionId };
 
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
@@ -190,6 +191,7 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
             input.tenantId,
             sessionId,
             loopDetector,
+            toolContext,
           );
 
           await db.insert(agentSessionMessages).values({

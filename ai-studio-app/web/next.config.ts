@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
     "@ais/agent-core",
     "@ais/memory-engine",
     "@ais/provider-bridge",
+    "@ais/rag-engine",
     "@ais/security",
     "@ais/tool-platform",
     "@ais/types",
@@ -24,6 +25,8 @@ const nextConfig: NextConfig = {
     "otplib",
     "@anthropic-ai/sdk",
     "openai",
+    "@huggingface/transformers",
+    "onnxruntime-node",
   ],
   webpack: (config, { isServer }) => {
     if (isServer) {

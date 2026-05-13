@@ -3,7 +3,7 @@ import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, Bot, Pencil, Loader2, MessageSquare, Send, RotateCcw, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Bot, Pencil, Loader2, MessageSquare, Send, RotateCcw, X, ChevronDown, ChevronRight, BookOpen, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -509,6 +509,106 @@ function AgentChat({ agent }: { agent: Agent }) {
   );
 }
 
+interface AssignedKB {
+  id: string;
+  knowledgeBaseId: string;
+  kbName: string;
+  kbDescription: string;
+  documentCount: number;
+  chunkCount: number;
+}
+
+interface AvailableKB {
+  id: string;
+  name: string;
+  documentCount: number;
+  chunkCount: number;
+}
+
+function KBAssignment({ agentId }: { agentId: string }) {
+  const [assigned, setAssigned] = useState<AssignedKB[]>([]);
+  const [available, setAvailable] = useState<AvailableKB[]>([]);
+  const [selectedKB, setSelectedKB] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [assigning, setAssigning] = useState(false);
+
+  const fetchAssigned = useCallback(async () => {
+    const res = await fetch(`/api/agents/${agentId}/knowledge-bases`);
+    if (res.ok) { const d = await res.json(); setAssigned(d.data); }
+  }, [agentId]);
+
+  const fetchAvailable = useCallback(async () => {
+    const res = await fetch("/api/knowledge-bases?pageSize=100");
+    if (res.ok) { const d = await res.json(); setAvailable(d.data); }
+  }, []);
+
+  useEffect(() => { Promise.all([fetchAssigned(), fetchAvailable()]).then(() => setLoading(false)); }, [fetchAssigned, fetchAvailable]);
+
+  const unassigned = available.filter((kb) => !assigned.some((a) => a.knowledgeBaseId === kb.id));
+
+  async function handleAssign() {
+    if (!selectedKB) return;
+    setAssigning(true);
+    const res = await fetch(`/api/agents/${agentId}/knowledge-bases`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ knowledgeBaseId: selectedKB }),
+    });
+    if (res.ok) { setSelectedKB(""); await fetchAssigned(); }
+    setAssigning(false);
+  }
+
+  async function handleRemove(assignmentId: string) {
+    await fetch(`/api/agents/${agentId}/knowledge-bases/${assignmentId}`, { method: "DELETE" });
+    await fetchAssigned();
+  }
+
+  if (loading) return <div className="text-xs text-muted-foreground">Loading KBs...</div>;
+
+  return (
+    <div className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <BookOpen className="h-4 w-4 text-muted-foreground" />
+        <p className="text-sm font-medium">Knowledge Bases</p>
+      </div>
+
+      {assigned.length > 0 ? (
+        <div className="space-y-1">
+          {assigned.map((kb) => (
+            <div key={kb.id} className="flex items-center justify-between rounded-md border px-2.5 py-1.5">
+              <div>
+                <span className="text-sm">{kb.kbName}</span>
+                <span className="text-xs text-muted-foreground ml-2">{kb.documentCount} docs &middot; {kb.chunkCount.toLocaleString()} chunks</span>
+              </div>
+              <button type="button" onClick={() => handleRemove(kb.id)} className="text-muted-foreground hover:text-destructive">
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">No knowledge bases assigned. The agent will not have access to document search.</p>
+      )}
+
+      {unassigned.length > 0 && (
+        <div className="flex gap-2">
+          <Select value={selectedKB} onChange={(e) => setSelectedKB(e.target.value)} className="flex-1 text-sm">
+            <option value="">Select a knowledge base...</option>
+            {unassigned.map((kb) => (
+              <option key={kb.id} value={kb.id}>{kb.name} ({kb.documentCount} docs)</option>
+            ))}
+          </Select>
+          <Button type="button" variant="outline" size="sm" onClick={handleAssign} disabled={!selectedKB || assigning}>
+            {assigning ? <Loader2 className="h-3 w-3 animate-spin" /> : "Assign"}
+          </Button>
+        </div>
+      )}
+
+      <p className="text-[11px] text-muted-foreground">Assigned KBs give the agent a knowledge_search tool to query uploaded documents.</p>
+    </div>
+  );
+}
+
 function EditAgentForm({ agent, models, onSaved }: { agent: Agent; models: ProviderModel[]; onSaved: () => void }) {
   const [form, setForm] = useState({
     name: agent.name,
@@ -616,6 +716,8 @@ function EditAgentForm({ agent, models, onSaved }: { agent: Agent; models: Provi
       </div>
 
       <RulesEditor rules={rules} onChange={setRules} />
+
+      <KBAssignment agentId={agent.id} />
 
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5">

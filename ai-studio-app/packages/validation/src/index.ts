@@ -5,3 +5,4 @@ export { paginationSchema, uuidSchema } from "./common";
 export { createProviderSchema, updateProviderSchema, createModelSchema, updateModelSchema } from "./providers";
 export { createToolSchema, updateToolSchema } from "./tools";
 export { createAgentSchema, updateAgentSchema } from "./agents";
+export { createKnowledgeBaseSchema, updateKnowledgeBaseSchema } from "./knowledge-bases";

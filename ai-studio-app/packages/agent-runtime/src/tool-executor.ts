@@ -1,5 +1,5 @@
 import { getDb } from "@ais-app/database";
-import { agentTools, tools, agentSessionToolCalls } from "@ais-app/database";
+import { agentTools, tools, agentSessionToolCalls, agentKnowledgeBases } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
 import { LoopDetector } from "@ais/tool-platform";
 
@@ -21,7 +21,14 @@ export interface ToolResult {
   is_error?: boolean;
 }
 
+export interface ToolContext {
+  agentId: string;
+  tenantId: string;
+  sessionId: string;
+}
+
 type ToolExecutorFn = (args: Record<string, unknown>) => Promise<string>;
+type ContextAwareExecutorFn = (args: Record<string, unknown>, ctx: ToolContext) => Promise<string>;
 
 const BUILTIN_EXECUTORS: Record<string, ToolExecutorFn> = {
   get_current_time: async (args) => {
@@ -43,6 +50,36 @@ const BUILTIN_EXECUTORS: Record<string, ToolExecutorFn> = {
 
   echo: async (args) => {
     return args.message as string || "No message provided";
+  },
+};
+
+const CONTEXT_EXECUTORS: Record<string, ContextAwareExecutorFn> = {
+  knowledge_search: async (args, ctx) => {
+    const { searchKnowledge } = await import("./knowledge-search");
+    const query = args.query as string;
+    if (!query) return "Error: query is required";
+
+    const topK = (args.top_k as number) || 5;
+    const results = await searchKnowledge(query, ctx.agentId, ctx.tenantId, { topK });
+
+    if (results.length === 0) return "No relevant documents found for this query.";
+
+    return results.map((r, i) =>
+      `[${i + 1}] (score: ${r.score.toFixed(3)}) [${r.knowledgeBaseName} / ${r.documentName}]\n${r.content}`
+    ).join("\n\n---\n\n");
+  },
+};
+
+const KNOWLEDGE_SEARCH_DEFINITION: ToolDefinition = {
+  name: "knowledge_search",
+  description: "Search the agent's assigned knowledge bases for relevant information. Use this when the user asks questions that might be answered by uploaded documents.",
+  input_schema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "The search query to find relevant document chunks" },
+      top_k: { type: "number", description: "Number of results to return (default: 5)" },
+    },
+    required: ["query"],
   },
 };
 
@@ -68,13 +105,25 @@ export async function loadToolDefinitions(
       eq(tools.isActive, true),
     ));
 
-  return rows.map((row) => ({
+  const defs = rows.map((row) => ({
     name: row.name,
     description: row.description || row.displayName,
     input_schema: Object.keys(row.parametersSchema as Record<string, unknown>).length > 0
       ? row.parametersSchema as Record<string, unknown>
       : { type: "object", properties: {}, required: [] },
   }));
+
+  const kbLinks = await db
+    .select({ id: agentKnowledgeBases.id })
+    .from(agentKnowledgeBases)
+    .where(and(eq(agentKnowledgeBases.agentId, agentId), eq(agentKnowledgeBases.tenantId, tenantId)))
+    .limit(1);
+
+  if (kbLinks.length > 0) {
+    defs.push(KNOWLEDGE_SEARCH_DEFINITION);
+  }
+
+  return defs;
 }
 
 export function createLoopDetector(): LoopDetector {
@@ -86,6 +135,7 @@ export async function executeTool(
   tenantId: string,
   sessionId: string,
   loopDetector?: LoopDetector,
+  context?: ToolContext,
 ): Promise<ToolResult> {
   if (loopDetector) {
     const loopError = loopDetector.record(call.name, call.input);
@@ -98,11 +148,21 @@ export async function executeTool(
   const db = getDb();
 
   let result: string;
-  let status: string = "success";
+  let status: "pending" | "success" | "error" | "denied" | "timeout" = "success";
   let errorMessage: string | null = null;
 
+  const contextExecutor = CONTEXT_EXECUTORS[call.name];
   const executor = BUILTIN_EXECUTORS[call.name];
-  if (executor) {
+
+  if (contextExecutor && context) {
+    try {
+      result = await contextExecutor(call.input, context);
+    } catch (e) {
+      result = `Error: ${(e as Error).message}`;
+      status = "error";
+      errorMessage = (e as Error).message;
+    }
+  } else if (executor) {
     try {
       result = await executor(call.input);
     } catch (e) {

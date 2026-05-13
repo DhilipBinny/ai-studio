@@ -129,7 +129,8 @@ async function testOpenAI(provider: ProviderRow, start: number): Promise<TestRes
     const relevant = models.filter((m) =>
       m.modelId.startsWith("gpt-") || m.modelId.startsWith("o1") ||
       m.modelId.startsWith("o3") || m.modelId.startsWith("o4") ||
-      m.modelId.startsWith("chatgpt")
+      m.modelId.startsWith("chatgpt") ||
+      m.modelId.startsWith("text-embedding-")
     );
     return { success: true, latencyMs, models: relevant.length > 0 ? relevant : models.slice(0, 20) };
   } catch (e) {

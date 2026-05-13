@@ -22,20 +22,23 @@ export const GET = withRBAC("KNOWLEDGE", 10, async (request, auth) => {
 
 export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth) => {
   const body = await request.json();
-  const { name, description, embeddingModel, embeddingDimension, chunkConfig } = body;
+  const { name, description, embeddingSource, embeddingProviderId, embeddingModel, embeddingDimension, chunkConfig } = body;
   if (!name) return errorResponse("Name required", "VALIDATION_ERROR", 400);
 
   const db = getDb();
   const [existing] = await db.select({ id: knowledgeBases.id }).from(knowledgeBases).where(and(eq(knowledgeBases.tenantId, auth.tenantId), eq(knowledgeBases.name, name))).limit(1);
   if (existing) return errorResponse("Name already exists", "NAME_EXISTS", 409);
 
+  const source = embeddingSource || "builtin";
   const [kb] = await db.insert(knowledgeBases).values({
     tenantId: auth.tenantId,
     name,
     description: description || "",
-    embeddingModel: embeddingModel || "text-embedding-3-small",
-    embeddingDimension: embeddingDimension || 1536,
-    chunkConfig: chunkConfig || { method: "recursive", chunk_size: 1000, chunk_overlap: 200 },
+    embeddingSource: source,
+    embeddingProviderId: source === "provider" ? embeddingProviderId : null,
+    embeddingModel: embeddingModel || (source === "builtin" ? "Xenova/bge-small-en-v1.5" : "text-embedding-3-small"),
+    embeddingDimension: embeddingDimension || (source === "builtin" ? 384 : 1536),
+    chunkConfig: chunkConfig || { method: "recursive", chunk_size: 2048, chunk_overlap: 200 },
     createdBy: auth.userId,
   }).returning();
 

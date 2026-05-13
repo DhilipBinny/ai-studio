@@ -16,3 +16,7 @@ export {
   testProviderConnection,
   type TestResult, type DiscoveredModel, type ProviderTestConfig,
 } from './test-connection';
+export {
+  embedText, embedSingle,
+  type EmbeddingConfig,
+} from './embedding';

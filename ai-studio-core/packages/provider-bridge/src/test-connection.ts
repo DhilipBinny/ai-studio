@@ -150,7 +150,8 @@ async function testOpenAI(provider: ProviderTestConfig, start: number): Promise<
       m.modelId.startsWith('o1') ||
       m.modelId.startsWith('o3') ||
       m.modelId.startsWith('o4') ||
-      m.modelId.startsWith('chatgpt')
+      m.modelId.startsWith('chatgpt') ||
+      m.modelId.startsWith('text-embedding-')
     );
 
     return { success: true, latencyMs, models: relevant.length > 0 ? relevant : models.slice(0, 20) };

@@ -31,6 +31,18 @@ export const POST = withRBAC("PROVIDERS", 10, async (request, auth, params) => {
 
   if (result.success && result.models.length > 0) {
     for (const model of result.models) {
+      const capabilities: string[] = [];
+      const isEmbedding =
+        model.modelId.startsWith("text-embedding-") ||
+        model.modelId.includes("embed") ||
+        model.modelId.includes("voyage");
+
+      if (isEmbedding) {
+        capabilities.push("embedding");
+      } else {
+        capabilities.push("chat");
+      }
+
       const [existing] = await db
         .select({ id: providerModels.id })
         .from(providerModels)
@@ -47,6 +59,7 @@ export const POST = withRBAC("PROVIDERS", 10, async (request, auth, params) => {
             displayName: model.displayName,
             contextWindow: model.contextWindow,
             maxOutputTokens: model.maxOutputTokens,
+            capabilities,
             updatedAt: new Date(),
           })
           .where(eq(providerModels.id, existing.id));
@@ -58,6 +71,7 @@ export const POST = withRBAC("PROVIDERS", 10, async (request, auth, params) => {
           displayName: model.displayName,
           contextWindow: model.contextWindow,
           maxOutputTokens: model.maxOutputTokens,
+          capabilities,
         });
       }
     }
