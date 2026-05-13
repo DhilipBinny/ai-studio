@@ -2,6 +2,7 @@
 import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 import { formatRelativeTime } from "@/lib/utils";
+import { WorkflowCanvas } from "@/components/workflow/canvas";
 
 import { useState, useEffect, useCallback } from "react";
 import {
@@ -227,7 +228,15 @@ function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onBack: ()
       </div>
 
       {tab === "nodes" && (
-        <NodeEditor nodes={nodes} edges={edges} agents={agents} allNodes={nodes} onSaveNodes={handleSaveNodes} onSaveEdges={handleSaveEdges} />
+        <WorkflowCanvas
+          nodes={nodes}
+          edges={edges}
+          agents={agents}
+          onSave={async (updatedNodes, updatedEdges) => {
+            await handleSaveNodes(updatedNodes as WorkflowNode[]);
+            await handleSaveEdges(updatedEdges);
+          }}
+        />
       )}
 
       {tab === "runs" && (
