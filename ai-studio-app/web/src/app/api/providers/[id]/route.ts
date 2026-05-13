@@ -26,7 +26,7 @@ export const GET = withRBAC("PROVIDERS", 10, async (_request, auth, params) => {
     .from(providerModels)
     .where(and(eq(providerModels.providerId, id), eq(providerModels.tenantId, auth.tenantId)));
 
-  return NextResponse.json({ ...provider, models });
+  return NextResponse.json({ ...provider, apiKeyRef: provider.apiKeyRef ? "****" : null, models });
 });
 
 export const PATCH = withRBAC("PROVIDERS", 20, async (request, auth, params) => {

@@ -2,6 +2,39 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import type { MCPServerConfig, MCPServerStatus, MCPServerStatusValue, MCPToolDefinition } from "@ais/types";
 
+const SAFE_ENV_KEYS = [
+  "PATH", "HOME", "USER", "SHELL", "TERM", "LANG", "LC_ALL", "LC_CTYPE",
+  "NODE_ENV", "TZ", "TMPDIR", "COLORTERM",
+];
+
+export const ALLOWED_COMMANDS = new Set([
+  "npx", "node", "python", "python3", "uvx", "docker", "deno", "bun",
+]);
+
+function buildSafeEnv(configEnv?: Record<string, string>): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const key of SAFE_ENV_KEYS) {
+    if (process.env[key]) env[key] = process.env[key]!;
+  }
+  if (configEnv) {
+    for (const [k, v] of Object.entries(configEnv)) {
+      env[k] = v;
+    }
+  }
+  return env;
+}
+
+function validateCommand(command: string): void {
+  const base = command.includes("/") ? command.split("/").pop()! : command;
+  if (!ALLOWED_COMMANDS.has(base)) {
+    throw new Error(
+      `Command "${base}" is not in the allowed list. ` +
+      `Permitted: ${[...ALLOWED_COMMANDS].join(", ")}. ` +
+      `Use npx or docker to run MCP servers.`
+    );
+  }
+}
+
 export class MCPClient {
   private client: Client | null = null;
   private transport: StdioClientTransport | null = null;
@@ -26,11 +59,12 @@ export class MCPClient {
     try {
       if (this.config.transport === "stdio") {
         if (!this.config.command) throw new Error("Command is required for stdio transport");
+        validateCommand(this.config.command);
 
         this.transport = new StdioClientTransport({
           command: this.config.command,
           args: this.config.args || [],
-          env: { ...process.env, ...(this.config.env || {}) } as Record<string, string>,
+          env: buildSafeEnv(this.config.env as Record<string, string> | undefined),
         });
       } else {
         throw new Error(`Transport "${this.config.transport}" is not yet supported. Use stdio.`);
