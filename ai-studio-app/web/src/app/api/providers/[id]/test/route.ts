@@ -36,8 +36,11 @@ export const POST = withRBAC("PROVIDERS", 10, async (request, auth, params) => {
         model.modelId.startsWith("text-embedding-") ||
         model.modelId.includes("embed") ||
         model.modelId.includes("voyage");
+      const isReranking = model.modelId.includes("rerank");
 
-      if (isEmbedding) {
+      if (isReranking) {
+        capabilities.push("reranking");
+      } else if (isEmbedding) {
         capabilities.push("embedding");
       } else {
         capabilities.push("chat");

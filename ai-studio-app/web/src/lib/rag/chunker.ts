@@ -1,1 +1,1 @@
-export { chunkText, type ChunkConfig, type Chunk } from "@ais/rag-engine";
+export { chunkText, contextualChunkText, parentChildChunkText, type ChunkConfig, type Chunk, type ChunkContext, type ParentChildChunk } from "@ais/rag-engine";

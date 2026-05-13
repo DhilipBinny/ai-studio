@@ -2,7 +2,7 @@ import { getDb } from "@ais-app/database";
 import { documents, documentChunks, knowledgeBases, providers } from "@ais-app/database";
 import { eq, and, sql } from "drizzle-orm";
 import { extractText } from "./text-extractor";
-import { chunkText, type ChunkConfig } from "./chunker";
+import { contextualChunkText, parentChildChunkText, type ChunkConfig, type ParentChildChunk } from "@ais/rag-engine";
 import { generateEmbeddings, buildEmbeddingConfig } from "./embedder";
 
 export async function processDocument(
@@ -61,13 +61,60 @@ export async function processDocument(
     const text = await extractText(doc.storagePath, doc.fileType);
     if (!text.trim()) throw new Error("No text could be extracted from the document");
 
-    const chunks = chunkText(text, chunkConfig);
+    const context = { fileName: doc.fileName };
+    const isParentChild = chunkConfig.method === "parent_child";
+
+    await db.delete(documentChunks).where(eq(documentChunks.documentId, documentId));
+
+    if (isParentChild) {
+      const pcChunks = parentChildChunkText(text, chunkConfig, context);
+      const childChunks = pcChunks.filter((c) => c.chunkType === "child");
+      const parentChunks = pcChunks.filter((c) => c.chunkType === "parent");
+
+      const childTexts = childChunks.map((c) => c.content);
+      const embeddings = await generateEmbeddings(childTexts, embeddingConfig);
+
+      const parentIdMap = new Map<number, number>();
+      for (const parent of parentChunks) {
+        const [inserted] = await db.insert(documentChunks).values({
+          tenantId,
+          documentId,
+          chunkIndex: parent.index,
+          content: parent.content,
+          chunkType: "parent",
+          tokenCount: parent.tokenCount,
+          metadata: { fileName: doc.fileName, fileType: doc.fileType },
+        }).returning({ id: documentChunks.id });
+        parentIdMap.set(parent.index, inserted.id);
+      }
+
+      const BATCH_INSERT = 50;
+      for (let i = 0; i < childChunks.length; i += BATCH_INSERT) {
+        const batch = childChunks.slice(i, i + BATCH_INSERT);
+        await db.insert(documentChunks).values(
+          batch.map((chunk, j) => ({
+            tenantId,
+            documentId,
+            chunkIndex: chunk.index,
+            content: chunk.content,
+            embedding: embeddings[i + j],
+            chunkType: "child" as const,
+            parentChunkId: chunk.parentIndex !== undefined ? parentIdMap.get(chunk.parentIndex) ?? null : null,
+            tokenCount: chunk.tokenCount,
+            metadata: { fileName: doc.fileName, fileType: doc.fileType },
+          })),
+        );
+      }
+
+      await finalizeDocument(db, documentId, doc.knowledgeBaseId, pcChunks.length);
+      return { chunkCount: pcChunks.length };
+    }
+
+    const chunks = contextualChunkText(text, chunkConfig, context);
     if (chunks.length === 0) throw new Error("Document produced no chunks after processing");
 
     const chunkTexts = chunks.map((c) => c.content);
     const embeddings = await generateEmbeddings(chunkTexts, embeddingConfig);
-
-    await db.delete(documentChunks).where(eq(documentChunks.documentId, documentId));
 
     const BATCH_INSERT = 50;
     for (let i = 0; i < chunks.length; i += BATCH_INSERT) {
@@ -79,48 +126,43 @@ export async function processDocument(
           chunkIndex: chunk.index,
           content: chunk.content,
           embedding: embeddings[i + j],
+          chunkType: "standard" as const,
           tokenCount: chunk.tokenCount,
-          metadata: {
-            fileName: doc.fileName,
-            fileType: doc.fileType,
-            chunkSize: chunkConfig.chunk_size || 2048,
-          },
+          metadata: { fileName: doc.fileName, fileType: doc.fileType, chunkSize: chunkConfig.chunk_size || 2048 },
         })),
       );
     }
 
-    await db
-      .update(documents)
-      .set({
-        status: "ready",
-        chunkCount: chunks.length,
-        processedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(documents.id, documentId));
-
-    const [{ totalChunks }] = await db
-      .select({ totalChunks: sql<number>`COALESCE(SUM(${documents.chunkCount}), 0)::int` })
-      .from(documents)
-      .where(and(eq(documents.knowledgeBaseId, doc.knowledgeBaseId), eq(documents.status, "ready")));
-
-    await db
-      .update(knowledgeBases)
-      .set({ chunkCount: totalChunks, updatedAt: new Date() })
-      .where(eq(knowledgeBases.id, doc.knowledgeBaseId));
-
+    await finalizeDocument(db, documentId, doc.knowledgeBaseId, chunks.length);
     return { chunkCount: chunks.length };
   } catch (e) {
     const errorMsg = (e as Error).message || "Unknown processing error";
     await db
       .update(documents)
-      .set({
-        status: "error",
-        errorMessage: errorMsg,
-        updatedAt: new Date(),
-      })
+      .set({ status: "error", errorMessage: errorMsg, updatedAt: new Date() })
       .where(eq(documents.id, documentId));
-
     throw e;
   }
+}
+
+async function finalizeDocument(
+  db: ReturnType<typeof getDb>,
+  documentId: string,
+  knowledgeBaseId: string,
+  chunkCount: number,
+) {
+  await db
+    .update(documents)
+    .set({ status: "ready", chunkCount, processedAt: new Date(), updatedAt: new Date() })
+    .where(eq(documents.id, documentId));
+
+  const [{ totalChunks }] = await db
+    .select({ totalChunks: sql<number>`COALESCE(SUM(${documents.chunkCount}), 0)::int` })
+    .from(documents)
+    .where(and(eq(documents.knowledgeBaseId, knowledgeBaseId), eq(documents.status, "ready")));
+
+  await db
+    .update(knowledgeBases)
+    .set({ chunkCount: totalChunks, updatedAt: new Date() })
+    .where(eq(knowledgeBases.id, knowledgeBaseId));
 }

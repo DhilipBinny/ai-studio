@@ -22,7 +22,7 @@ export const GET = withRBAC("KNOWLEDGE", 10, async (request, auth) => {
 
 export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth) => {
   const body = await request.json();
-  const { name, description, embeddingSource, embeddingProviderId, embeddingModel, embeddingDimension, chunkConfig } = body;
+  const { name, description, embeddingSource, embeddingProviderId, embeddingModel, embeddingDimension, rerankSource, rerankProviderId, rerankModel, chunkConfig } = body;
   if (!name) return errorResponse("Name required", "VALIDATION_ERROR", 400);
 
   const db = getDb();
@@ -38,6 +38,9 @@ export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth) => {
     embeddingProviderId: source === "provider" ? embeddingProviderId : null,
     embeddingModel: embeddingModel || (source === "builtin" ? "Xenova/bge-small-en-v1.5" : "text-embedding-3-small"),
     embeddingDimension: embeddingDimension || (source === "builtin" ? 384 : 1536),
+    rerankSource: rerankSource || null,
+    rerankProviderId: rerankSource === "provider" ? rerankProviderId : null,
+    rerankModel: rerankModel || null,
     chunkConfig: chunkConfig || { method: "recursive", chunk_size: 2048, chunk_overlap: 200 },
     createdBy: auth.userId,
   }).returning();

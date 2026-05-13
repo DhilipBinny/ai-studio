@@ -20,3 +20,7 @@ export {
   embedText, embedSingle,
   type EmbeddingConfig,
 } from './embedding';
+export {
+  rerankText,
+  type RerankConfig, type RerankResult,
+} from './reranker';

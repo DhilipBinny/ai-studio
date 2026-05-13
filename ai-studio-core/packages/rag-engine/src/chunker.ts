@@ -1,4 +1,4 @@
-import type { ChunkConfig, Chunk } from "./types";
+import type { ChunkConfig, Chunk, ChunkContext, ParentChildChunk } from "./types";
 
 const DEFAULT_CHUNK_SIZE = 2048;
 const DEFAULT_CHUNK_OVERLAP = 200;
@@ -89,4 +89,70 @@ function mergeWithOverlap(segments: string[], maxSize: number, overlap: number):
 
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
+}
+
+export function contextualChunkText(
+  text: string,
+  config: ChunkConfig,
+  context: ChunkContext,
+): Chunk[] {
+  const chunks = chunkText(text, config);
+  const prefix = context.sectionHeading
+    ? `[Document: ${context.fileName} | Section: ${context.sectionHeading}] `
+    : `[Document: ${context.fileName}] `;
+
+  return chunks.map((c) => ({
+    ...c,
+    content: prefix + c.content,
+    tokenCount: estimateTokens(prefix + c.content),
+  }));
+}
+
+const DEFAULT_PARENT_SIZE = 2048;
+const DEFAULT_CHILD_SIZE = 512;
+
+export function parentChildChunkText(
+  text: string,
+  config: ChunkConfig,
+  context?: ChunkContext,
+): ParentChildChunk[] {
+  const parentSize = config.parent_chunk_size || DEFAULT_PARENT_SIZE;
+  const childSize = config.child_chunk_size || DEFAULT_CHILD_SIZE;
+  const overlap = config.chunk_overlap || 100;
+
+  const parentChunks = chunkText(text, { ...config, chunk_size: parentSize, chunk_overlap: overlap });
+  const results: ParentChildChunk[] = [];
+  let globalIndex = 0;
+
+  for (const parent of parentChunks) {
+    const parentIdx = globalIndex++;
+    results.push({
+      index: parentIdx,
+      content: parent.content,
+      tokenCount: parent.tokenCount,
+      chunkType: "parent",
+    });
+
+    const children = chunkText(parent.content, {
+      method: "recursive",
+      chunk_size: childSize,
+      chunk_overlap: Math.floor(overlap / 2),
+    });
+
+    for (const child of children) {
+      const childContent = context
+        ? `[Document: ${context.fileName}] ${child.content}`
+        : child.content;
+
+      results.push({
+        index: globalIndex++,
+        content: childContent,
+        tokenCount: estimateTokens(childContent),
+        chunkType: "child",
+        parentIndex: parentIdx,
+      });
+    }
+  }
+
+  return results;
 }
