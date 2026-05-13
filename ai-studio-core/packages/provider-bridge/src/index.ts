@@ -1,5 +1,5 @@
 export { ProviderRegistry, type SecretsResolver, type ProviderInfo } from './registry';
-export { AnthropicProvider } from './anthropic';
+export { AnthropicProvider, type AnthropicProviderConfig } from './anthropic';
 export { OpenAIProvider } from './openai';
 export { createStreamingTimeout, type StreamingTimeout, type StreamingTimeoutOptions } from './streaming-timeout';
 export {

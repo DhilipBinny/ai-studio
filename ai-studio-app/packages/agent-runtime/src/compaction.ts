@@ -1,7 +1,7 @@
 import { getDb } from "@ais-app/database";
 import { agentSessionMessages, providerModels } from "@ais-app/database";
 import { eq, asc, lt } from "drizzle-orm";
-import { callLLM } from "./llm-caller";
+import { createProvider } from "./provider-factory";
 import type { ProviderConfig } from "./types";
 
 const COMPACTION_THRESHOLD = 0.75;
@@ -85,9 +85,12 @@ ${conversationLines.join("\n")}
 </conversation>`;
 
   try {
-    const response = await callLLM(providerConfig, "You are a conversation summarizer. Be factual and concise.", [
-      { role: "user", content: summaryPrompt },
-    ], { maxTokens: 1024 });
+    const provider = createProvider(providerConfig);
+    const response = await provider.chat({
+      messages: [{ role: "user" as const, content: summaryPrompt }],
+      model: providerConfig.modelId,
+      systemPrompt: { cached: "You are a conversation summarizer. Be factual and concise.", dynamic: "" },
+    });
 
     if (!response.text) return { compacted: false };
 

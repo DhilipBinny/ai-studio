@@ -8,9 +8,16 @@ import { checkAndCompact } from "./compaction";
 import { sanitizeInput, detectPromptInjection } from "@ais/security";
 import type { SessionInput, SessionResult, AgentConfig, ProviderConfig } from "./types";
 import type { ToolCall, ToolContext } from "./tool-executor";
-import type Anthropic from "@anthropic-ai/sdk";
 
 const MAX_TOOL_ROUNDS = 10;
+
+interface ToolCallBlock {
+  type: string;
+  id?: string;
+  name?: string;
+  input?: unknown;
+  text?: string;
+}
 
 export async function runSession(input: SessionInput): Promise<SessionResult> {
   const db = getDb();
@@ -142,9 +149,15 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
           return { role: "tool" as const, content: m.content, tool_call_id: m.toolCallId || undefined };
         }
         if (m.role === "assistant" && m.toolCalls) {
+          const blocks = m.toolCalls as ToolCallBlock[];
+          const textParts = blocks.filter((b) => b.type === "text").map((b) => b.text || "").join("");
+          const toolCalls = blocks
+            .filter((b) => b.type === "tool_use")
+            .map((b) => ({ id: b.id || "", function: { name: b.name || "", arguments: JSON.stringify(b.input || {}) } }));
           return {
             role: "assistant" as const,
-            content: m.toolCalls as Anthropic.ContentBlock[],
+            content: textParts || m.content,
+            tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
           };
         }
         return {
@@ -163,17 +176,17 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       totalOutputTokens += response.outputTokens;
 
       if (response.toolCalls.length > 0) {
-        const contentBlocks: Anthropic.ContentBlock[] = [];
+        const toolCallBlocks: ToolCallBlock[] = [];
         if (response.text) {
-          contentBlocks.push({ type: "text", text: response.text } as Anthropic.TextBlock);
+          toolCallBlocks.push({ type: "text", text: response.text });
         }
         for (const tc of response.toolCalls) {
-          contentBlocks.push({
+          toolCallBlocks.push({
             type: "tool_use",
             id: tc.id,
             name: tc.name,
             input: tc.input,
-          } as Anthropic.ToolUseBlock);
+          });
         }
 
         await db.insert(agentSessionMessages).values({
@@ -181,7 +194,7 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
           agentSessionId: sessionId,
           role: "assistant",
           content: response.text || "",
-          toolCalls: contentBlocks,
+          toolCalls: toolCallBlocks,
         });
 
         for (const tc of response.toolCalls) {

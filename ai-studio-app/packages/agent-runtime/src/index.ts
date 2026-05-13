@@ -1,5 +1,6 @@
 export { runSession } from "./session-runner";
 export { buildSystemPrompt } from "./prompt-builder";
+export { createProvider } from "./provider-factory";
 export { callLLM } from "./llm-caller";
 export { loadToolDefinitions, executeTool, createLoopDetector } from "./tool-executor";
 export { checkAndCompact } from "./compaction";
