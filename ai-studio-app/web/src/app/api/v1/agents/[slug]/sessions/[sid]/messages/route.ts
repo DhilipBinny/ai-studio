@@ -5,6 +5,17 @@ import { eq, and, asc } from "drizzle-orm";
 import { runSession } from "@ais-app/agent-runtime";
 import { authenticateApiKey, errorJson } from "@/lib/api-key-auth";
 
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+    },
+  });
+}
+
 export async function POST(request: NextRequest, context: { params: Promise<{ slug: string; sid: string }> }) {
   const auth = await authenticateApiKey(request);
   if (!auth) return errorJson("Invalid or missing API key", "UNAUTHORIZED", 401);
