@@ -1,6 +1,7 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
+import { formatRelativeTime } from "@/lib/utils";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Users, Search, Pencil, Loader2 } from "lucide-react";
@@ -86,7 +87,7 @@ export default function UsersPage() {
                   <TableCell>
                     {!u.isActive ? <Badge variant="secondary">Inactive</Badge> : u.isLocked ? <Badge variant="error">Locked</Badge> : <Badge variant="success">Active</Badge>}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString() : "Never"}</TableCell>
+                  <TableCell className="text-muted-foreground">{u.lastLoginAt ? formatRelativeTime(u.lastLoginAt) : "Never"}</TableCell>
                   <TableCell>
                     {u.isActive ? (
                       <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditUser(u)}>

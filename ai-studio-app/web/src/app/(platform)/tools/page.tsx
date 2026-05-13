@@ -3,7 +3,7 @@ import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Wrench, Pencil, Loader2 } from "lucide-react";
+import { Plus, Wrench, Pencil, Loader2, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -77,6 +77,10 @@ export default function ToolsPage() {
       <PageHeader title="Tools" description="Register and manage tools that agents can use.">
         <Button onClick={() => setShowCreate(true)}><Plus className="h-4 w-4" /> Add Tool</Button>
       </PageHeader>
+
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground">{total} tool{total !== 1 ? "s" : ""}</span>
+      </div>
 
       {!loading && tools.length === 0 ? (
         <EmptyState icon={Wrench} title="No tools yet" description="Register your first tool to give agents capabilities." actionLabel="Add Tool" onAction={() => setShowCreate(true)} />

@@ -1,5 +1,6 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
+import { formatDate, formatRelativeTime } from "@/lib/utils";
 
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -129,7 +130,7 @@ function GeneralTab() {
                   <p className="text-xs text-muted-foreground">{schema.description}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-[10px] text-muted-foreground">{new Date(c.updatedAt).toLocaleDateString()}</span>
+                  <span className="text-[10px] text-muted-foreground">{formatDate(c.updatedAt)}</span>
                   <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => isEditing ? setEditingKey(null) : startEdit(c)}>
                     {isEditing ? "Cancel" : "Edit"}
                   </Button>
@@ -659,7 +660,7 @@ function ApiKeysTab() {
                       <Badge variant={k.isActive ? "success" : "secondary"}>{k.isActive ? "Active" : "Revoked"}</Badge>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleString() : "Never"}
+                      {k.lastUsedAt ? formatRelativeTime(k.lastUsedAt) : "Never"}
                     </TableCell>
                     <TableCell>
                       {k.isActive && (

@@ -1,6 +1,7 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
+import { formatDate } from "@/lib/utils";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, BookOpen, Upload, Pencil, Trash2, Loader2, ArrowLeft, FileText, CheckCircle, AlertCircle, Clock, RefreshCw, Cpu, Cloud } from "lucide-react";
@@ -131,7 +132,7 @@ function KBListView({ onSelect }: { onSelect: (id: string) => void }) {
                   <TableCell><Badge variant="secondary">{kb.embeddingModel}</Badge></TableCell>
                   <TableCell className="text-muted-foreground">{kb.documentCount}</TableCell>
                   <TableCell className="text-muted-foreground">{kb.chunkCount.toLocaleString()}</TableCell>
-                  <TableCell className="text-muted-foreground">{new Date(kb.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(kb.createdAt)}</TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" className="h-7 px-2" onClick={(e) => { e.stopPropagation(); setEditKB(kb); }}>
                       <Pencil className="h-3 w-3" />
@@ -336,7 +337,7 @@ function KBDetailView({ kbId, onBack }: { kbId: string; onBack: () => void }) {
                         {doc.errorMessage && <p className="text-xs text-destructive mt-1 line-clamp-1">{doc.errorMessage}</p>}
                       </TableCell>
                       <TableCell className="text-muted-foreground">{doc.status === "ready" ? doc.chunkCount.toLocaleString() : "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell className="text-muted-foreground">{formatDate(doc.createdAt)}</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(doc.id)}>
                           <Trash2 className="h-3 w-3" />

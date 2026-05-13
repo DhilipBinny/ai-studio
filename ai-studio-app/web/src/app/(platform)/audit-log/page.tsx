@@ -1,6 +1,7 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
+import { formatDateTime } from "@/lib/utils";
 
 import { useState, useEffect, useCallback } from "react";
 import { Card } from "@/components/ui/card";
@@ -91,7 +92,7 @@ export default function AuditLogPage() {
                       {e.resourceType ? `${e.resourceType}${e.resourceId ? ` / ${e.resourceId.slice(0, 8)}...` : ""}` : "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground font-mono text-xs">{e.ipAddress || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{new Date(e.createdAt).toLocaleString()}</TableCell>
+                    <TableCell className="text-muted-foreground">{formatDateTime(e.createdAt)}</TableCell>
                   </TableRow>
                   {isExpanded && (
                     <TableRow key={`${e.id}-detail`}>

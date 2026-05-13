@@ -232,7 +232,7 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand text-sm font-bold">
-            {typeInfo?.name.charAt(0) || "?"}
+            {provider.name.charAt(0).toUpperCase()}
           </div>
           <div>
             <div className="flex items-center gap-2">

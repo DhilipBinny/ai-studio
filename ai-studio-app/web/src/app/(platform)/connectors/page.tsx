@@ -1,6 +1,7 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
+import { formatRelativeTime } from "@/lib/utils";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Plug, Pencil, Loader2, Trash2, TestTube, Check, Wrench } from "lucide-react";
@@ -77,13 +78,13 @@ export default function ConnectorsPage() {
                       <div className="font-medium">{c.name}</div>
                       {c.description && <div className="text-xs text-muted-foreground line-clamp-1">{c.description}</div>}
                     </TableCell>
-                    <TableCell><Badge variant="secondary">{c.connectorType}</Badge></TableCell>
+                    <TableCell><Badge variant="secondary">{c.connectorType === "mcp" ? "MCP" : c.connectorType}</Badge></TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANT[c.status] || "secondary"}>{c.status}</Badge>
                       {c.lastError && <p className="text-xs text-destructive mt-0.5 line-clamp-1">{c.lastError}</p>}
                     </TableCell>
                     <TableCell className="text-muted-foreground">{tools.length > 0 ? tools.length : "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{c.lastTestedAt ? new Date(c.lastTestedAt).toLocaleString() : "Never"}</TableCell>
+                    <TableCell className="text-muted-foreground">{c.lastTestedAt ? formatRelativeTime(c.lastTestedAt) : "Never"}</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditConnector(c)}>
                         <Pencil className="h-3 w-3" />
