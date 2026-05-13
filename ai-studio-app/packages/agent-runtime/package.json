@@ -11,6 +11,7 @@
     "@ais/agent-core": "workspace:*",
     "@ais/mcp-client": "workspace:*",
     "@ais/tool-platform": "workspace:*",
+    "@ais/tools-common": "workspace:*",
     "@ais/security": "workspace:*",
     "@ais/memory-engine": "workspace:*",
     "@ais/provider-bridge": "workspace:*",

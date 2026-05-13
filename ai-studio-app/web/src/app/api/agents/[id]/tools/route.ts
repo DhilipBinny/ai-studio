@@ -11,7 +11,7 @@ export const GET = withRBAC("AGENTS", 10, async (_request, auth, params) => {
 
   const db = getDb();
   const data = await db
-    .select({ id: agentTools.id, toolId: agentTools.toolId, toolConfig: agentTools.toolConfig, isRequired: agentTools.isRequired, priority: agentTools.priority, toolName: tools.name, toolDisplayName: tools.displayName })
+    .select({ id: agentTools.id, toolId: agentTools.toolId, toolConfig: agentTools.toolConfig, isRequired: agentTools.isRequired, priority: agentTools.priority, toolName: tools.name, toolDisplayName: tools.displayName, riskLevel: tools.riskLevel })
     .from(agentTools)
     .innerJoin(tools, eq(agentTools.toolId, tools.id))
     .where(and(eq(agentTools.agentId, id), eq(agentTools.tenantId, auth.tenantId)));

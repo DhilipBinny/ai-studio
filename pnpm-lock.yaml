@@ -37,6 +37,9 @@ importers:
       '@ais/tool-platform':
         specifier: workspace:*
         version: link:../../../ai-studio-core/packages/tool-platform
+      '@ais/tools-common':
+        specifier: workspace:*
+        version: link:../../../ai-studio-core/packages/tools-common
       '@ais/types':
         specifier: workspace:*
         version: link:../../../ai-studio-core/packages/types
@@ -173,6 +176,9 @@ importers:
       '@ais/tool-platform':
         specifier: workspace:*
         version: link:../../ai-studio-core/packages/tool-platform
+      '@ais/tools-common':
+        specifier: workspace:*
+        version: link:../../ai-studio-core/packages/tools-common
       '@ais/types':
         specifier: workspace:*
         version: link:../../ai-studio-core/packages/types
@@ -365,6 +371,22 @@ importers:
         version: 8.5.1(jiti@2.7.0)(postcss@8.5.14)(tsx@4.21.0)(typescript@5.9.3)
       typescript:
         specifier: ^5.7.0
+        version: 5.9.3
+
+  ai-studio-core/packages/tools-common:
+    dependencies:
+      '@ais/tool-platform':
+        specifier: workspace:*
+        version: link:../tool-platform
+      '@ais/types':
+        specifier: workspace:*
+        version: link:../types
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.19
+      typescript:
+        specifier: ^5.8.3
         version: 5.9.3
 
   ai-studio-core/packages/types:

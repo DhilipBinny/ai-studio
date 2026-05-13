@@ -17,6 +17,7 @@ const nextConfig: NextConfig = {
     "@ais/rag-engine",
     "@ais/security",
     "@ais/tool-platform",
+    "@ais/tools-common",
     "@ais/types",
   ],
   serverExternalPackages: [

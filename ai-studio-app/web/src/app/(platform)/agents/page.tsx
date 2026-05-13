@@ -3,7 +3,7 @@ import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, Bot, Pencil, Loader2, MessageSquare, Send, RotateCcw, X, ChevronDown, ChevronRight, BookOpen, Trash2, Plug } from "lucide-react";
+import { Plus, Bot, Pencil, Loader2, MessageSquare, Send, RotateCcw, X, ChevronDown, ChevronRight, BookOpen, Trash2, Plug, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -700,6 +700,102 @@ function ConnectorAssignment({ agentId }: { agentId: string }) {
   );
 }
 
+function ToolRiskBadge({ level }: { level: string }) {
+  const config: Record<string, { label: string; className: string }> = {
+    safe: { label: "Safe", className: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300" },
+    moderate: { label: "Moderate", className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300" },
+    dangerous: { label: "Dangerous", className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300" },
+  };
+  const c = config[level] || { label: level, className: "" };
+  return <Badge variant="outline" className={`text-[9px] ${c.className}`}>{c.label}</Badge>;
+}
+
+function ToolAssignment({ agentId }: { agentId: string }) {
+  const [assigned, setAssigned] = useState<Array<{ id: string; toolId: string; toolName: string; toolDisplayName: string; riskLevel: string }>>([]);
+  const [available, setAvailable] = useState<Array<{ id: string; name: string; displayName: string; riskLevel: string; category: string }>>([]);
+  const [selectedTool, setSelectedTool] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [assigning, setAssigning] = useState(false);
+
+  const fetchAssigned = useCallback(async () => {
+    const res = await fetch(`/api/agents/${agentId}/tools`);
+    if (res.ok) { const d = await res.json(); setAssigned(d.data || []); }
+  }, [agentId]);
+
+  const fetchAvailable = useCallback(async () => {
+    const res = await fetch("/api/tools?pageSize=100&type=builtin");
+    if (res.ok) {
+      const d = await res.json();
+      setAvailable((d.data || []).filter((t: Record<string, unknown>) => t.riskLevel !== "safe"));
+    }
+  }, []);
+
+  useEffect(() => { Promise.all([fetchAssigned(), fetchAvailable()]).then(() => setLoading(false)); }, [fetchAssigned, fetchAvailable]);
+
+  const unassigned = available.filter((t) => !assigned.some((a) => a.toolId === t.id));
+
+  async function handleAssign() {
+    if (!selectedTool) return;
+    setAssigning(true);
+    const res = await fetch(`/api/agents/${agentId}/tools`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ toolId: selectedTool }),
+    });
+    if (res.ok) { setSelectedTool(""); await fetchAssigned(); }
+    setAssigning(false);
+  }
+
+  async function handleRemove(assignmentId: string) {
+    await fetch(`/api/agents/${agentId}/tools/${assignmentId}`, { method: "DELETE" });
+    await fetchAssigned();
+  }
+
+  if (loading) return <div className="text-xs text-muted-foreground">Loading tools...</div>;
+
+  return (
+    <div className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <Wrench className="h-4 w-4 text-muted-foreground" />
+        <p className="text-sm font-medium">Built-in Tools</p>
+      </div>
+
+      {assigned.length > 0 ? (
+        <div className="space-y-1">
+          {assigned.map((t) => (
+            <div key={t.id} className="flex items-center justify-between rounded-md border px-2.5 py-1.5">
+              <div className="flex items-center gap-2">
+                <span className="text-sm">{t.toolDisplayName}</span>
+                <ToolRiskBadge level={t.riskLevel} />
+              </div>
+              <button type="button" onClick={() => handleRemove(t.id)} className="text-muted-foreground hover:text-destructive">
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">No extra tools assigned. Safe tools (read_file, grep, web_fetch, etc.) are auto-available.</p>
+      )}
+
+      {unassigned.length > 0 && (
+        <div className="flex gap-2">
+          <Select value={selectedTool} onChange={(e) => setSelectedTool(e.target.value)} className="flex-1 text-sm">
+            <option value="">Select a tool...</option>
+            {unassigned.map((t) => (
+              <option key={t.id} value={t.id}>{t.displayName} ({t.riskLevel})</option>
+            ))}
+          </Select>
+          <Button type="button" variant="outline" size="sm" onClick={handleAssign} disabled={!selectedTool || assigning}>
+            {assigning ? <Loader2 className="h-3 w-3 animate-spin" /> : "Assign"}
+          </Button>
+        </div>
+      )}
+
+      <p className="text-[11px] text-muted-foreground">Safe tools are auto-available. Assign moderate/dangerous tools explicitly.</p>
+    </div>
+  );
+}
+
 function EditAgentForm({ agent, models, onSaved }: { agent: Agent; models: ProviderModel[]; onSaved: () => void }) {
   const [form, setForm] = useState({
     name: agent.name,
@@ -811,6 +907,8 @@ function EditAgentForm({ agent, models, onSaved }: { agent: Agent; models: Provi
       <KBAssignment agentId={agent.id} />
 
       <ConnectorAssignment agentId={agent.id} />
+
+      <ToolAssignment agentId={agent.id} />
 
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5">

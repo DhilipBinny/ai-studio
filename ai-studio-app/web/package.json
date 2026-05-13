@@ -26,6 +26,7 @@
     "@ais/rag-engine": "workspace:*",
     "@ais/security": "workspace:*",
     "@ais/tool-platform": "workspace:*",
+    "@ais/tools-common": "workspace:*",
     "@ais/types": "workspace:*",
     "@huggingface/transformers": "^3.4.0",
     "@anthropic-ai/sdk": "^0.95.2",

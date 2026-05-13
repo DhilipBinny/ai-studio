@@ -25,9 +25,20 @@ interface Tool {
   description: string;
   toolType: string;
   category: string;
+  riskLevel: string;
   version: number;
   isActive: boolean;
   createdAt: string;
+}
+
+function RiskBadge({ level }: { level: string }) {
+  const config: Record<string, { label: string; className: string }> = {
+    safe: { label: "Safe", className: "bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300" },
+    moderate: { label: "Moderate", className: "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300" },
+    dangerous: { label: "Dangerous", className: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300" },
+  };
+  const c = config[level] || { label: level, className: "" };
+  return <Badge variant="outline" className={c.className}>{c.label}</Badge>;
 }
 
 const TOOL_TYPES = [
@@ -76,13 +87,14 @@ export default function ToolsPage() {
               <TableRow>
                 <TableHead>Tool</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Risk</TableHead>
                 <TableHead>Category</TableHead>
                 <TableHead>Version</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? <TableSkeleton columns={5} /> : tools.map((t) => (
+              {loading ? <TableSkeleton columns={6} /> : tools.map((t) => (
                 <TableRow key={t.id}>
                   <TableCell>
                     <div className="font-medium">{t.displayName}</div>
@@ -90,6 +102,7 @@ export default function ToolsPage() {
                     {t.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{t.description}</div>}
                   </TableCell>
                   <TableCell><Badge variant="secondary">{t.toolType}</Badge></TableCell>
+                  <TableCell><RiskBadge level={t.riskLevel} /></TableCell>
                   <TableCell className="text-muted-foreground">{t.category || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">v{t.version}</TableCell>
                   <TableCell>
@@ -230,7 +243,13 @@ function EditToolForm({ tool, onSaved }: { tool: Tool; onSaved: () => void }) {
 
       <div className="space-y-1">
         <p className="text-sm font-mono text-muted-foreground">{tool.name}</p>
-        <p className="text-xs text-muted-foreground">Type: {tool.toolType} &middot; Version: v{tool.version}</p>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>Type: {tool.toolType}</span>
+          <span>&middot;</span>
+          <RiskBadge level={tool.riskLevel} />
+          <span>&middot;</span>
+          <span>v{tool.version}</span>
+        </div>
       </div>
 
       <div className="space-y-2">
