@@ -1,4 +1,5 @@
 import { embedText as providerEmbed, type EmbeddingConfig } from "@ais/provider-bridge";
+import type { Embedder } from "@ais/rag-engine";
 
 export type { EmbeddingConfig } from "@ais/provider-bridge";
 
@@ -42,8 +43,6 @@ let builtinPipeline: BuiltinPipeline | null = null;
 
 async function getBuiltinPipeline(): Promise<BuiltinPipeline> {
   if (!builtinPipeline) {
-    // webpackIgnore prevents webpack from bundling native onnxruntime-node binaries.
-    // Node.js resolves the module at runtime (listed in serverExternalPackages).
     const transformers = await import(/* webpackIgnore: true */ "@huggingface/transformers");
     builtinPipeline = await (transformers.pipeline as Function)("feature-extraction", "Xenova/bge-small-en-v1.5", {
       dtype: "q8",
@@ -62,28 +61,28 @@ async function embedBuiltin(texts: string[]): Promise<number[][]> {
   return results;
 }
 
-export async function generateEmbeddings(
-  texts: string[],
-  config: EmbeddingConfig,
-): Promise<number[][]> {
-  if (texts.length === 0) return [];
-
-  if (config.source === "builtin") {
-    return embedBuiltin(texts);
-  }
-
-  return providerEmbed(config, texts, "document");
+export function createEmbedder(config: EmbeddingConfig): Embedder {
+  return {
+    async embed(texts: string[], inputType?: "query" | "document") {
+      if (texts.length === 0) return [];
+      if (config.source === "builtin") return embedBuiltin(texts);
+      return providerEmbed(config, texts, inputType);
+    },
+    async embedSingle(text: string, inputType?: "query" | "document") {
+      if (config.source === "builtin") {
+        const [embedding] = await embedBuiltin([text]);
+        return embedding;
+      }
+      const [embedding] = await providerEmbed(config, [text], inputType);
+      return embedding;
+    },
+  };
 }
 
-export async function generateSingleEmbedding(
-  text: string,
-  config: EmbeddingConfig,
-): Promise<number[]> {
-  if (config.source === "builtin") {
-    const [embedding] = await embedBuiltin([text]);
-    return embedding;
-  }
+export async function generateEmbeddings(texts: string[], config: EmbeddingConfig): Promise<number[][]> {
+  return createEmbedder(config).embed(texts, "document");
+}
 
-  const [embedding] = await providerEmbed(config, [text], "query");
-  return embedding;
+export async function generateSingleEmbedding(text: string, config: EmbeddingConfig): Promise<number[]> {
+  return createEmbedder(config).embedSingle(text, "query");
 }

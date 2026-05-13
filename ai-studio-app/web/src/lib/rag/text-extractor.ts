@@ -1,5 +1,6 @@
 import { readFile } from "fs/promises";
 import { join } from "path";
+import type { TextExtractor } from "@ais/rag-engine";
 
 const UPLOAD_BASE = join(process.cwd(), "..", ".data", "uploads");
 
@@ -35,4 +36,10 @@ async function extractDocx(buffer: Buffer): Promise<string> {
   const mammoth = await import("mammoth");
   const result = await mammoth.extractRawText({ buffer });
   return result.value;
+}
+
+export function createTextExtractor(): TextExtractor {
+  return {
+    extract: extractText,
+  };
 }
