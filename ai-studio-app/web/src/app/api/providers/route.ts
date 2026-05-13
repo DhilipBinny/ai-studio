@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { providers, providerModels } from "@ais-app/database";
 import { createProviderSchema, paginationSchema } from "@ais-app/validation";
+import { encryptSecret } from "@ais-app/auth";
 import { eq, and, count, desc, sql } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
@@ -98,7 +99,7 @@ export const POST = withRBAC("PROVIDERS", 20, async (request, auth) => {
       name,
       providerType,
       baseUrl: baseUrl || null,
-      apiKeyRef: apiKeyRef || null,
+      apiKeyRef: apiKeyRef ? encryptSecret(apiKeyRef) : null,
       config: config || {},
     })
     .returning();

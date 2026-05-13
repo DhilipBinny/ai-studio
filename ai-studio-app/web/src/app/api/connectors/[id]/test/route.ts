@@ -5,6 +5,7 @@ import { eq, and } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 import { MCPClient } from "@ais/mcp-client";
+import { decryptSecret, isEncrypted } from "@ais-app/auth";
 import type { MCPServerConfig } from "@ais/types";
 
 export const POST = withRBAC("CONNECTORS", 20, async (_request, auth, params) => {
@@ -27,7 +28,9 @@ export const POST = withRBAC("CONNECTORS", 20, async (_request, auth, params) =>
     transport: (config.transport as "stdio" | "sse") || "stdio",
     command: config.command as string | undefined,
     args: config.args as string[] | undefined,
-    env: config.env as Record<string, string> | undefined,
+    env: config.env
+      ? Object.fromEntries(Object.entries(config.env as Record<string, string>).map(([k, v]) => [k, isEncrypted(v) ? decryptSecret(v) : v]))
+      : undefined,
     url: config.url as string | undefined,
   };
 

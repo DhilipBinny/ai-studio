@@ -1,4 +1,5 @@
 import { embedText as providerEmbed, type EmbeddingConfig } from "@ais/provider-bridge";
+import { decryptSecret, isEncrypted } from "@ais-app/auth";
 import type { Embedder } from "@ais/rag-engine";
 
 export type { EmbeddingConfig } from "@ais/provider-bridge";
@@ -33,7 +34,7 @@ export function buildEmbeddingConfig(kb: EmbeddingKBConfig): EmbeddingConfig {
     model: kb.embeddingModel,
     dimension: kb.embeddingDimension,
     providerType: kb.provider.providerType,
-    apiKey: kb.provider.apiKeyRef || undefined,
+    apiKey: kb.provider.apiKeyRef ? (isEncrypted(kb.provider.apiKeyRef) ? decryptSecret(kb.provider.apiKeyRef) : kb.provider.apiKeyRef) : undefined,
     baseUrl: kb.provider.baseUrl || undefined,
   };
 }

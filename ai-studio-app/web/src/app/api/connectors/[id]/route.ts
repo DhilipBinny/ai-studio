@@ -4,6 +4,7 @@ import { connectors } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
+import { encryptSecret } from "@ais-app/auth";
 
 export const GET = withRBAC("CONNECTORS", 10, async (_request, auth, params) => {
   const id = params?.id;
@@ -38,7 +39,12 @@ export const PATCH = withRBAC("CONNECTORS", 20, async (request, auth, params) =>
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (body.name !== undefined) updates.name = body.name;
   if (body.description !== undefined) updates.description = body.description;
-  if (body.connectionConfig !== undefined) updates.connectionConfig = body.connectionConfig;
+  if (body.connectionConfig !== undefined) {
+    const cc = body.connectionConfig;
+    updates.connectionConfig = cc?.env
+      ? { ...cc, env: Object.fromEntries(Object.entries(cc.env as Record<string, string>).map(([k, v]) => [k, encryptSecret(v)])) }
+      : cc;
+  }
   if (body.credentialsRef !== undefined) updates.credentialsRef = body.credentialsRef;
 
   const [updated] = await db

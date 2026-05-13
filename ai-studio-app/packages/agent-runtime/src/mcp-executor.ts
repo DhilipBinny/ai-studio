@@ -2,8 +2,16 @@ import { getDb } from "@ais-app/database";
 import { agentConnectors, connectors } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
 import { MCPBridge } from "@ais/mcp-client";
+import { decryptSecret, isEncrypted } from "@ais-app/auth";
 import type { MCPServerConfig, MCPToolDefinition } from "@ais/types";
 import type { ToolDefinition } from "./tool-executor";
+
+function decryptEnvVars(env: Record<string, string> | undefined): Record<string, string> | undefined {
+  if (!env) return undefined;
+  return Object.fromEntries(
+    Object.entries(env).map(([k, v]) => [k, isEncrypted(v) ? decryptSecret(v) : v]),
+  );
+}
 
 let bridge: MCPBridge | null = null;
 
@@ -52,7 +60,7 @@ export async function loadMCPTools(
       transport: (config.transport as "stdio" | "sse") || "stdio",
       command: config.command as string | undefined,
       args: config.args as string[] | undefined,
-      env: config.env as Record<string, string> | undefined,
+      env: decryptEnvVars(config.env as Record<string, string> | undefined),
     };
 
     try {

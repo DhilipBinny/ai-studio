@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { connectors } from "@ais-app/database";
 import { paginationSchema } from "@ais-app/validation";
+import { encryptSecret } from "@ais-app/auth";
 import { eq, and, count, desc } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
@@ -34,7 +35,9 @@ export const POST = withRBAC("CONNECTORS", 20, async (request, auth) => {
     name,
     description: description || "",
     connectorType,
-    connectionConfig: connectionConfig || {},
+    connectionConfig: connectionConfig?.env
+      ? { ...connectionConfig, env: Object.fromEntries(Object.entries(connectionConfig.env as Record<string, string>).map(([k, v]) => [k, encryptSecret(v)])) }
+      : connectionConfig || {},
     credentialsRef: credentialsRef || null,
     healthCheckUrl: healthCheckUrl || null,
     createdBy: auth.userId,

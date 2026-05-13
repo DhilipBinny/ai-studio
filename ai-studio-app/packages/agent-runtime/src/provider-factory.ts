@@ -1,10 +1,18 @@
 import { AnthropicProvider, OpenAIProvider } from "@ais/provider-bridge";
 import type { ProviderInterface } from "@ais/provider-bridge";
+import { decryptSecret, isEncrypted } from "@ais-app/auth";
 import type { ProviderConfig } from "./types";
+
+function resolveSecret(value: string | null): string | null {
+  if (!value) return null;
+  if (isEncrypted(value)) return decryptSecret(value);
+  return value;
+}
 
 export function createProvider(config: ProviderConfig): ProviderInterface {
   const providerCfg = config.config as Record<string, unknown> || {};
   const isOAuth = providerCfg.authMethod === "oauth_token";
+  const apiKey = resolveSecret(config.apiKeyRef);
 
   switch (config.providerType) {
     case "anthropic": {
@@ -15,7 +23,7 @@ export function createProvider(config: ProviderConfig): ProviderInterface {
 
         return new AnthropicProvider(
           {
-            authToken: config.apiKeyRef || "",
+            authToken: apiKey || "",
             defaultModel: config.modelId,
             baseUrl: config.baseUrl || undefined,
           },
@@ -29,7 +37,7 @@ export function createProvider(config: ProviderConfig): ProviderInterface {
         );
       }
       return new AnthropicProvider({
-        apiKey: config.apiKeyRef || "",
+        apiKey: apiKey || "",
         baseUrl: config.baseUrl || undefined,
         defaultModel: config.modelId,
       });
@@ -37,7 +45,7 @@ export function createProvider(config: ProviderConfig): ProviderInterface {
 
     case "openai":
       return new OpenAIProvider({
-        apiKey: config.apiKeyRef || "",
+        apiKey: apiKey || "",
         defaultModel: config.modelId,
       });
 
@@ -51,7 +59,7 @@ export function createProvider(config: ProviderConfig): ProviderInterface {
 
     case "openai_compatible":
       return new OpenAIProvider({
-        apiKey: config.apiKeyRef || "",
+        apiKey: apiKey || "",
         baseUrl: config.baseUrl || undefined,
         defaultModel: config.modelId,
       });

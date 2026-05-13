@@ -1,6 +1,7 @@
 import { getDb } from "@ais-app/database";
 import { agentKnowledgeBases, knowledgeBases, documentChunks, providers } from "@ais-app/database";
 import { eq, and, sql, inArray } from "drizzle-orm";
+import { decryptSecret, isEncrypted } from "@ais-app/auth";
 import type { SearchStore, SearchHit, AgentKBInfo } from "@ais/rag-engine";
 
 export class DrizzleSearchStore implements SearchStore {
@@ -38,7 +39,7 @@ export class DrizzleSearchStore implements SearchStore {
       rerankSource: r.rerankSource,
       rerankModel: r.rerankModel,
       providerType: r.providerType,
-      apiKeyRef: r.apiKeyRef,
+      apiKeyRef: r.apiKeyRef && isEncrypted(r.apiKeyRef) ? decryptSecret(r.apiKeyRef) : r.apiKeyRef,
       baseUrl: r.baseUrl,
       rerankProviderId: r.rerankProviderId,
     }));

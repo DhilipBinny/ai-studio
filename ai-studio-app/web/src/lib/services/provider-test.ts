@@ -8,6 +8,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import { decryptSecret, isEncrypted } from "@ais-app/auth";
 
 export interface TestResult {
   success: boolean;
@@ -34,6 +35,14 @@ interface ProviderRow {
 const TEST_TIMEOUT_MS = 15_000;
 
 export async function testProvider(provider: ProviderRow): Promise<TestResult> {
+  const resolvedProvider = {
+    ...provider,
+    apiKeyRef: provider.apiKeyRef && isEncrypted(provider.apiKeyRef) ? decryptSecret(provider.apiKeyRef) : provider.apiKeyRef,
+  };
+  return testProviderInternal(resolvedProvider);
+}
+
+async function testProviderInternal(provider: ProviderRow): Promise<TestResult> {
   const start = Date.now();
 
   try {

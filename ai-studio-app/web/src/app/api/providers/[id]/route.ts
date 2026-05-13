@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { providers, providerModels } from "@ais-app/database";
 import { updateProviderSchema } from "@ais-app/validation";
+import { encryptSecret } from "@ais-app/auth";
 import { eq, and } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
@@ -48,9 +49,14 @@ export const PATCH = withRBAC("PROVIDERS", 20, async (request, auth, params) => 
 
   if (!existing) return errorResponse("Provider not found", "NOT_FOUND", 404);
 
+  const updateData = { ...parsed.data };
+  if (updateData.apiKeyRef) {
+    updateData.apiKeyRef = encryptSecret(updateData.apiKeyRef);
+  }
+
   const [updated] = await db
     .update(providers)
-    .set(parsed.data)
+    .set(updateData)
     .where(eq(providers.id, id))
     .returning();
 
