@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
-import { users, profiles } from "@ais-app/database";
+import { users, profiles, passwordHistory } from "@ais-app/database";
 import { hashPassword, validatePassword, checkBreached } from "@ais-app/auth";
 import { createUserSchema, paginationSchema } from "@ais-app/validation";
 import { eq, and, count, asc, desc, ilike } from "drizzle-orm";
@@ -121,6 +121,8 @@ export const POST = withRBAC("USERS", 20, async (request, auth) => {
       profileId: users.profileId,
       createdAt: users.createdAt,
     });
+
+  await db.insert(passwordHistory).values({ tenantId: auth.tenantId, userId: user.id, passwordHash });
 
   await createAuditEntry({
     tenantId: auth.tenantId,

@@ -7,3 +7,4 @@ export { computeAuditHash } from "./audit";
 export { RateLimiter } from "./rate-limit";
 export { validatePassword, checkBreached, PASSWORD_POLICY, type PasswordValidationResult } from "./password-policy";
 export { encryptSecret, decryptSecret, isEncrypted } from "./encryption";
+export { checkPasswordHistory } from "./password-history";

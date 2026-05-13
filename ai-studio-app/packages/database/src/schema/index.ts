@@ -4,6 +4,7 @@ export * from "./profiles";
 export * from "./users";
 export * from "./otp";
 export * from "./password-reset";
+export * from "./password-history";
 export * from "./system-config";
 export * from "./audit-log";
 export * from "./sessions";

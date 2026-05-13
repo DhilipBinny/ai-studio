@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
-import { users, passwordResetRequests, sessions } from "@ais-app/database";
+import { users, passwordResetRequests, sessions, passwordHistory } from "@ais-app/database";
 import { passwordResetSchema } from "@ais-app/validation";
-import { hashPassword, hashToken, validatePassword, checkBreached } from "@ais-app/auth";
-import { eq, and, isNull } from "drizzle-orm";
+import { hashPassword, hashToken, validatePassword, checkBreached, checkPasswordHistory, AUTH_CONFIG } from "@ais-app/auth";
+import { eq, and, isNull, desc } from "drizzle-orm";
 import { errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
@@ -43,7 +43,21 @@ export async function POST(request: Request) {
     return errorResponse("This password has appeared in data breaches. Choose a different one.", "BREACHED_PASSWORD", 400);
   }
 
+  const history = await db.select({ passwordHash: passwordHistory.passwordHash })
+    .from(passwordHistory).where(eq(passwordHistory.userId, resetRequest.userId))
+    .orderBy(desc(passwordHistory.createdAt)).limit(AUTH_CONFIG.password.historyCount);
+  const historyCheck = await checkPasswordHistory(newPassword, history.map((h) => h.passwordHash));
+  if (historyCheck.reused) {
+    return errorResponse(historyCheck.error!, "PASSWORD_REUSED", 400);
+  }
+
   const newHash = await hashPassword(newPassword);
+
+  await db.insert(passwordHistory).values({
+    tenantId: resetRequest.tenantId,
+    userId: resetRequest.userId,
+    passwordHash: newHash,
+  });
 
   await db.update(users).set({
     passwordHash: newHash,
