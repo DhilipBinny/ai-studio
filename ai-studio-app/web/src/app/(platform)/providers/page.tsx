@@ -17,6 +17,7 @@ interface ProviderModel {
   id: string;
   modelId: string;
   displayName: string;
+  capabilities: string[];
   contextWindow: number | null;
   maxOutputTokens: number | null;
 }
@@ -34,10 +35,10 @@ interface Provider {
 }
 
 const PROVIDER_TYPES = [
-  { id: "anthropic", name: "Anthropic", description: "Claude Sonnet, Opus, Haiku" },
-  { id: "openai", name: "OpenAI", description: "GPT-4o, o1, o3, o4-mini" },
-  { id: "ollama", name: "Ollama", description: "Local models via Ollama" },
-  { id: "openai_compatible", name: "OpenAI Compatible", description: "LM Studio, Together, Groq, vLLM" },
+  { id: "anthropic", name: "Anthropic", description: "Claude Sonnet, Opus, Haiku (chat only, no embeddings)" },
+  { id: "openai", name: "OpenAI", description: "GPT-4o, o1, o3 + embedding models" },
+  { id: "ollama", name: "Ollama", description: "Local chat + embedding models via Ollama" },
+  { id: "openai_compatible", name: "OpenAI Compatible", description: "Voyage AI, Cohere, NVIDIA, Groq, vLLM — chat, embedding, or reranking" },
 ];
 
 const STATUS_VARIANT: Record<string, "success" | "warning" | "error" | "secondary"> = {
@@ -76,7 +77,7 @@ export default function ProvidersPage() {
 
   return (
     <RequirePermission module="PROVIDERS"><>
-      <PageHeader title="Providers" description="Manage LLM providers and model configurations.">
+      <PageHeader title="Providers" description="Manage AI providers — chat models, embedding models, and re-ranking services.">
         {hasAvailableTypes && (
           <Button onClick={() => setShowAdd(true)}>
             <Plus className="h-4 w-4" /> Add Provider
@@ -88,7 +89,7 @@ export default function ProvidersPage() {
         <EmptyState
           icon={ExternalLink}
           title="No providers configured"
-          description="Connect an LLM provider to start using AI models."
+          description="Connect AI providers for chat, embeddings, and re-ranking. Supports Anthropic, OpenAI, Ollama, Voyage AI, Cohere, and any OpenAI-compatible endpoint."
           actionLabel="Add Provider"
           onAction={() => setShowAdd(true)}
         />
@@ -102,6 +103,26 @@ export default function ProvidersPage() {
             <ProviderCard key={provider.id} provider={provider} onUpdated={fetchProviders} defaultModelId={defaultModelId} onSetDefault={setDefaultModelId} />
           ))}
         </div>
+      )}
+
+      {!loading && providers.length > 0 && (
+        <Card className="p-4 mt-2 bg-muted/30 border-dashed">
+          <p className="text-xs font-medium mb-2">Provider Capabilities</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-muted-foreground">
+            <div>
+              <p className="font-medium text-foreground mb-0.5">Chat Models</p>
+              <p>Used by agents for conversation. Anthropic, OpenAI, Ollama, and compatible endpoints.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground mb-0.5">Embedding Models</p>
+              <p>Used by Knowledge Bases to vectorize documents. OpenAI, Ollama, Voyage AI, NVIDIA. Models tagged automatically on Test Connection.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground mb-0.5">Re-ranking Models</p>
+              <p>Used by Knowledge Bases to improve search precision. Cohere, Voyage AI, Jina. Add as OpenAI Compatible provider.</p>
+            </div>
+          </div>
+        </Card>
       )}
 
       <Dialog open={showAdd} onOpenChange={setShowAdd}>
@@ -265,7 +286,16 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
           >
             {showModels ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
             <Check className="h-3 w-3 text-green-600" />
-            {provider.models.length} model{provider.models.length !== 1 ? "s" : ""} available
+            {provider.models.length} model{provider.models.length !== 1 ? "s" : ""}
+            {(() => {
+              const caps = provider.models.reduce<Record<string, number>>((acc, m) => {
+                const cap = (m.capabilities as string[])?.[0] || "chat";
+                acc[cap] = (acc[cap] || 0) + 1;
+                return acc;
+              }, {});
+              const parts = Object.entries(caps).map(([k, v]) => `${v} ${k}`);
+              return parts.length > 1 ? ` (${parts.join(", ")})` : "";
+            })()}
           </button>
           {showModels && (
             <div className="mt-2 space-y-1">
@@ -572,16 +602,26 @@ function ModelRow({ model, providerId, providerType, isDefault, onSetDefault }: 
         <div className="flex items-center gap-2">
           <span className="font-medium">{model.displayName}</span>
           <span className="font-mono text-muted-foreground">{model.modelId}</span>
+          {(model.capabilities as string[])?.includes("embedding") && (
+            <Badge variant="secondary" className="text-[9px] px-1 py-0">embedding</Badge>
+          )}
+          {(model.capabilities as string[])?.includes("reranking") && (
+            <Badge variant="secondary" className="text-[9px] px-1 py-0">reranking</Badge>
+          )}
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
           {model.contextWindow && <span>{(model.contextWindow / 1000).toFixed(0)}K ctx</span>}
           {model.maxOutputTokens && <span>{(model.maxOutputTokens / 1000).toFixed(0)}K out</span>}
-          <Button variant="ghost" size="sm" onClick={() => setShowChat(!showChat)} className="h-6 px-2 text-[10px]">
-            <Send className="h-3 w-3" /> Try
-          </Button>
-          <button onClick={onSetDefault} className="p-0.5 transition-colors" title={isDefault ? "Default model" : "Set as default"}>
-            <Star className={`h-3.5 w-3.5 ${isDefault ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400"}`} />
-          </button>
+          {(model.capabilities as string[])?.includes("chat") && (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setShowChat(!showChat)} className="h-6 px-2 text-[10px]">
+                <Send className="h-3 w-3" /> Try
+              </Button>
+              <button onClick={onSetDefault} className="p-0.5 transition-colors" title={isDefault ? "Default model" : "Set as default"}>
+                <Star className={`h-3.5 w-3.5 ${isDefault ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400"}`} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 

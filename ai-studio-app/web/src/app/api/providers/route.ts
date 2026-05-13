@@ -43,6 +43,7 @@ export const GET = withRBAC("PROVIDERS", 10, async (request, auth) => {
           providerId: providerModels.providerId,
           modelId: providerModels.modelId,
           displayName: providerModels.displayName,
+          capabilities: providerModels.capabilities,
           contextWindow: providerModels.contextWindow,
           maxOutputTokens: providerModels.maxOutputTokens,
           isActive: providerModels.isActive,
