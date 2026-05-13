@@ -304,10 +304,17 @@ export async function executeTool(
   let status: "pending" | "success" | "error" | "denied" | "timeout" = "success";
   let errorMessage: string | null = null;
 
-  const toolRisk = BUILTIN_TOOL_RISK[call.name];
+  let toolRisk = BUILTIN_TOOL_RISK[call.name];
+  if (!toolRisk) {
+    const [toolRow] = await db.select({ riskLevel: tools.riskLevel }).from(tools)
+      .where(and(eq(tools.tenantId, tenantId), eq(tools.name, call.name), eq(tools.isActive, true))).limit(1);
+    toolRisk = toolRow?.riskLevel;
+  }
+
   if (toolRisk === "dangerous") {
+    const argsHash = JSON.stringify(call.input);
     const [pendingCall] = await db
-      .select({ id: agentSessionToolCalls.id, approvalStatus: agentSessionToolCalls.approvalStatus })
+      .select({ id: agentSessionToolCalls.id, approvalStatus: agentSessionToolCalls.approvalStatus, arguments: agentSessionToolCalls.arguments })
       .from(agentSessionToolCalls)
       .where(and(
         eq(agentSessionToolCalls.agentSessionId, sessionId),
@@ -317,7 +324,9 @@ export async function executeTool(
       .orderBy(desc(agentSessionToolCalls.createdAt))
       .limit(1);
 
-    if (!pendingCall || pendingCall.approvalStatus !== "approved") {
+    const argsMatch = pendingCall && JSON.stringify(pendingCall.arguments) === argsHash;
+
+    if (!pendingCall || !argsMatch || pendingCall.approvalStatus !== "approved") {
       await db.insert(agentSessionToolCalls).values({
         tenantId,
         agentSessionId: sessionId,

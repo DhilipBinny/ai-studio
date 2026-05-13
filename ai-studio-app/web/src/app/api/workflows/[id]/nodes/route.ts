@@ -13,6 +13,12 @@ export const PUT = withRBAC("WORKFLOWS", 20, async (request, auth, params) => {
 
   if (!Array.isArray(nodes)) return errorResponse("nodes array required", "VALIDATION_ERROR", 400);
 
+  const nodeNames = nodes.map((n) => n.name?.replace(/\s+/g, "_").toLowerCase());
+  const uniqueNames = new Set(nodeNames);
+  if (uniqueNames.size !== nodeNames.length) {
+    return errorResponse("Node names must be unique (names are compared case-insensitively with spaces as underscores)", "DUPLICATE_NAME", 400);
+  }
+
   const db = getDb();
 
   const [workflow] = await db.select({ id: workflows.id }).from(workflows).where(and(eq(workflows.id, id), eq(workflows.tenantId, auth.tenantId))).limit(1);

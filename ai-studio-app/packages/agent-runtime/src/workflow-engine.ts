@@ -269,33 +269,42 @@ export async function triggerWorkflow(
 
       const stepStart = Date.now();
 
-      await db.insert(workflowRunSteps).values({
+      const [step] = await db.insert(workflowRunSteps).values({
         tenantId,
         workflowRunId: run.id,
         workflowNodeId: currentNode.id,
         status: "running",
         input: state,
         startedAt: new Date(),
-      });
+      }).returning({ id: workflowRunSteps.id });
 
-      const { output, paused } = await executeNode(currentNode, state, tenantId, run.id, userId);
+      let stepOutput: Record<string, unknown>;
+      let paused = false;
+      try {
+        const result = await executeNode(currentNode, state, tenantId, run.id, userId);
+        stepOutput = result.output;
+        paused = result.paused;
+      } catch (nodeErr) {
+        await db.update(workflowRunSteps).set({
+          status: "failed", errorMessage: (nodeErr as Error).message,
+          durationMs: Date.now() - stepStart, completedAt: new Date(),
+        }).where(eq(workflowRunSteps.id, step.id));
+        throw nodeErr;
+      }
 
       const nodeKey = currentNode.name.replace(/\s+/g, "_").toLowerCase();
-      state[nodeKey] = output;
+      state[nodeKey] = stepOutput;
       stepsCompleted++;
 
       await db
         .update(workflowRunSteps)
         .set({
           status: paused ? "waiting_human" : "completed",
-          output,
+          output: stepOutput,
           durationMs: Date.now() - stepStart,
           completedAt: new Date(),
         })
-        .where(and(
-          eq(workflowRunSteps.workflowRunId, run.id),
-          eq(workflowRunSteps.workflowNodeId, currentNode.id),
-        ));
+        .where(eq(workflowRunSteps.id, step.id));
 
       await db
         .update(workflowRuns)
@@ -314,6 +323,10 @@ export async function triggerWorkflow(
       if (currentNode.nodeType === "output") break;
 
       const nextNodes = getNextNodes(currentNode.id, graphEdges, graphNodes, state);
+      if (nextNodes.length > 1) {
+        const prev = (state._warnings as unknown as string[]) || [];
+        (state as Record<string, unknown>)._warnings = [...prev, `Parallel branches not yet supported: only following first path after "${currentNode.name}"`];
+      }
       currentNode = nextNodes[0] || null;
     }
 
@@ -343,13 +356,12 @@ export async function resumeWorkflow(
   const db = getDb();
 
   const [run] = await db
-    .select()
-    .from(workflowRuns)
-    .where(and(eq(workflowRuns.id, runId), eq(workflowRuns.tenantId, tenantId)))
-    .limit(1);
+    .update(workflowRuns)
+    .set({ status: "running" })
+    .where(and(eq(workflowRuns.id, runId), eq(workflowRuns.tenantId, tenantId), eq(workflowRuns.status, "waiting")))
+    .returning();
 
-  if (!run) throw new Error("Run not found");
-  if (run.status !== "waiting") throw new Error("Run is not paused");
+  if (!run) throw new Error("Run not found or not paused (may have been resumed by another request)");
 
   const steps = await db
     .select()
@@ -394,7 +406,7 @@ export async function resumeWorkflow(
   const nodeKey = pausedNode.name.replace(/\s+/g, "_").toLowerCase();
   state[nodeKey] = { ...((state[nodeKey] as Record<string, unknown>) || {}), decision };
 
-  await db.update(workflowRuns).set({ status: "running", output: state }).where(eq(workflowRuns.id, runId));
+  await db.update(workflowRuns).set({ output: state }).where(eq(workflowRuns.id, runId));
 
   let stepsCompleted = steps.length;
   const visited = new Set<string>();
@@ -408,20 +420,33 @@ export async function resumeWorkflow(
       visited.add(currentNode.id);
 
       const stepStart = Date.now();
-      await db.insert(workflowRunSteps).values({
+      const [rStep] = await db.insert(workflowRunSteps).values({
         tenantId, workflowRunId: runId, workflowNodeId: currentNode.id,
         status: "running", input: state, startedAt: new Date(),
-      });
+      }).returning({ id: workflowRunSteps.id });
 
-      const { output, paused } = await executeNode(currentNode, state, run.tenantId, runId, userId);
+      let stepOutput: Record<string, unknown>;
+      let paused = false;
+      try {
+        const result = await executeNode(currentNode, state, run.tenantId, runId, userId);
+        stepOutput = result.output;
+        paused = result.paused;
+      } catch (nodeErr) {
+        await db.update(workflowRunSteps).set({
+          status: "failed", errorMessage: (nodeErr as Error).message,
+          durationMs: Date.now() - stepStart, completedAt: new Date(),
+        }).where(eq(workflowRunSteps.id, rStep.id));
+        throw nodeErr;
+      }
+
       const key = currentNode.name.replace(/\s+/g, "_").toLowerCase();
-      state[key] = output;
+      state[key] = stepOutput;
       stepsCompleted++;
 
       await db.update(workflowRunSteps).set({
         status: paused ? "waiting_human" : "completed",
-        output, durationMs: Date.now() - stepStart, completedAt: new Date(),
-      }).where(and(eq(workflowRunSteps.workflowRunId, runId), eq(workflowRunSteps.workflowNodeId, currentNode.id)));
+        output: stepOutput, durationMs: Date.now() - stepStart, completedAt: new Date(),
+      }).where(eq(workflowRunSteps.id, rStep.id));
 
       await db.update(workflowRuns).set({ output: state }).where(eq(workflowRuns.id, runId));
 
@@ -432,6 +457,10 @@ export async function resumeWorkflow(
       if (currentNode.nodeType === "output") break;
 
       const nextNodes = getNextNodes(currentNode.id, graphEdges, graphNodes, state);
+      if (nextNodes.length > 1) {
+        const prev = (state._warnings as unknown as string[]) || [];
+        (state as Record<string, unknown>)._warnings = [...prev, `Parallel branches not yet supported: only following first path after "${currentNode.name}"`];
+      }
       currentNode = nextNodes[0] || null;
     }
 
