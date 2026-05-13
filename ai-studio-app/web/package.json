@@ -21,6 +21,7 @@
     "@ais-app/validation": "workspace:*",
     "@ais/agent-core": "workspace:*",
     "@ais/memory-engine": "workspace:*",
+    "@ais/mcp-client": "workspace:*",
     "@ais/provider-bridge": "workspace:*",
     "@ais/rag-engine": "workspace:*",
     "@ais/security": "workspace:*",

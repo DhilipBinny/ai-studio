@@ -12,6 +12,7 @@ export * from "./tools";
 export * from "./agents";
 export * from "./knowledge-bases";
 export * from "./connectors";
+export * from "./agent-connectors";
 export * from "./agent-sessions";
 export * from "./workflows";
 export * from "./usage-records";

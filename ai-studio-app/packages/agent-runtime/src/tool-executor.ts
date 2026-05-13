@@ -2,6 +2,7 @@ import { getDb } from "@ais-app/database";
 import { agentTools, tools, agentSessionToolCalls, agentKnowledgeBases } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
 import { LoopDetector } from "@ais/tool-platform";
+import { loadMCPTools, executeMCPTool } from "./mcp-executor";
 
 export interface ToolDefinition {
   name: string;
@@ -83,10 +84,15 @@ const KNOWLEDGE_SEARCH_DEFINITION: ToolDefinition = {
   },
 };
 
+export interface LoadedTools {
+  definitions: ToolDefinition[];
+  mcpConnectorMap: Map<string, string>;
+}
+
 export async function loadToolDefinitions(
   agentId: string,
   tenantId: string,
-): Promise<ToolDefinition[]> {
+): Promise<LoadedTools> {
   const db = getDb();
 
   const rows = await db
@@ -105,7 +111,7 @@ export async function loadToolDefinitions(
       eq(tools.isActive, true),
     ));
 
-  const defs = rows.map((row) => ({
+  const defs: ToolDefinition[] = rows.map((row) => ({
     name: row.name,
     description: row.description || row.displayName,
     input_schema: Object.keys(row.parametersSchema as Record<string, unknown>).length > 0
@@ -123,7 +129,10 @@ export async function loadToolDefinitions(
     defs.push(KNOWLEDGE_SEARCH_DEFINITION);
   }
 
-  return defs;
+  const { tools: mcpTools, connectorMap } = await loadMCPTools(agentId, tenantId);
+  defs.push(...mcpTools);
+
+  return { definitions: defs, mcpConnectorMap: connectorMap };
 }
 
 export function createLoopDetector(): LoopDetector {
@@ -136,6 +145,7 @@ export async function executeTool(
   sessionId: string,
   loopDetector?: LoopDetector,
   context?: ToolContext,
+  mcpConnectorMap?: Map<string, string>,
 ): Promise<ToolResult> {
   if (loopDetector) {
     const loopError = loopDetector.record(call.name, call.input);
@@ -151,10 +161,19 @@ export async function executeTool(
   let status: "pending" | "success" | "error" | "denied" | "timeout" = "success";
   let errorMessage: string | null = null;
 
+  const isMCP = call.name.startsWith("mcp__") && mcpConnectorMap;
   const contextExecutor = CONTEXT_EXECUTORS[call.name];
   const executor = BUILTIN_EXECUTORS[call.name];
 
-  if (contextExecutor && context) {
+  if (isMCP) {
+    try {
+      result = await executeMCPTool(call.name, call.input, mcpConnectorMap);
+    } catch (e) {
+      result = `Error: ${(e as Error).message}`;
+      status = "error";
+      errorMessage = (e as Error).message;
+    }
+  } else if (contextExecutor && context) {
     try {
       result = await contextExecutor(call.input, context);
     } catch (e) {

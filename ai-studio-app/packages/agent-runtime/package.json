@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@ais/agent-core": "workspace:*",
+    "@ais/mcp-client": "workspace:*",
     "@ais/tool-platform": "workspace:*",
     "@ais/security": "workspace:*",
     "@ais/memory-engine": "workspace:*",

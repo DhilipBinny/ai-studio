@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
-import { agents, agentTools, tools, agentKnowledgeBases, knowledgeBases } from "@ais-app/database";
+import { agents, agentTools, tools, agentKnowledgeBases, knowledgeBases, agentConnectors, connectors } from "@ais-app/database";
 import { updateAgentSchema } from "@ais-app/validation";
 import { eq, and } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
@@ -26,7 +26,13 @@ export const GET = withRBAC("AGENTS", 10, async (_request, auth, params) => {
     .innerJoin(knowledgeBases, eq(agentKnowledgeBases.knowledgeBaseId, knowledgeBases.id))
     .where(eq(agentKnowledgeBases.agentId, id));
 
-  return NextResponse.json({ ...agent, tools: assignedTools, knowledgeBases: assignedKBs });
+  const assignedConnectors = await db
+    .select({ id: agentConnectors.id, connectorId: agentConnectors.connectorId, connectorName: connectors.name, connectorType: connectors.connectorType, status: connectors.status })
+    .from(agentConnectors)
+    .innerJoin(connectors, eq(agentConnectors.connectorId, connectors.id))
+    .where(eq(agentConnectors.agentId, id));
+
+  return NextResponse.json({ ...agent, tools: assignedTools, knowledgeBases: assignedKBs, connectors: assignedConnectors });
 });
 
 export const PATCH = withRBAC("AGENTS", 20, async (request, auth, params) => {

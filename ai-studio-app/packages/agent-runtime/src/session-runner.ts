@@ -118,7 +118,7 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       content: sanitized,
     });
 
-    const toolDefs = await loadToolDefinitions(input.agentId, input.tenantId);
+    const { definitions: toolDefs, mcpConnectorMap } = await loadToolDefinitions(input.agentId, input.tenantId);
     const systemPrompt = buildSystemPrompt(agentConfig, { timezone: "Asia/Singapore" });
     const loopDetector = createLoopDetector();
     const toolContext: ToolContext = { agentId: input.agentId, tenantId: input.tenantId, sessionId };
@@ -205,6 +205,7 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
             sessionId,
             loopDetector,
             toolContext,
+            mcpConnectorMap,
           );
 
           await db.insert(agentSessionMessages).values({

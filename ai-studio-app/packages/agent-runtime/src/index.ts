@@ -3,6 +3,7 @@ export { buildSystemPrompt } from "./prompt-builder";
 export { createProvider } from "./provider-factory";
 export { callLLM } from "./llm-caller";
 export { loadToolDefinitions, executeTool, createLoopDetector } from "./tool-executor";
+export { loadMCPTools, executeMCPTool } from "./mcp-executor";
 export { checkAndCompact } from "./compaction";
 export { searchKnowledge } from "./knowledge-search";
 export { DrizzleDocumentStore, DrizzleSearchStore } from "./stores/index";

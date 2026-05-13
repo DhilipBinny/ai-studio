@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     "@ais-app/types",
     "@ais-app/validation",
     "@ais/agent-core",
+    "@ais/mcp-client",
     "@ais/memory-engine",
     "@ais/provider-bridge",
     "@ais/rag-engine",
@@ -26,6 +27,7 @@ const nextConfig: NextConfig = {
     "@anthropic-ai/sdk",
     "openai",
     "@huggingface/transformers",
+    "@modelcontextprotocol/sdk",
     "onnxruntime-node",
   ],
   webpack: (config, { isServer }) => {

@@ -3,7 +3,7 @@ import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, Bot, Pencil, Loader2, MessageSquare, Send, RotateCcw, X, ChevronDown, ChevronRight, BookOpen, Trash2 } from "lucide-react";
+import { Plus, Bot, Pencil, Loader2, MessageSquare, Send, RotateCcw, X, ChevronDown, ChevronRight, BookOpen, Trash2, Plug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -609,6 +609,97 @@ function KBAssignment({ agentId }: { agentId: string }) {
   );
 }
 
+interface AssignedConnector {
+  id: string;
+  connectorId: string;
+  connectorName: string;
+  connectorType: string;
+  status: string;
+}
+
+function ConnectorAssignment({ agentId }: { agentId: string }) {
+  const [assigned, setAssigned] = useState<AssignedConnector[]>([]);
+  const [available, setAvailable] = useState<Array<{ id: string; name: string; connectorType: string; status: string }>>([]);
+  const [selectedConnector, setSelectedConnector] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [assigning, setAssigning] = useState(false);
+
+  const fetchAssigned = useCallback(async () => {
+    const res = await fetch(`/api/agents/${agentId}/connectors`);
+    if (res.ok) { const d = await res.json(); setAssigned(d.data); }
+  }, [agentId]);
+
+  const fetchAvailable = useCallback(async () => {
+    const res = await fetch("/api/connectors?pageSize=100");
+    if (res.ok) { const d = await res.json(); setAvailable(d.data.filter((c: Record<string, unknown>) => c.connectorType === "mcp")); }
+  }, []);
+
+  useEffect(() => { Promise.all([fetchAssigned(), fetchAvailable()]).then(() => setLoading(false)); }, [fetchAssigned, fetchAvailable]);
+
+  const unassigned = available.filter((c) => !assigned.some((a) => a.connectorId === c.id));
+
+  async function handleAssign() {
+    if (!selectedConnector) return;
+    setAssigning(true);
+    const res = await fetch(`/api/agents/${agentId}/connectors`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ connectorId: selectedConnector }),
+    });
+    if (res.ok) { setSelectedConnector(""); await fetchAssigned(); }
+    setAssigning(false);
+  }
+
+  async function handleRemove(assignmentId: string) {
+    await fetch(`/api/agents/${agentId}/connectors/${assignmentId}`, { method: "DELETE" });
+    await fetchAssigned();
+  }
+
+  if (loading) return <div className="text-xs text-muted-foreground">Loading connectors...</div>;
+
+  return (
+    <div className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <Plug className="h-4 w-4 text-muted-foreground" />
+        <p className="text-sm font-medium">MCP Connectors</p>
+      </div>
+
+      {assigned.length > 0 ? (
+        <div className="space-y-1">
+          {assigned.map((c) => (
+            <div key={c.id} className="flex items-center justify-between rounded-md border px-2.5 py-1.5">
+              <div>
+                <span className="text-sm">{c.connectorName}</span>
+                <Badge variant={c.status === "active" ? "success" : "secondary"} className="ml-2 text-[9px]">{c.status}</Badge>
+              </div>
+              <button type="button" onClick={() => handleRemove(c.id)} className="text-muted-foreground hover:text-destructive">
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">No MCP connectors assigned. Add connectors to give the agent access to external tools.</p>
+      )}
+
+      {unassigned.length > 0 && (
+        <div className="flex gap-2">
+          <Select value={selectedConnector} onChange={(e) => setSelectedConnector(e.target.value)} className="flex-1 text-sm">
+            <option value="">Select a connector...</option>
+            {unassigned.map((c) => (
+              <option key={c.id} value={c.id}>{c.name} ({c.connectorType})</option>
+            ))}
+          </Select>
+          <Button type="button" variant="outline" size="sm" onClick={handleAssign} disabled={!selectedConnector || assigning}>
+            {assigning ? <Loader2 className="h-3 w-3 animate-spin" /> : "Assign"}
+          </Button>
+        </div>
+      )}
+
+      <p className="text-[11px] text-muted-foreground">Assigned MCP connectors give the agent access to external tools (GitHub, Slack, etc.).</p>
+    </div>
+  );
+}
+
 function EditAgentForm({ agent, models, onSaved }: { agent: Agent; models: ProviderModel[]; onSaved: () => void }) {
   const [form, setForm] = useState({
     name: agent.name,
@@ -718,6 +809,8 @@ function EditAgentForm({ agent, models, onSaved }: { agent: Agent; models: Provi
       <RulesEditor rules={rules} onChange={setRules} />
 
       <KBAssignment agentId={agent.id} />
+
+      <ConnectorAssignment agentId={agent.id} />
 
       <div className="grid grid-cols-3 gap-3">
         <div className="space-y-1.5">
