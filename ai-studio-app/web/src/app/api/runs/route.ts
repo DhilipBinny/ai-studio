@@ -24,6 +24,7 @@ export const GET = withRBAC("RUNS", 10, async (request, auth) => {
       status: agentSessions.status, triggerType: agentSessions.triggerType, channel: agentSessions.channel,
       totalInputTokens: agentSessions.totalInputTokens, totalOutputTokens: agentSessions.totalOutputTokens,
       totalCostUsd: agentSessions.totalCostUsd, totalTurns: agentSessions.totalTurns,
+      totalToolCalls: agentSessions.totalToolCalls,
       modelUsed: agentSessions.modelUsed, startedAt: agentSessions.startedAt,
       completedAt: agentSessions.completedAt, createdAt: agentSessions.createdAt,
     })
