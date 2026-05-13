@@ -164,22 +164,22 @@ export default function AgentsPage() {
 
       <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={setShowCreate} size="2xl">
         <DialogContent onClose={() => setShowCreate(false)}>
           <DialogHeader><DialogTitle>Create Agent</DialogTitle></DialogHeader>
           <CreateAgentForm models={models} onCreated={() => { setShowCreate(false); fetchAgents(); }} />
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editAgent} onOpenChange={(open) => { if (!open) setEditAgent(null); }}>
+      <Dialog open={!!editAgent} onOpenChange={(open) => { if (!open) setEditAgent(null); }} size="2xl">
         <DialogContent onClose={() => setEditAgent(null)}>
           <DialogHeader><DialogTitle>Edit Agent</DialogTitle></DialogHeader>
           {editAgent && <EditAgentForm agent={editAgent} models={models} onSaved={() => { setEditAgent(null); fetchAgents(); }} />}
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!chatAgent} onOpenChange={(open) => { if (!open) setChatAgent(null); }}>
-        <DialogContent onClose={() => setChatAgent(null)} className="max-w-2xl h-[80vh] flex flex-col">
+      <Dialog open={!!chatAgent} onOpenChange={(open) => { if (!open) setChatAgent(null); }} size="3xl">
+        <DialogContent onClose={() => setChatAgent(null)} className="h-[80vh] flex flex-col">
           <DialogHeader><DialogTitle>Chat — {chatAgent?.name}</DialogTitle></DialogHeader>
           {chatAgent && <AgentChat agent={chatAgent} />}
         </DialogContent>

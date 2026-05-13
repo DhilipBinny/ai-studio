@@ -119,14 +119,14 @@ export default function ToolsPage() {
 
       <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={setShowCreate} size="xl">
         <DialogContent onClose={() => setShowCreate(false)}>
           <DialogHeader><DialogTitle>Add Tool</DialogTitle></DialogHeader>
           <CreateToolForm onCreated={() => { setShowCreate(false); fetchTools(); }} />
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editTool} onOpenChange={(open) => { if (!open) setEditTool(null); }}>
+      <Dialog open={!!editTool} onOpenChange={(open) => { if (!open) setEditTool(null); }} size="xl">
         <DialogContent onClose={() => setEditTool(null)}>
           <DialogHeader><DialogTitle>Edit Tool</DialogTitle></DialogHeader>
           {editTool && <EditToolForm tool={editTool} onSaved={() => { setEditTool(null); fetchTools(); }} />}

@@ -4,13 +4,26 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import { X } from "lucide-react";
 
+type DialogSize = "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "full";
+
+const sizeClasses: Record<DialogSize, string> = {
+  sm: "max-w-sm",
+  md: "max-w-md",
+  lg: "max-w-lg",
+  xl: "max-w-xl",
+  "2xl": "max-w-2xl",
+  "3xl": "max-w-3xl",
+  full: "max-w-[90vw]",
+};
+
 interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
+  size?: DialogSize;
 }
 
-function Dialog({ open, onOpenChange, children }: DialogProps) {
+function Dialog({ open, onOpenChange, children, size = "lg" }: DialogProps) {
   React.useEffect(() => {
     if (!open) return;
     function handleEsc(e: KeyboardEvent) {
@@ -32,7 +45,7 @@ function Dialog({ open, onOpenChange, children }: DialogProps) {
         className="fixed inset-0 bg-black/40 animate-in fade-in-0 duration-200"
         onClick={() => onOpenChange(false)}
       />
-      <div className="relative z-50 w-full max-w-lg animate-in fade-in-0 zoom-in-[0.97] slide-in-from-bottom-1 duration-200">
+      <div className={cn("relative z-50 w-full animate-in fade-in-0 zoom-in-[0.97] slide-in-from-bottom-1 duration-200", sizeClasses[size])}>
         {children}
       </div>
     </div>
@@ -54,7 +67,7 @@ const DialogContent = React.forwardRef<
     {onClose && (
       <button
         onClick={onClose}
-        className="absolute right-4 top-4 rounded-md p-1.5 text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="absolute right-4 top-4 z-10 rounded-md p-1.5 text-muted-foreground/70 hover:text-foreground hover:bg-muted transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         aria-label="Close"
       >
         <X className="h-4 w-4" />
@@ -82,3 +95,4 @@ function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 }
 
 export { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter };
+export type { DialogSize };

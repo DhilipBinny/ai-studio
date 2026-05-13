@@ -146,14 +146,14 @@ function KBListView({ onSelect }: { onSelect: (id: string) => void }) {
 
       <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={setShowCreate} size="xl">
         <DialogContent onClose={() => setShowCreate(false)}>
           <DialogHeader><DialogTitle>Create Knowledge Base</DialogTitle></DialogHeader>
           <CreateKBForm onCreated={() => { setShowCreate(false); fetchKbs(); }} />
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editKB} onOpenChange={(open) => { if (!open) setEditKB(null); }}>
+      <Dialog open={!!editKB} onOpenChange={(open) => { if (!open) setEditKB(null); }} size="xl">
         <DialogContent onClose={() => setEditKB(null)}>
           <DialogHeader><DialogTitle>Edit Knowledge Base</DialogTitle></DialogHeader>
           {editKB && <EditKBForm kb={editKB} onSaved={() => { setEditKB(null); fetchKbs(); }} />}

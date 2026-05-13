@@ -125,8 +125,8 @@ export default function ProvidersPage() {
         </Card>
       )}
 
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent onClose={() => setShowAdd(false)} className="max-w-xl">
+      <Dialog open={showAdd} onOpenChange={setShowAdd} size="xl">
+        <DialogContent onClose={() => setShowAdd(false)}>
           <DialogHeader>
             <DialogTitle>Add Provider</DialogTitle>
           </DialogHeader>

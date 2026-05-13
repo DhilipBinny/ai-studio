@@ -110,14 +110,14 @@ export default function UsersPage() {
 
       <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={setShowCreate} size="xl">
         <DialogContent onClose={() => setShowCreate(false)}>
           <DialogHeader><DialogTitle>Add User</DialogTitle></DialogHeader>
           <CreateUserForm onCreated={() => { setShowCreate(false); fetchUsers(); }} />
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editUser} onOpenChange={(open) => { if (!open) setEditUser(null); }}>
+      <Dialog open={!!editUser} onOpenChange={(open) => { if (!open) setEditUser(null); }} size="xl">
         <DialogContent onClose={() => setEditUser(null)}>
           <DialogHeader><DialogTitle>Edit User</DialogTitle></DialogHeader>
           {editUser && <EditUserForm user={editUser} onSaved={() => { setEditUser(null); fetchUsers(); }} />}

@@ -99,14 +99,14 @@ export default function ConnectorsPage() {
 
       <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={setShowCreate} size="xl">
         <DialogContent onClose={() => setShowCreate(false)}>
           <DialogHeader><DialogTitle>Add Connector</DialogTitle></DialogHeader>
           <CreateConnectorForm onCreated={() => { setShowCreate(false); fetchConnectors(); }} />
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editConnector} onOpenChange={(open) => { if (!open) setEditConnector(null); }}>
+      <Dialog open={!!editConnector} onOpenChange={(open) => { if (!open) setEditConnector(null); }} size="xl">
         <DialogContent onClose={() => setEditConnector(null)}>
           <DialogHeader><DialogTitle>Connector Details</DialogTitle></DialogHeader>
           {editConnector && <ConnectorDetail connector={editConnector} onUpdated={() => { setEditConnector(null); fetchConnectors(); }} />}

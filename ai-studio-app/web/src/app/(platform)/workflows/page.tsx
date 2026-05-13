@@ -59,7 +59,7 @@ export default function WorkflowsPage() {
         </Table></Card>
       )}
       <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={setShowCreate} size="xl">
         <DialogContent onClose={() => setShowCreate(false)}>
           <DialogHeader><DialogTitle>Create Workflow</DialogTitle></DialogHeader>
           <CreateWorkflowForm onCreated={() => { setShowCreate(false); fetchWorkflows(); }} />
