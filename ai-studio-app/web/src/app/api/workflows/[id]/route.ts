@@ -13,8 +13,8 @@ export const GET = withRBAC("WORKFLOWS", 10, async (_request, auth, params) => {
   const [workflow] = await db.select().from(workflows).where(and(eq(workflows.id, id), eq(workflows.tenantId, auth.tenantId))).limit(1);
   if (!workflow) return errorResponse("Workflow not found", "NOT_FOUND", 404);
 
-  const nodes = await db.select().from(workflowNodes).where(eq(workflowNodes.workflowId, id));
-  const edges = await db.select().from(workflowEdges).where(eq(workflowEdges.workflowId, id));
+  const nodes = await db.select().from(workflowNodes).where(and(eq(workflowNodes.workflowId, id), eq(workflowNodes.tenantId, auth.tenantId)));
+  const edges = await db.select().from(workflowEdges).where(and(eq(workflowEdges.workflowId, id), eq(workflowEdges.tenantId, auth.tenantId)));
 
   return NextResponse.json({ ...workflow, nodes, edges });
 });

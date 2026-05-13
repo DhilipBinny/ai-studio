@@ -5,15 +5,16 @@ import { eq, and, asc } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 
 export const GET = withRBAC("WORKFLOWS", 10, async (_request, auth, params) => {
+  const id = params?.id;
   const rid = params?.rid;
-  if (!rid) return errorResponse("Run ID required", "MISSING_ID", 400);
+  if (!id || !rid) return errorResponse("Workflow and Run IDs required", "MISSING_ID", 400);
 
   const db = getDb();
 
   const [run] = await db
     .select()
     .from(workflowRuns)
-    .where(and(eq(workflowRuns.id, rid), eq(workflowRuns.tenantId, auth.tenantId)))
+    .where(and(eq(workflowRuns.id, rid), eq(workflowRuns.workflowId, id), eq(workflowRuns.tenantId, auth.tenantId)))
     .limit(1);
 
   if (!run) return errorResponse("Run not found", "NOT_FOUND", 404);

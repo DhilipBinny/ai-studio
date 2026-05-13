@@ -242,10 +242,18 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       .where(eq(agentSessions.id, sessionId))
       .limit(1);
 
+    const [currentStatus] = await db
+      .select({ status: agentSessions.status })
+      .from(agentSessions)
+      .where(eq(agentSessions.id, sessionId))
+      .limit(1);
+
+    const nextStatus = currentStatus?.status === "waiting_approval" ? "waiting_approval" : "waiting";
+
     await db
       .update(agentSessions)
       .set({
-        status: "waiting",
+        status: nextStatus,
         totalInputTokens: (current?.inputTokens || 0) + totalInputTokens,
         totalOutputTokens: (current?.outputTokens || 0) + totalOutputTokens,
         totalTurns: (current?.turns || 0) + 1,

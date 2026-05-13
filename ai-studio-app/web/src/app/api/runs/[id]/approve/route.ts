@@ -31,16 +31,24 @@ export const POST = withRBAC("RUNS", 20, async (request, auth, params) => {
   }
 
   const [toolCall] = await db
-    .select({ id: agentSessionToolCalls.id, toolName: agentSessionToolCalls.toolName })
+    .select({
+      id: agentSessionToolCalls.id,
+      toolName: agentSessionToolCalls.toolName,
+      approvalStatus: agentSessionToolCalls.approvalStatus,
+    })
     .from(agentSessionToolCalls)
     .where(and(
       eq(agentSessionToolCalls.id, Number(toolCallId)),
       eq(agentSessionToolCalls.agentSessionId, id),
+      eq(agentSessionToolCalls.tenantId, auth.tenantId),
       eq(agentSessionToolCalls.requiresApproval, true),
     ))
     .limit(1);
 
   if (!toolCall) return errorResponse("Tool call not found or does not require approval", "NOT_FOUND", 404);
+  if (toolCall.approvalStatus) {
+    return errorResponse(`Tool call already ${toolCall.approvalStatus}`, "ALREADY_DECIDED", 409);
+  }
 
   await db
     .update(agentSessionToolCalls)
@@ -49,13 +57,13 @@ export const POST = withRBAC("RUNS", 20, async (request, auth, params) => {
       approvedBy: auth.userId,
       approvedAt: new Date(),
       status: action === "approve" ? "pending" : "denied",
-      result: action === "deny" ? "Denied by admin" : "Awaiting human approval",
+      result: action === "deny" ? "Denied by admin" : "Approved — will execute on next message",
     })
     .where(eq(agentSessionToolCalls.id, Number(toolCallId)));
 
   await db
     .update(agentSessions)
-    .set({ status: action === "approve" ? "waiting" : "waiting" })
+    .set({ status: action === "approve" ? "waiting" : "failed" })
     .where(eq(agentSessions.id, id));
 
   await createAuditEntry({

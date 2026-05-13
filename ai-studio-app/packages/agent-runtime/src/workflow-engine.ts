@@ -34,12 +34,15 @@ interface GraphEdge {
   sortOrder: number;
 }
 
+const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 function resolveTemplate(template: string, state: WorkflowState): string {
   return template.replace(/\{\{([^}]+)\}\}/g, (_, path: string) => {
     const parts = path.trim().split(".");
     let current: unknown = state;
     for (const part of parts) {
       if (current === null || current === undefined) return "";
+      if (BLOCKED_KEYS.has(part)) return "";
       current = (current as Record<string, unknown>)[part];
     }
     if (current === null || current === undefined) return "";
@@ -210,13 +213,13 @@ export async function triggerWorkflow(
   const nodes = await db
     .select()
     .from(workflowNodes)
-    .where(eq(workflowNodes.workflowId, workflowId))
+    .where(and(eq(workflowNodes.workflowId, workflowId), eq(workflowNodes.tenantId, tenantId)))
     .orderBy(asc(workflowNodes.createdAt));
 
   const edges = await db
     .select()
     .from(workflowEdges)
-    .where(eq(workflowEdges.workflowId, workflowId));
+    .where(and(eq(workflowEdges.workflowId, workflowId), eq(workflowEdges.tenantId, tenantId)));
 
   if (nodes.length === 0) throw new Error("Workflow has no nodes");
 
@@ -370,12 +373,12 @@ export async function resumeWorkflow(
   const nodes = await db
     .select()
     .from(workflowNodes)
-    .where(eq(workflowNodes.workflowId, run.workflowId));
+    .where(and(eq(workflowNodes.workflowId, run.workflowId), eq(workflowNodes.tenantId, tenantId)));
 
   const edges = await db
     .select()
     .from(workflowEdges)
-    .where(eq(workflowEdges.workflowId, run.workflowId));
+    .where(and(eq(workflowEdges.workflowId, run.workflowId), eq(workflowEdges.tenantId, tenantId)));
 
   const graphNodes: GraphNode[] = nodes.map((n) => ({
     id: n.id, nodeType: n.nodeType, name: n.name, config: (n.config || {}) as NodeConfig,
