@@ -31,41 +31,9 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
+import type { WorkflowNode, WorkflowEdge, AgentSummary, ProviderModel } from "@ais-app/types";
 
-interface WorkflowNode {
-  id: string;
-  nodeType: string;
-  name: string;
-  config: Record<string, unknown>;
-  errorPolicy?: Record<string, unknown>;
-  positionX: number;
-  positionY: number;
-}
-
-interface WorkflowEdge {
-  id: string;
-  fromNodeId: string;
-  toNodeId: string;
-  conditionLabel: string | null;
-  conditionExpr: string | null;
-  edgeType?: string;
-  sortOrder: number;
-}
-
-interface Agent {
-  id: string;
-  name: string;
-}
-
-interface ProviderModel {
-  id: string;
-  modelId: string;
-  displayName: string;
-  providerName: string;
-}
+type Agent = AgentSummary;
 
 // ---------------------------------------------------------------------------
 // Node Type Registry

@@ -20,57 +20,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Markdown } from "@/components/markdown";
-
-interface Session {
-  id: string;
-  agentId: string;
-  agentName: string;
-  status: string;
-  channel: string;
-  totalInputTokens: number;
-  totalOutputTokens: number;
-  totalCostUsd: string;
-  totalTurns: number;
-  totalToolCalls: number;
-  modelUsed: string | null;
-  startedAt: string | null;
-  completedAt: string | null;
-  createdAt: string;
-}
-
-interface SessionDetail extends Session {
-  agentSlug: string;
-  providerUsed: string | null;
-  errorMessage: string | null;
-  triggerType: string;
-  messages: SessionMessage[];
-  toolCalls: SessionToolCall[];
-}
-
-interface SessionMessage {
-  id: number;
-  role: string;
-  content: string;
-  toolCalls: unknown;
-  toolCallId: string | null;
-  metadata: unknown;
-  createdAt: string;
-}
-
-interface SessionToolCall {
-  id: number;
-  toolName: string;
-  arguments: Record<string, unknown>;
-  result: string | null;
-  status: string;
-  durationMs: number | null;
-  errorMessage: string | null;
-  requiresApproval: boolean;
-  approvalStatus: string | null;
-  approvedBy: string | null;
-  approvedAt: string | null;
-  createdAt: string;
-}
+import type { Session, SessionDetail, SessionMessage, SessionToolCall } from "@ais-app/types";
 
 const STATUS_VARIANT: Record<string, "info" | "success" | "error" | "warning" | "secondary"> = {
   pending: "secondary", running: "info", waiting: "info", waiting_approval: "warning", completed: "success", failed: "error", cancelled: "warning", timeout: "error",

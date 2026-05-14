@@ -24,14 +24,9 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
+import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowRun, RunStep, AgentSummary, ProviderModel } from "@ais-app/types";
 
-interface Workflow { id: string; name: string; description: string; status: string; version: number; createdAt: string; }
-interface WorkflowNode { id: string; nodeType: string; name: string; config: Record<string, unknown>; positionX: number; positionY: number; }
-interface WorkflowEdge { id: string; fromNodeId: string; toNodeId: string; conditionLabel: string | null; conditionExpr: string | null; edgeType?: string; sortOrder: number; }
-interface ProviderModel { id: string; modelId: string; displayName: string; providerName: string; }
-interface WorkflowRun { id: string; status: string; input: Record<string, unknown>; output: Record<string, unknown> | null; errorMessage: string | null; startedAt: string | null; completedAt: string | null; createdAt: string; }
-interface RunStep { id: number; nodeId: string; nodeName: string; nodeType: string; status: string; output: Record<string, unknown> | null; durationMs: number | null; startedAt: string | null; }
-interface Agent { id: string; name: string; slug: string; }
+type Agent = AgentSummary;
 
 const STATUS_VARIANT: Record<string, "success" | "warning" | "secondary" | "error" | "info"> = {
   draft: "warning", active: "success", disabled: "secondary", archived: "error",

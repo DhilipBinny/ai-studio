@@ -9,27 +9,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { FileBrowser } from "@/components/workspace/file-browser";
-
-interface Agent {
-  id: string;
-  name: string;
-  slug: string;
-  status: string;
-}
-
-interface Workflow {
-  id: string;
-  name: string;
-  status: string;
-}
-
-interface WorkflowRun {
-  id: string;
-  status: string;
-  startedAt: string | null;
-  completedAt: string | null;
-  createdAt: string;
-}
+import type { Agent, Workflow, WorkflowRun } from "@ais-app/types";
 
 export default function WorkspacePage() {
   const [tab, setTab] = useState("agents");

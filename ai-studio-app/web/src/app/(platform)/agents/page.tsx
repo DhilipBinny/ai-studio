@@ -18,44 +18,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import { Markdown } from "@/components/markdown";
-
-interface Persona {
-  identity?: string;
-  instructions?: string;
-  tone?: string;
-  context?: string;
-}
-
-interface AgentRule {
-  rule: string;
-  priority?: number;
-}
-
-interface Agent {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  systemPrompt: string;
-  persona: Persona;
-  rules: AgentRule[];
-  status: string;
-  version: number;
-  tags: string[];
-  providerModelId: string | null;
-  temperature: string;
-  maxTurns: number;
-  maxTokensPerTurn: number;
-  createdAt: string;
-}
-
-interface ProviderModel {
-  id: string;
-  modelId: string;
-  displayName: string;
-  providerName: string;
-  providerType: string;
-}
+import type { Agent, Persona, AgentRule, ProviderModel } from "@ais-app/types";
 
 const STATUS_VARIANT: Record<string, "success" | "warning" | "secondary" | "error"> = {
   draft: "warning", active: "success", disabled: "secondary", archived: "error",
