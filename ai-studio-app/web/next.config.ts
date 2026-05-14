@@ -4,7 +4,6 @@ import { resolve } from "path";
 const nextConfig: NextConfig = {
   outputFileTracingRoot: resolve(__dirname, "../../"),
   transpilePackages: [
-    "@ais-app/agent-runtime",
     "@ais-app/auth",
     "@ais-app/database",
     "@ais-app/email",
@@ -21,6 +20,7 @@ const nextConfig: NextConfig = {
     "@ais/types",
   ],
   serverExternalPackages: [
+    "@ais-app/agent-runtime",
     "@node-rs/argon2",
     "postgres",
     "nodemailer",

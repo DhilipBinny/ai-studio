@@ -48,7 +48,7 @@ async function flushBuffer(): Promise<void> {
       })),
     );
   } catch {
-    // DB write failure is non-fatal for real-time — spans are already in the ring buffer
+    // DB write failure is non-fatal — spans are in the ring buffer
   }
 }
 

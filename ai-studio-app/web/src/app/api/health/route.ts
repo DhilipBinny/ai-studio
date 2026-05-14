@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api-utils";
+import { progressBus } from "@ais-app/agent-runtime/src/progress-bus";
 
 const startTime = Date.now();
 
@@ -49,6 +50,8 @@ export async function GET(request: NextRequest) {
     detail: `RSS ${rssMB}MB (threshold ${maxRssMB}MB), Heap ${Math.round(mem.heapUsed / 1024 / 1024)}MB`,
   };
 
+  const busStats = progressBus.getStats();
+
   return NextResponse.json({
     status: overall,
     timestamp: new Date().toISOString(),
@@ -56,5 +59,6 @@ export async function GET(request: NextRequest) {
     version: process.env.npm_package_version || "dev",
     node: process.version,
     checks,
+    progressBus: busStats,
   }, { status: overall === "healthy" ? 200 : 503 });
 }
