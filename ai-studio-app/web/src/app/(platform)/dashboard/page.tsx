@@ -195,38 +195,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {stats && (
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Token Usage Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="grid grid-cols-3 gap-4">
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Input Tokens</p>
-                <p className="text-lg font-semibold">{formatNumber(stats.totalInputTokens)}</p>
-                <div className="h-2 bg-muted rounded-full mt-2 overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${stats.totalTokens > 0 ? (stats.totalInputTokens / stats.totalTokens) * 100 : 0}%` }} />
-                </div>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Output Tokens</p>
-                <p className="text-lg font-semibold">{formatNumber(stats.totalOutputTokens)}</p>
-                <div className="h-2 bg-muted rounded-full mt-2 overflow-hidden">
-                  <div className="h-full bg-green-500 rounded-full" style={{ width: `${stats.totalTokens > 0 ? (stats.totalOutputTokens / stats.totalTokens) * 100 : 0}%` }} />
-                </div>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Total</p>
-                <p className="text-lg font-semibold">{formatNumber(stats.totalTokens)}</p>
-                <div className="h-2 bg-muted rounded-full mt-2 overflow-hidden">
-                  <div className="h-full bg-primary rounded-full w-full" />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </></RequirePermission>
   );
 }
