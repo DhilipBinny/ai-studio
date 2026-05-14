@@ -15,6 +15,14 @@ export function errorResponse(
   return NextResponse.json({ error, code, details }, { status });
 }
 
+export async function parseJsonBody(request: NextRequest): Promise<Record<string, unknown> | null> {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
+}
+
 export async function getAuthContext(
   request: NextRequest
 ): Promise<AuthContext | null> {

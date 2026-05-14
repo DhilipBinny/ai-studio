@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { triggerWorkflow } from "@ais-app/agent-runtime";
 import { triggerWorkflowSchema } from "@ais-app/validation";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
 export const POST = withRBAC("WORKFLOWS", 20, async (request, auth, params) => {
   const id = params?.id;
   if (!id) return errorResponse("Workflow ID required", "MISSING_ID", 400);
 
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = triggerWorkflowSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse("Validation failed", "VALIDATION_ERROR", 400, {
