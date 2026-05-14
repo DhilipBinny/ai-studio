@@ -3,7 +3,7 @@ import { RequirePermission } from "@/components/require-permission";
 import { formatDate, formatRelativeTime } from "@/lib/utils";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Copy, Key } from "lucide-react";
+import { Loader2, Copy, Key, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +43,6 @@ export default function SettingsPage() {
 }
 
 import { SYSTEM_CONFIG_SCHEMA, type ConfigSectionDef, type ConfigFieldDef } from "@ais-app/types";
-import { Copy, Key } from "lucide-react";
 
 function GeneralTab() {
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
@@ -132,7 +131,7 @@ function GeneralTab() {
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-muted-foreground">{formatDate(c.updatedAt)}</span>
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => isEditing ? setEditingKey(null) : startEdit(c)}>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => isEditing ? setEditingKey(null) : startEdit(c)} aria-label="Edit config">
                     {isEditing ? "Cancel" : "Edit"}
                   </Button>
                 </div>
@@ -240,7 +239,7 @@ function AdvancedTab() {
           <p className="text-sm font-semibold">Advanced Configuration</p>
           <p className="text-xs text-muted-foreground">Agent limits, default model, and other dynamic settings (JSON)</p>
         </div>
-        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => editing ? setEditing(false) : startEdit()}>
+        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => editing ? setEditing(false) : startEdit()} aria-label="Edit config">
           {editing ? "Cancel" : "Edit"}
         </Button>
       </div>
@@ -665,7 +664,7 @@ function ApiKeysTab() {
                     </TableCell>
                     <TableCell>
                       {k.isActive && (
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-destructive" onClick={() => handleRevoke(k.id)}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-destructive" onClick={() => handleRevoke(k.id)} aria-label="Revoke API key">
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       )}

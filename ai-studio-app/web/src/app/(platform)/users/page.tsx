@@ -90,7 +90,7 @@ export default function UsersPage() {
                   <TableCell className="text-muted-foreground">{u.lastLoginAt ? formatRelativeTime(u.lastLoginAt) : "Never"}</TableCell>
                   <TableCell>
                     {u.isActive ? (
-                      <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditUser(u)}>
+                      <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditUser(u)} aria-label="Edit user">
                         <Pencil className="h-3 w-3" />
                       </Button>
                     ) : (

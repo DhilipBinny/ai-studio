@@ -450,7 +450,7 @@ function AgentChat({ agent }: { agent: Agent }) {
           )}
         </div>
         {sessionId && (
-          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleNewSession}>
+          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleNewSession} aria-label="New session">
             <RotateCcw className="h-3 w-3 mr-1" /> New Session
           </Button>
         )}
