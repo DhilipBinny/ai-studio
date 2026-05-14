@@ -6,6 +6,7 @@ import { callLLM } from "./llm-caller";
 import { createProvider } from "./provider-factory";
 import { getModelPricing, calculateCost } from "./model-pricing";
 import { executeTool, createLoopDetector, loadToolDefinitions } from "./tool-executor";
+import { progressBus } from "./progress-bus";
 import { ensureWorkspace } from "@ais/tools-common";
 import type { WorkspaceConfig } from "@ais/tools-common";
 import type { ToolCall, ToolContext } from "./tool-executor";
@@ -265,6 +266,7 @@ async function executeNode(
   tenantId: string,
   runId: string,
   userId: string | null,
+  nodeSpanId?: string,
 ): Promise<NodeResult> {
   const config = node.config;
 
@@ -286,7 +288,7 @@ async function executeNode(
       const result = await runSession({
         agentId: config.agentId, tenantId, userId: userId || "", message,
         channel: "workflow", sessionId: config.sessionId ? resolveTemplate(config.sessionId, state) : undefined,
-        metadata: { workflowRunId: runId, nodeName: node.name },
+        metadata: { workflowRunId: runId, nodeName: node.name, parentSpanId: nodeSpanId },
       });
       return {
         output: { response: result.response, sessionId: result.sessionId, status: result.status, usage: result.usage, error: result.error || null },
@@ -516,6 +518,7 @@ async function executeNodeWithRetry(
   runId: string,
   userId: string | null,
   stepId: number,
+  nodeSpanId?: string,
 ): Promise<{ result: NodeResult; attempt: number }> {
   const policy = node.errorPolicy;
   let attempt = 0;
@@ -528,7 +531,7 @@ async function executeNodeWithRetry(
     try {
       const timeoutMs = policy.timeoutMs || 600_000;
       const result = await Promise.race([
-        executeNode(node, state, tenantId, runId, userId),
+        executeNode(node, state, tenantId, runId, userId, nodeSpanId),
         new Promise<never>((_, reject) => {
           timeoutTimer = setTimeout(() => reject(new Error(`Node "${node.name}" timed out after ${timeoutMs}ms`)), timeoutMs);
         }),
@@ -782,13 +785,19 @@ function createStepRecorder(): StepRecorder {
     const db = getDb();
     const stepStart = Date.now();
 
+    const nodeSpan = progressBus.emit({
+      traceId: runId, parentId: null, tenantId,
+      spanKind: "node", phase: "start", name: node.name,
+      message: `Node type: ${node.nodeType}`, nodeId: node.id,
+    });
+
     const [step] = await db.insert(workflowRunSteps).values({
       tenantId, workflowRunId: runId, workflowNodeId: node.id,
       status: "running", input: state, startedAt: new Date(), lastHeartbeatAt: new Date(),
     }).returning({ id: workflowRunSteps.id });
 
     try {
-      const { result, attempt } = await executeNodeWithRetry(node, state, tenantId, runId, userId, step.id);
+      const { result, attempt } = await executeNodeWithRetry(node, state, tenantId, runId, userId, step.id, nodeSpan.id);
 
       await db.update(workflowRunSteps).set({
         status: result.paused ? "waiting_human" : "completed",
@@ -796,12 +805,27 @@ function createStepRecorder(): StepRecorder {
         completedAt: new Date(), attempt,
       }).where(eq(workflowRunSteps.id, step.id));
 
+      progressBus.emit({
+        traceId: runId, parentId: null, tenantId,
+        spanKind: "node", phase: result.paused ? "progress" : "complete", name: node.name,
+        message: result.paused ? "Waiting for human input" : `Completed (attempt ${attempt})`,
+        durationMs: Date.now() - stepStart, nodeId: node.id,
+      });
+
       return { ...result, attempt };
     } catch (error) {
       await db.update(workflowRunSteps).set({
         status: "failed", errorMessage: (error as Error).message,
         durationMs: Date.now() - stepStart, completedAt: new Date(),
       }).where(eq(workflowRunSteps.id, step.id));
+
+      progressBus.emit({
+        traceId: runId, parentId: null, tenantId,
+        spanKind: "node", phase: "error", name: node.name,
+        message: (error as Error).message.slice(0, 500),
+        durationMs: Date.now() - stepStart, nodeId: node.id,
+      });
+
       throw error;
     }
   };
@@ -1086,20 +1110,47 @@ export async function triggerWorkflow(
   const graph = buildExecutionGraph(graphNodes, graphEdges);
   const state: WorkflowState = { input };
 
+  const wfSpan = progressBus.emit({
+    traceId: run.id, parentId: null, tenantId,
+    spanKind: "workflow", phase: "start", name: workflow.name,
+    message: `Workflow started — ${nodes.length} nodes`,
+  });
+
   try {
     const { stepsCompleted, paused } = await executeGraph(graph, graphEdges, state, run.id, tenantId, userId);
 
     if (paused) {
+      progressBus.emit({
+        traceId: run.id, parentId: null, tenantId,
+        spanKind: "workflow", phase: "progress", name: workflow.name,
+        message: "Paused — waiting for human input",
+      });
       return { runId: run.id, status: "waiting", output: state as Record<string, unknown>, stepsCompleted };
     }
 
     await db.update(workflowRuns).set({ status: "completed", output: state, completedAt: new Date() })
       .where(eq(workflowRuns.id, run.id));
+
+    progressBus.emit({
+      traceId: run.id, parentId: null, tenantId,
+      spanKind: "workflow", phase: "complete", name: workflow.name,
+      message: `Completed — ${stepsCompleted} steps`,
+      durationMs: Date.now() - wfSpan.timestamp,
+    });
+
     return { runId: run.id, status: "completed", output: state as Record<string, unknown>, stepsCompleted };
   } catch (e) {
     const errorMsg = (e as Error).message;
     await db.update(workflowRuns).set({ status: "failed", errorMessage: errorMsg, completedAt: new Date() })
       .where(eq(workflowRuns.id, run.id));
+
+    progressBus.emit({
+      traceId: run.id, parentId: null, tenantId,
+      spanKind: "workflow", phase: "error", name: workflow.name,
+      message: errorMsg.slice(0, 500),
+      durationMs: Date.now() - wfSpan.timestamp,
+    });
+
     return { runId: run.id, status: "failed", output: null, stepsCompleted: 0, error: errorMsg };
   }
 }

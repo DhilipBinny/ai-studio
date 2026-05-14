@@ -9,6 +9,7 @@ import {
   CheckCircle2, XCircle, Loader2, DollarSign, FolderOpen,
 } from "lucide-react";
 import { FileBrowser } from "@/components/workspace/file-browser";
+import { EventFeed, HistoricalEventFeed } from "@/components/activity/event-feed";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -338,6 +339,12 @@ function SessionDetailView({ sessionId, onBack }: { sessionId: string; onBack: (
           </div>
         );
       })()}
+
+      {(session.status === "running" || session.status === "waiting_approval") ? (
+        <EventFeed traceId={session.id} enabled height={350} />
+      ) : (
+        <HistoricalEventFeed sessionId={session.id} height={300} />
+      )}
 
       <div className="border border-border rounded-lg">
         <div className="px-4 py-3 border-b bg-muted/30">

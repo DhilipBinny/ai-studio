@@ -19,3 +19,4 @@ export * from "./workflows";
 export * from "./usage-records";
 export * from "./cron-jobs";
 export * from "./api-keys";
+export * from "./progress-spans";

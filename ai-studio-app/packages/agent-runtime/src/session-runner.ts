@@ -7,6 +7,7 @@ import { loadToolDefinitions, executeTool, createLoopDetector } from "./tool-exe
 import { checkAndCompact } from "./compaction";
 import { sanitizeInput, detectPromptInjection } from "@ais/security";
 import { getModelPricing, calculateCost } from "./model-pricing";
+import { progressBus, truncatePreview } from "./progress-bus";
 import type { SessionInput, SessionResult, AgentConfig, ProviderConfig } from "./types";
 import type { ToolCall, ToolContext } from "./tool-executor";
 
@@ -104,6 +105,9 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       .where(and(eq(agentSessions.id, sessionId), eq(agentSessions.tenantId, input.tenantId)));
   }
 
+  const workflowRunId = (input.metadata as Record<string, unknown> | undefined)?.workflowRunId as string | undefined;
+  const parentSpanId = (input.metadata as Record<string, unknown> | undefined)?.parentSpanId as string | undefined;
+
   try {
     const sanitized = sanitizeInput(input.message);
     const injection = detectPromptInjection(sanitized);
@@ -121,8 +125,6 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       role: "user",
       content: sanitized,
     });
-
-    const workflowRunId = (input.metadata as Record<string, unknown> | undefined)?.workflowRunId as string | undefined;
     const { definitions: toolDefs, mcpConnectorMap, workspaceConfig } = await loadToolDefinitions(input.agentId, input.tenantId, sessionId, workflowRunId);
     const systemPrompt = buildSystemPrompt(agentConfig, { timezone: "Asia/Singapore" });
     const loopDetector = createLoopDetector();
@@ -134,6 +136,14 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       modelRow.costPerInputToken,
       modelRow.costPerOutputToken,
     );
+
+    const traceId = workflowRunId || sessionId;
+    const agentSpan = progressBus.emit({
+      traceId, parentId: parentSpanId || null, tenantId: input.tenantId,
+      spanKind: "agent", phase: "start", name: agentConfig.name,
+      message: `Agent session started`,
+      agentId: input.agentId, agentName: agentConfig.name, sessionId, modelId: modelRow.modelId,
+    });
 
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
@@ -179,6 +189,14 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
         };
       });
 
+      const llmStartSpan = progressBus.emit({
+        traceId, parentId: agentSpan.id, tenantId: input.tenantId,
+        spanKind: "llm", phase: "start", name: modelRow.modelId,
+        message: `Round ${round + 1}`,
+        agentId: input.agentId, agentName: agentConfig.name, sessionId, modelId: modelRow.modelId,
+      });
+      const llmCallStart = Date.now();
+
       const response = await callLLM(providerConfig, systemPrompt, messages, {
         temperature: parseFloat(agentConfig.temperature),
         maxTokens: agentConfig.maxTokensPerTurn,
@@ -190,6 +208,18 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
 
       const roundCost = calculateCost(pricing, response.inputTokens, response.outputTokens);
       totalCost += roundCost;
+
+      const { preview: respPreview, len: respLen } = truncatePreview(response.text);
+      progressBus.emit({
+        traceId, parentId: agentSpan.id, tenantId: input.tenantId,
+        spanKind: "llm", phase: "complete", name: modelRow.modelId,
+        message: response.stopReason === "tool_use" ? `Tool use requested (${response.toolCalls.length} calls)` : "Response complete",
+        durationMs: Date.now() - llmCallStart,
+        tokens: response.inputTokens + response.outputTokens,
+        inputTokens: response.inputTokens, outputTokens: response.outputTokens, costUsd: roundCost,
+        resultPreview: respPreview, resultLen: respLen,
+        agentId: input.agentId, agentName: agentConfig.name, sessionId, modelId: modelRow.modelId,
+      });
 
       await db.insert(usageRecords).values({
         tenantId: input.tenantId,
@@ -229,6 +259,15 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
 
         for (const tc of response.toolCalls) {
           totalToolCalls++;
+          const { preview: argsP, len: argsL } = truncatePreview(tc.input);
+          progressBus.emit({
+            traceId, parentId: llmStartSpan.id, tenantId: input.tenantId,
+            spanKind: "tool", phase: "start", name: tc.name,
+            toolName: tc.name, argsPreview: argsP, argsLen: argsL,
+            agentId: input.agentId, agentName: agentConfig.name, sessionId,
+          });
+          const toolStart = Date.now();
+
           const toolResult = await executeTool(
             { id: tc.id, name: tc.name, input: tc.input } as ToolCall,
             input.tenantId,
@@ -238,6 +277,17 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
             mcpConnectorMap,
             workspaceConfig,
           );
+
+          const toolDuration = Date.now() - toolStart;
+          const { preview: resP, len: resL } = truncatePreview(toolResult.content);
+          progressBus.emit({
+            traceId, parentId: llmStartSpan.id, tenantId: input.tenantId,
+            spanKind: "tool", phase: toolResult.is_error ? "error" : "complete",
+            name: tc.name, toolName: tc.name,
+            message: toolResult.is_error ? toolResult.content.slice(0, 200) : undefined,
+            durationMs: toolDuration, resultPreview: resP, resultLen: resL,
+            agentId: input.agentId, agentName: agentConfig.name, sessionId,
+          });
 
           await db.insert(agentSessionMessages).values({
             tenantId: input.tenantId,
@@ -281,6 +331,16 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       })
       .where(eq(agentSessions.id, sessionId));
 
+    progressBus.emit({
+      traceId, parentId: parentSpanId || null, tenantId: input.tenantId,
+      spanKind: "agent", phase: "complete", name: agentConfig.name,
+      message: `Completed — ${totalToolCalls} tool calls`,
+      durationMs: Date.now() - agentSpan.timestamp,
+      tokens: totalInputTokens + totalOutputTokens,
+      inputTokens: totalInputTokens, outputTokens: totalOutputTokens, costUsd: totalCost,
+      agentId: input.agentId, agentName: agentConfig.name, sessionId,
+    });
+
     return {
       sessionId,
       response: finalText,
@@ -293,6 +353,13 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       .update(agentSessions)
       .set({ status: "failed", errorMessage: errorMsg, completedAt: new Date() })
       .where(eq(agentSessions.id, sessionId));
+
+    progressBus.emit({
+      traceId: workflowRunId || sessionId, parentId: parentSpanId || null, tenantId: input.tenantId,
+      spanKind: "agent", phase: "error", name: agentConfig.name,
+      message: errorMsg.slice(0, 500),
+      agentId: input.agentId, agentName: agentConfig.name, sessionId,
+    });
 
     return { sessionId, response: "", usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, status: "failed", error: errorMsg };
   }
