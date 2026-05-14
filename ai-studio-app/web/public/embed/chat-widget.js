@@ -1,3 +1,11 @@
+// TODO: Embeddable chat widget for external websites.
+// - Brand references (window.EcholAI, CSS class prefix "echolai-") are hardcoded
+//   because this is a standalone .js file that can't import from TS modules.
+// - When this feature is production-ready, generate this file at build time from
+//   branding constants (packages/types/src/branding.ts) or make the global name
+//   configurable via a data attribute on the script tag.
+// - Depends on: /api/v1/agents/:slug/sessions (exists), API key auth (exists)
+// - Missing: documentation, Settings UI to show embed snippet, rate limiting
 (function () {
   "use strict";
 
