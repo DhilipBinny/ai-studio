@@ -626,7 +626,7 @@ function ApiKeysTab() {
             <div className="rounded-lg border border-green-200 bg-green-50 p-3 space-y-2">
               <p className="text-sm font-medium text-green-800">API key created. Copy it now — it won&apos;t be shown again.</p>
               <div className="flex items-center gap-2">
-                <code className="flex-1 bg-white border rounded px-2 py-1 text-xs font-mono break-all">{createdKey}</code>
+                <code className="flex-1 bg-white border border-border rounded px-2 py-1 text-xs font-mono break-all">{createdKey}</code>
                 <Button variant="outline" size="sm" className="shrink-0" onClick={() => { navigator.clipboard.writeText(createdKey); }}>
                   <Copy className="h-3 w-3" />
                 </Button>

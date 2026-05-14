@@ -441,10 +441,10 @@ function CreateKBForm({ onCreated }: { onCreated: () => void }) {
         <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Collection of product docs for support agents" rows={2} />
       </div>
 
-      <div className="border rounded-lg p-3 space-y-3">
+      <div className="border border-border rounded-lg p-3 space-y-3">
         <Label className="text-sm font-medium">Embedding Source</Label>
         <div className="space-y-2">
-          <label className="flex items-start gap-3 p-2 rounded-md border cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
+          <label className="flex items-start gap-3 p-2 rounded-md border border-border cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
             <input type="radio" name="embeddingSource" value="builtin" checked={form.embeddingSource === "builtin"}
               onChange={() => setForm((f) => ({ ...f, embeddingSource: "builtin", embeddingProviderId: "", embeddingModel: "Xenova/bge-small-en-v1.5", embeddingDimension: 384 }))}
               className="mt-1" />
@@ -453,7 +453,7 @@ function CreateKBForm({ onCreated }: { onCreated: () => void }) {
               <p className="text-xs text-muted-foreground mt-0.5">bge-small-en-v1.5 — 384 dims, runs on CPU. Good for getting started.</p>
             </div>
           </label>
-          <label className="flex items-start gap-3 p-2 rounded-md border cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
+          <label className="flex items-start gap-3 p-2 rounded-md border border-border cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
             <input type="radio" name="embeddingSource" value="provider" checked={form.embeddingSource === "provider"}
               onChange={() => setForm((f) => ({ ...f, embeddingSource: "provider", embeddingModel: "", embeddingDimension: 1024 }))}
               className="mt-1" />
@@ -498,10 +498,10 @@ function CreateKBForm({ onCreated }: { onCreated: () => void }) {
         )}
       </div>
 
-      <div className="border rounded-lg p-3 space-y-2">
+      <div className="border border-border rounded-lg p-3 space-y-2">
         <Label className="text-sm font-medium">Chunking Method</Label>
         <div className="space-y-2">
-          <label className="flex items-start gap-3 p-2 rounded-md border cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
+          <label className="flex items-start gap-3 p-2 rounded-md border border-border cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
             <input type="radio" name="chunkMethod" value="recursive" checked={form.chunkMethod === "recursive"}
               onChange={() => setForm((f) => ({ ...f, chunkMethod: "recursive" }))} className="mt-1" />
             <div>
@@ -509,7 +509,7 @@ function CreateKBForm({ onCreated }: { onCreated: () => void }) {
               <p className="text-xs text-muted-foreground">Recursive splitting with contextual prefix. Good for most documents.</p>
             </div>
           </label>
-          <label className="flex items-start gap-3 p-2 rounded-md border cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
+          <label className="flex items-start gap-3 p-2 rounded-md border border-border cursor-pointer hover:bg-muted/50 has-[:checked]:border-primary/50 has-[:checked]:bg-primary/5">
             <input type="radio" name="chunkMethod" value="parent_child" checked={form.chunkMethod === "parent_child"}
               onChange={() => setForm((f) => ({ ...f, chunkMethod: "parent_child" }))} className="mt-1" />
             <div>
@@ -520,7 +520,7 @@ function CreateKBForm({ onCreated }: { onCreated: () => void }) {
         </div>
       </div>
 
-      <div className="border rounded-lg p-3 space-y-2">
+      <div className="border border-border rounded-lg p-3 space-y-2">
         <Label className="text-sm font-medium">Re-ranking</Label>
         <Select value={form.rerankSource} onChange={(e) => setForm((f) => ({ ...f, rerankSource: e.target.value as "" | "builtin" | "provider", rerankProviderId: "", rerankModel: "" }))}>
           <option value="">Disabled (default)</option>

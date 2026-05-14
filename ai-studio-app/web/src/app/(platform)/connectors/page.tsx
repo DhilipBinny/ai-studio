@@ -184,7 +184,7 @@ function CreateConnectorForm({ onCreated }: { onCreated: () => void }) {
       </div>
 
       {form.connectorType === "mcp" && (
-        <div className="border rounded-lg p-3 space-y-3">
+        <div className="border border-border rounded-lg p-3 space-y-3">
           <p className="text-sm font-medium">MCP Server Configuration</p>
           <div className="space-y-2">
             <Label className="text-xs">Command <span className="text-destructive">*</span></Label>
@@ -277,7 +277,7 @@ function ConnectorDetail({ connector, onUpdated }: { connector: Connector; onUpd
             <Wrench className="h-3 w-3" />
             {discoveredTools.length} tools discovered
           </div>
-          <div className="rounded-md border max-h-48 overflow-y-auto">
+          <div className="rounded-md border border-border max-h-48 overflow-y-auto">
             {discoveredTools.map((t) => (
               <div key={t.name} className="flex items-start gap-2 px-2.5 py-1.5 border-b last:border-b-0">
                 <span className="text-xs font-mono font-medium shrink-0">{t.name}</span>

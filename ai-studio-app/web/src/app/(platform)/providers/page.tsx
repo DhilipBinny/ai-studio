@@ -330,7 +330,7 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
       )}
 
       {showConfig && (
-        <div className="mt-4 max-w-sm space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+        <div className="mt-4 max-w-sm space-y-3 rounded-lg border border-border border-border bg-muted/30 p-4">
           <div className="space-y-1.5">
             <Label className="text-xs">Name</Label>
             <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="h-9" />
@@ -643,7 +643,7 @@ function ModelRow({ model, providerId, providerType, isDefault, onSetDefault }: 
           </div>
 
           {chatResponse && (
-            <div className="rounded-md bg-background border border-border p-2 text-xs">
+            <div className="rounded-md bg-background border border-border border-border p-2 text-xs">
               <p>{chatResponse}</p>
               {chatMeta && (
                 <p className="mt-1 text-[10px] text-muted-foreground">

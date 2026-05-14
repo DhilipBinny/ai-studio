@@ -326,7 +326,7 @@ function SessionDetailView({ sessionId, onBack }: { sessionId: string; onBack: (
         );
       })()}
 
-      <div className="border rounded-lg">
+      <div className="border border-border rounded-lg">
         <div className="px-4 py-3 border-b bg-muted/30">
           <h2 className="text-sm font-semibold">Execution Timeline</h2>
           <p className="text-xs text-muted-foreground">{session.messages.length} messages, {session.toolCalls.length} tool calls</p>
@@ -339,7 +339,7 @@ function SessionDetailView({ sessionId, onBack }: { sessionId: string; onBack: (
       </div>
 
       {session.toolCalls.length > 0 && (
-        <div className="border rounded-lg">
+        <div className="border border-border rounded-lg">
           <div className="px-4 py-3 border-b bg-muted/30">
             <h2 className="text-sm font-semibold">Tool Calls Summary</h2>
           </div>
@@ -375,7 +375,7 @@ function SessionDetailView({ sessionId, onBack }: { sessionId: string; onBack: (
 
 function MetricCard({ icon: Icon, label, value, detail }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; detail?: string }) {
   return (
-    <div className="rounded-lg border px-3 py-2.5">
+    <div className="rounded-lg border border-border px-3 py-2.5">
       <div className="flex items-center gap-1.5 mb-1">
         <Icon className="h-3.5 w-3.5 text-muted-foreground" />
         <span className="text-xs text-muted-foreground">{label}</span>
@@ -506,7 +506,7 @@ function ToolCallCard({ name, input, toolCalls, callId }: { name: string; input:
   const matchingCall = toolCalls.find((tc) => tc.toolName === name && callId);
 
   return (
-    <div className="rounded-md border bg-muted/30 px-3 py-2">
+    <div className="rounded-md border border-border bg-muted/30 px-3 py-2">
       <div className="flex items-center gap-2">
         <Wrench className="h-3 w-3 text-amber-600" />
         <span className="text-xs font-mono font-medium">{name}</span>

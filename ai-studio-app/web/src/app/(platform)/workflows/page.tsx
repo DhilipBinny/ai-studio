@@ -358,7 +358,7 @@ function NodeEditor({ nodes, edges, agents, allNodes, onSaveNodes, onSaveEdges }
             const outEdge = edges.find((e) => e.fromNodeId === node.id);
             const targetNode = outEdge ? allNodes.find((n) => n.id === outEdge.toNodeId) : null;
             return (
-              <div key={node.id} className="border rounded-lg p-3">
+              <div key={node.id} className="border border-border rounded-lg p-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-[10px]">{node.nodeType}</Badge>
@@ -447,17 +447,17 @@ function RunDetail({ workflowId, runId, onBack }: { workflowId: string; runId: s
       </div>
 
       <div className="grid grid-cols-3 gap-3">
-        <div className="border rounded-lg px-3 py-2.5">
+        <div className="border border-border rounded-lg px-3 py-2.5">
           <p className="text-xs text-muted-foreground">Steps</p>
           <p className="text-sm font-semibold">{run.steps.length}</p>
         </div>
-        <div className="border rounded-lg px-3 py-2.5">
+        <div className="border border-border rounded-lg px-3 py-2.5">
           <p className="text-xs text-muted-foreground">Duration</p>
           <p className="text-sm font-semibold">
             {run.startedAt && run.completedAt ? `${((new Date(run.completedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1)}s` : "—"}
           </p>
         </div>
-        <div className="border rounded-lg px-3 py-2.5">
+        <div className="border border-border rounded-lg px-3 py-2.5">
           <p className="text-xs text-muted-foreground">Started</p>
           <p className="text-sm font-semibold">{formatRelativeTime(run.startedAt)}</p>
         </div>
@@ -467,7 +467,7 @@ function RunDetail({ workflowId, runId, onBack }: { workflowId: string; runId: s
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{run.errorMessage}</div>
       )}
 
-      <div className="border rounded-lg">
+      <div className="border border-border rounded-lg">
         <div className="px-4 py-3 border-b bg-muted/30">
           <h2 className="text-sm font-semibold">Execution Steps</h2>
         </div>
@@ -479,7 +479,7 @@ function RunDetail({ workflowId, runId, onBack }: { workflowId: string; runId: s
       </div>
 
       {run.output && (
-        <div className="border rounded-lg">
+        <div className="border border-border rounded-lg">
           <div className="px-4 py-3 border-b bg-muted/30">
             <h2 className="text-sm font-semibold">Final Output</h2>
           </div>

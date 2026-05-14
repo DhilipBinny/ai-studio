@@ -331,7 +331,7 @@ function CreateAgentForm({ models, onCreated }: { models: ProviderModel[]; onCre
         {models.length === 0 && <p className="text-xs text-amber-600">No models available. Test a provider connection first.</p>}
       </div>
 
-      <div className="border rounded-lg p-3 space-y-1">
+      <div className="border border-border rounded-lg p-3 space-y-1">
         <p className="text-sm font-medium">Persona</p>
         <PersonaEditor persona={persona} onChange={setPersona} />
       </div>
@@ -456,7 +456,7 @@ function AgentChat({ agent }: { agent: Agent }) {
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-3 min-h-0 rounded-lg border bg-muted/30 p-4">
+      <div className="flex-1 overflow-y-auto space-y-3 min-h-0 rounded-lg border border-border bg-muted/30 p-4">
         {messages.length === 0 && (
           <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
             Send a message to start chatting with {agent.name}
@@ -484,7 +484,7 @@ function AgentChat({ agent }: { agent: Agent }) {
         ))}
         {sending && (
           <div className="flex justify-start">
-            <div className="bg-background border rounded-lg px-3 py-2 text-sm text-muted-foreground">
+            <div className="bg-background border border-border rounded-lg px-3 py-2 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
             </div>
           </div>
@@ -566,7 +566,7 @@ function KBAssignment({ agentId }: { agentId: string }) {
   if (loading) return <div className="text-xs text-muted-foreground">Loading KBs...</div>;
 
   return (
-    <div className="border rounded-lg p-3 space-y-2">
+    <div className="border border-border rounded-lg p-3 space-y-2">
       <div className="flex items-center gap-2">
         <BookOpen className="h-4 w-4 text-muted-foreground" />
         <p className="text-sm font-medium">Knowledge Bases</p>
@@ -575,7 +575,7 @@ function KBAssignment({ agentId }: { agentId: string }) {
       {assigned.length > 0 ? (
         <div className="space-y-1">
           {assigned.map((kb) => (
-            <div key={kb.id} className="flex items-center justify-between rounded-md border px-2.5 py-1.5">
+            <div key={kb.id} className="flex items-center justify-between rounded-md border border-border px-2.5 py-1.5">
               <div>
                 <span className="text-sm">{kb.kbName}</span>
                 <span className="text-xs text-muted-foreground ml-2">{kb.documentCount} docs &middot; {kb.chunkCount.toLocaleString()} chunks</span>
@@ -657,7 +657,7 @@ function ConnectorAssignment({ agentId }: { agentId: string }) {
   if (loading) return <div className="text-xs text-muted-foreground">Loading connectors...</div>;
 
   return (
-    <div className="border rounded-lg p-3 space-y-2">
+    <div className="border border-border rounded-lg p-3 space-y-2">
       <div className="flex items-center gap-2">
         <Plug className="h-4 w-4 text-muted-foreground" />
         <p className="text-sm font-medium">MCP Connectors</p>
@@ -666,7 +666,7 @@ function ConnectorAssignment({ agentId }: { agentId: string }) {
       {assigned.length > 0 ? (
         <div className="space-y-1">
           {assigned.map((c) => (
-            <div key={c.id} className="flex items-center justify-between rounded-md border px-2.5 py-1.5">
+            <div key={c.id} className="flex items-center justify-between rounded-md border border-border px-2.5 py-1.5">
               <div>
                 <span className="text-sm">{c.connectorName}</span>
                 <Badge variant={c.status === "active" ? "success" : "secondary"} className="ml-2 text-[9px]">{c.status}</Badge>
@@ -753,7 +753,7 @@ function ToolAssignment({ agentId }: { agentId: string }) {
   if (loading) return <div className="text-xs text-muted-foreground">Loading tools...</div>;
 
   return (
-    <div className="border rounded-lg p-3 space-y-2">
+    <div className="border border-border rounded-lg p-3 space-y-2">
       <div className="flex items-center gap-2">
         <Wrench className="h-4 w-4 text-muted-foreground" />
         <p className="text-sm font-medium">Built-in Tools</p>
@@ -762,7 +762,7 @@ function ToolAssignment({ agentId }: { agentId: string }) {
       {assigned.length > 0 ? (
         <div className="space-y-1">
           {assigned.map((t) => (
-            <div key={t.id} className="flex items-center justify-between rounded-md border px-2.5 py-1.5">
+            <div key={t.id} className="flex items-center justify-between rounded-md border border-border px-2.5 py-1.5">
               <div className="flex items-center gap-2">
                 <span className="text-sm">{t.toolDisplayName}</span>
                 <ToolRiskBadge level={t.riskLevel} />
@@ -897,7 +897,7 @@ function EditAgentForm({ agent, models, onSaved }: { agent: Agent; models: Provi
         <ModelSelect value={form.providerModelId} onChange={(v) => setForm((f) => ({ ...f, providerModelId: v }))} models={models} />
       </div>
 
-      <div className="border rounded-lg p-3 space-y-1">
+      <div className="border border-border rounded-lg p-3 space-y-1">
         <p className="text-sm font-medium">Persona</p>
         <PersonaEditor persona={persona} onChange={setPersona} />
       </div>
