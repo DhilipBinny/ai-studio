@@ -3,6 +3,7 @@ export interface WorkspaceConfig {
   tenantId: string;
   agentId: string;
   sessionId: string;
+  workflowRunId?: string;
 }
 
 export interface BuiltinToolContext {

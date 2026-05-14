@@ -6,6 +6,8 @@ import { callLLM } from "./llm-caller";
 import { createProvider } from "./provider-factory";
 import { getModelPricing, calculateCost } from "./model-pricing";
 import { executeTool, createLoopDetector, loadToolDefinitions } from "./tool-executor";
+import { ensureWorkspace } from "@ais/tools-common";
+import type { WorkspaceConfig } from "@ais/tools-common";
 import type { ToolCall, ToolContext } from "./tool-executor";
 import type { ProviderConfig } from "./types";
 
@@ -337,7 +339,12 @@ async function executeNode(
       const loopDetector = createLoopDetector();
       const ctx: ToolContext = { agentId: "", tenantId, sessionId: runId };
       const toolCall: ToolCall = { id: `wf-${Date.now()}`, name: config.toolName, input: args };
-      const result = await executeTool(toolCall, tenantId, runId, loopDetector, ctx, new Map(), undefined);
+      const wsCfg: WorkspaceConfig = {
+        dataRoot: process.env.DATA_ROOT || ".data",
+        tenantId, agentId: "", sessionId: runId, workflowRunId: runId,
+      };
+      ensureWorkspace(wsCfg);
+      const result = await executeTool(toolCall, tenantId, runId, loopDetector, ctx, new Map(), wsCfg);
       return { output: { result: result.content, isError: result.is_error || false }, paused: false };
     }
 

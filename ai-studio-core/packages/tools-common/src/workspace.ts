@@ -3,7 +3,15 @@ import path from "node:path";
 import type { WorkspaceConfig } from "./types";
 
 export function getAgentWorkspacePath(config: WorkspaceConfig): string {
-  return path.resolve(config.dataRoot, "tenants", config.tenantId, "workspace", config.agentId);
+  if (config.workflowRunId) {
+    return path.resolve(config.dataRoot, "tenants", config.tenantId, "workspace", "runs", config.workflowRunId);
+  }
+  const newPath = path.resolve(config.dataRoot, "tenants", config.tenantId, "workspace", "agents", config.agentId);
+  const legacyPath = path.resolve(config.dataRoot, "tenants", config.tenantId, "workspace", config.agentId);
+  if (!fs.existsSync(newPath) && fs.existsSync(legacyPath)) {
+    return legacyPath;
+  }
+  return newPath;
 }
 
 export function getSharedWorkspacePath(config: WorkspaceConfig): string {
@@ -15,11 +23,11 @@ export function getTempPath(config: WorkspaceConfig): string {
 }
 
 export function ensureWorkspace(config: WorkspaceConfig): string {
-  const agentDir = getAgentWorkspacePath(config);
-  fs.mkdirSync(agentDir, { recursive: true });
+  const wsDir = getAgentWorkspacePath(config);
+  fs.mkdirSync(wsDir, { recursive: true });
   const sharedDir = getSharedWorkspacePath(config);
   fs.mkdirSync(sharedDir, { recursive: true });
-  return agentDir;
+  return wsDir;
 }
 
 export function resolveTenantPath(requestedPath: string, config: WorkspaceConfig): string {
@@ -35,11 +43,11 @@ export function resolveTenantPath(requestedPath: string, config: WorkspaceConfig
     throw new Error("Path traversal blocked: control characters not allowed");
   }
 
-  let resolved: string;
-
   if (path.isAbsolute(requestedPath)) {
     throw new Error(`Access denied: absolute paths not allowed ("${requestedPath}")`);
   }
+
+  let resolved: string;
 
   if (requestedPath.startsWith("shared/") || requestedPath === "shared") {
     const relative = requestedPath.slice("shared".length).replace(/^\//, "");
@@ -48,19 +56,19 @@ export function resolveTenantPath(requestedPath: string, config: WorkspaceConfig
     resolved = path.resolve(agentBase, requestedPath);
   }
 
-  const isInAgent = resolved === agentBase || resolved.startsWith(agentBase + path.sep);
+  const isInWorkspace = resolved === agentBase || resolved.startsWith(agentBase + path.sep);
   const isInShared = resolved === sharedBase || resolved.startsWith(sharedBase + path.sep);
 
-  if (!isInAgent && !isInShared) {
+  if (!isInWorkspace && !isInShared) {
     throw new Error(`Access denied: path "${requestedPath}" resolves outside workspace`);
   }
 
   try {
     if (fs.existsSync(resolved)) {
       const realPath = fs.realpathSync(resolved);
-      const realInAgent = realPath === agentBase || realPath.startsWith(agentBase + path.sep);
+      const realInWorkspace = realPath === agentBase || realPath.startsWith(agentBase + path.sep);
       const realInShared = realPath === sharedBase || realPath.startsWith(sharedBase + path.sep);
-      if (!realInAgent && !realInShared) {
+      if (!realInWorkspace && !realInShared) {
         throw new Error(`Access denied: symlink "${requestedPath}" resolves outside workspace`);
       }
     }

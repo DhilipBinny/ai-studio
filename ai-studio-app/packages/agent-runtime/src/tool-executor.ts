@@ -177,6 +177,7 @@ export async function loadToolDefinitions(
   agentId: string,
   tenantId: string,
   sessionId?: string,
+  workflowRunId?: string,
 ): Promise<LoadedTools> {
   const db = getDb();
 
@@ -270,7 +271,7 @@ export async function loadToolDefinitions(
 
   if (hasBuiltinTools && sessionId) {
     const dataRoot = process.env.DATA_ROOT || ".data";
-    workspaceConfig = { dataRoot, tenantId, agentId, sessionId };
+    workspaceConfig = { dataRoot, tenantId, agentId, sessionId, workflowRunId };
     ensureWorkspace(workspaceConfig);
   }
 
