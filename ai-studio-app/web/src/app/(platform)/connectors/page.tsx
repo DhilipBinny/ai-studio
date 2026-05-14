@@ -257,9 +257,9 @@ function ConnectorDetail({ connector, onUpdated }: { connector: Connector; onUpd
         <div className="rounded-md bg-muted/50 p-3 space-y-1 text-xs font-mono">
           <p><span className="text-muted-foreground">command:</span> {config.command as string || "—"}</p>
           <p><span className="text-muted-foreground">args:</span> {(config.args as string[])?.join(" ") || "—"}</p>
-          {config.env && Object.keys(config.env as Record<string, string>).length > 0 && (
+          {config.env && Object.keys(config.env as Record<string, string>).length > 0 ? (
             <p><span className="text-muted-foreground">env:</span> {Object.keys(config.env as Record<string, string>).join(", ")}</p>
-          )}
+          ) : null}
         </div>
       )}
 

@@ -1,6 +1,8 @@
 export { MODULES, MODULE_IDS, SECTION_LABELS, type Module, type Section } from "./modules";
 export { SYSTEM_CONFIG_SCHEMA, getConfigDefaults, validateConfigValue, type ConfigFieldDef, type ConfigSectionDef } from "./system-config-schema";
 
+import type { Module } from "./modules";
+
 export type PermissionLevel = 0 | 10 | 20;
 
 export type AccessRights = Record<Module, PermissionLevel>;
