@@ -46,6 +46,12 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
+*,
+*::before,
+*::after {
+  border-color: var(--color-border);
+}
+
 body {
   font-family: var(--font-sans);
   background: var(--color-background);
