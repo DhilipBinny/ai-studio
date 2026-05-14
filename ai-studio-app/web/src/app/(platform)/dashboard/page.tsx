@@ -47,8 +47,6 @@ interface Stats {
   successRate: number;
   errorRate: number;
   totalTokens: number;
-  totalInputTokens: number;
-  totalOutputTokens: number;
   totalToolCalls: number;
   totalCostUsd: number;
   avgCostPerSession: number;
