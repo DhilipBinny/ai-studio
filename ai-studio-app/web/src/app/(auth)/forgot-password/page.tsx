@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, ArrowLeft, Mail } from "lucide-react";
+import { BRAND } from "@/lib/branding";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -40,7 +41,7 @@ export default function ForgotPasswordPage() {
     <div className="flex min-h-svh flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 md:p-10">
       <div className="w-full max-w-[420px] space-y-8">
         <div className="flex flex-col items-center space-y-3 text-center">
-          <img src="/branding/echollogo.png" alt="Echol" className="h-14 w-auto" />
+          <img src={BRAND.logo} alt={BRAND.logoAlt} className="h-14 w-auto" />
           <h1 className="text-2xl font-semibold tracking-tight text-brand">
             {submitted ? "Check your email" : "Reset password"}
           </h1>
@@ -78,7 +79,7 @@ export default function ForgotPasswordPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@echoltech.com"
+                    placeholder={BRAND.emailPlaceholder}
                     required
                     autoFocus
                     className="h-11 border-slate-300 px-4 text-sm focus-visible:ring-brand/30"
@@ -98,7 +99,7 @@ export default function ForgotPasswordPage() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground/50">
-          &copy; {new Date().getFullYear()} Echol Technology. All rights reserved.
+          {BRAND.copyright(new Date().getFullYear())}
         </p>
       </div>
     </div>

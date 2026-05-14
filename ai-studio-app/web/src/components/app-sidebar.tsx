@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { BRAND } from "@/lib/branding";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { MODULES, SECTION_LABELS, type Module, type Section } from "@ais-app/types";
@@ -114,12 +115,12 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
     >
       <div className={cn("flex h-14 shrink-0 items-center border-b border-sidebar-border", collapsed ? "justify-center px-2" : "gap-2.5 px-4")}>
         <img
-          src="/branding/echol-icon.png"
-          alt="Echol"
+          src={BRAND.icon}
+          alt={BRAND.logoAlt}
           className={cn("shrink-0 rounded-lg", collapsed ? "h-7 w-7" : "h-8 w-8")}
         />
         {!collapsed && (
-          <span className="text-base font-semibold text-sidebar-foreground">AI Studio</span>
+          <span className="text-base font-semibold text-sidebar-foreground">{BRAND.shortName}</span>
         )}
       </div>
 

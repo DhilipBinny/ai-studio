@@ -7,6 +7,7 @@ import { sendEmail } from "@ais-app/email";
 import { eq, and } from "drizzle-orm";
 import { errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
+import { BRAND } from "@/lib/branding";
 import { randomBytes } from "node:crypto";
 
 const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
@@ -48,20 +49,20 @@ export async function POST(request: Request) {
   try {
     await sendEmail({
       to: email,
-      subject: "Reset your password — Echol AI Studio",
+      subject: `Reset your password — ${BRAND.name}`,
       html: `
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-          <h2 style="color: #811a1b;">Echol AI Studio</h2>
+          <h2 style="color: ${BRAND.hex};">${BRAND.name}</h2>
           <p>Hi ${user.name || "there"},</p>
           <p>We received a request to reset your password. Click the link below to set a new password:</p>
           <p style="margin: 24px 0;">
-            <a href="${resetUrl}" style="background: #811a1b; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">
+            <a href="${resetUrl}" style="background: ${BRAND.hex}; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 500;">
               Reset Password
             </a>
           </p>
           <p style="color: #666; font-size: 13px;">This link expires in ${AUTH_CONFIG.password.resetTokenExpiryMinutes} minutes. If you didn't request this, you can safely ignore this email.</p>
           <hr style="border: none; border-top: 1px solid #e5e5e5; margin: 24px 0;" />
-          <p style="color: #999; font-size: 11px;">Echol Technology Pte Ltd</p>
+          <p style="color: #999; font-size: 11px;">${BRAND.company} Pte Ltd</p>
         </div>
       `,
     });

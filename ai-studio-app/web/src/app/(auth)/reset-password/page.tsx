@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/password-input";
 import { Loader2, CheckCircle } from "lucide-react";
+import { BRAND } from "@/lib/branding";
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
@@ -53,7 +54,7 @@ export default function ResetPasswordPage() {
     <div className="flex min-h-svh flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 md:p-10">
       <div className="w-full max-w-[420px] space-y-8">
         <div className="flex flex-col items-center space-y-3 text-center">
-          <img src="/branding/echollogo.png" alt="Echol" className="h-14 w-auto" />
+          <img src={BRAND.logo} alt={BRAND.logoAlt} className="h-14 w-auto" />
           <h1 className="text-2xl font-semibold tracking-tight text-brand">
             {submitted ? "Password reset" : "Set new password"}
           </h1>
@@ -88,7 +89,7 @@ export default function ResetPasswordPage() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground/50">
-          &copy; {new Date().getFullYear()} Echol Technology. All rights reserved.
+          {BRAND.copyright(new Date().getFullYear())}
         </p>
       </div>
     </div>

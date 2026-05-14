@@ -1,5 +1,6 @@
 export { MODULES, MODULE_IDS, SECTION_LABELS, type Module, type Section } from "./modules";
 export { SYSTEM_CONFIG_SCHEMA, getConfigDefaults, validateConfigValue, type ConfigFieldDef, type ConfigSectionDef } from "./system-config-schema";
+export { BRAND_NAME, BRAND_COMPANY, BRAND_HEX, BRAND_EMAIL_FROM, BRAND_USER_AGENT } from "./branding";
 
 import type { Module } from "./modules";
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BRAND } from "@/lib/branding";
 
 type LoginState = "credentials" | "otp" | "loading";
 
@@ -79,8 +80,8 @@ export default function LoginPage() {
     <div className="flex min-h-svh flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 md:p-10">
       <div className="w-full max-w-[420px] space-y-8">
         <div className="flex flex-col items-center space-y-3 text-center">
-          <img src="/branding/echollogo.png" alt="Echol" className="h-14 w-auto" />
-          <h1 className="text-2xl font-semibold tracking-tight text-brand">Echol AI Studio</h1>
+          <img src={BRAND.logo} alt={BRAND.logoAlt} className="h-14 w-auto" />
+          <h1 className="text-2xl font-semibold tracking-tight text-brand">{BRAND.name}</h1>
           {state === "otp" && (
             <p className="text-sm text-muted-foreground">
               Enter the 6-digit code sent to your email
@@ -104,7 +105,7 @@ export default function LoginPage() {
                   type="text"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setFieldErrors((p) => ({ ...p, email: undefined })); }}
-                  placeholder="you@echoltech.com"
+                  placeholder={BRAND.emailPlaceholder}
                   autoComplete="username"
                   autoFocus
                   className={`h-11 px-4 text-sm focus-visible:ring-brand/30 ${fieldErrors.email ? "border-destructive focus-visible:ring-destructive/30" : "border-slate-300"}`}
@@ -176,7 +177,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground/50">
-          &copy; {new Date().getFullYear()} Echol Technology. All rights reserved.
+          {BRAND.copyright(new Date().getFullYear())}
         </p>
       </div>
     </div>

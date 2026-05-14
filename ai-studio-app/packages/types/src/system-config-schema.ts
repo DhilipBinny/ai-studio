@@ -17,13 +17,15 @@ export interface ConfigSectionDef {
   fields: ConfigFieldDef[];
 }
 
+import { BRAND_NAME } from "./branding";
+
 export const SYSTEM_CONFIG_SCHEMA: ConfigSectionDef[] = [
   {
     key: "general",
     label: "General",
     description: "Application name and regional settings",
     fields: [
-      { key: "app_name", label: "Application Name", type: "text", default: "Echol AI Studio", required: true },
+      { key: "app_name", label: "Application Name", type: "text", default: BRAND_NAME, required: true },
       { key: "timezone", label: "Timezone", type: "select", default: "Asia/Singapore", options: [
         "Asia/Singapore", "Asia/Kolkata", "Asia/Tokyo", "Asia/Shanghai", "Asia/Dubai",
         "Europe/London", "Europe/Paris", "Europe/Berlin",

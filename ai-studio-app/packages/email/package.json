@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ais-app/types": "workspace:*",
     "nodemailer": "^6.10.1"
   },
   "devDependencies": {

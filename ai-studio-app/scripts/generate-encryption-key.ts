@@ -14,10 +14,11 @@
  */
 
 import { randomBytes } from "crypto";
+import { BRAND_NAME } from "@ais-app/types";
 
 const key = randomBytes(32).toString("hex");
 
-console.log("=== Echol AI Studio — Encryption Key Generator ===\n");
+console.log(`=== ${BRAND_NAME} — Encryption Key Generator ===\n`);
 console.log("Generated AES-256-GCM key (64 hex characters = 256 bits):\n");
 console.log(`  ENCRYPTION_KEY=${key}\n`);
 console.log("Add this to your .env files:");
