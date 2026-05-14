@@ -23,7 +23,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Save, Loader2, X, Settings2 } from "lucide-react";
+import {
+  Save, Loader2, X, Settings2,
+  Play, Flag, GitBranch, Route, Repeat, Layers, Timer, Workflow,
+  Bot, Sparkles, Search, Wrench, Globe, Code, ArrowLeftRight,
+  Combine, UserCheck,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -70,31 +76,33 @@ interface NodeTypeDef {
   label: string;
   category: "flow" | "ai" | "action" | "data" | "human";
   color: string;
+  icon: LucideIcon;
   description: string;
 }
 
 const NODE_REGISTRY: NodeTypeDef[] = [
-  { type: "input",            label: "Input",            category: "flow",   color: "#3b82f6", description: "Entry point — passes trigger data" },
-  { type: "output",           label: "Output",           category: "flow",   color: "#22c55e", description: "Terminal — formats final result" },
-  { type: "condition",        label: "Condition",        category: "flow",   color: "#f59e0b", description: "If/else branch on expression" },
-  { type: "switch",           label: "Switch",           category: "flow",   color: "#f97316", description: "Multi-branch routing by value" },
-  { type: "loop",             label: "Loop",             category: "flow",   color: "#6366f1", description: "Repeat until condition met" },
-  { type: "iteration",        label: "Iteration",        category: "flow",   color: "#8b5cf6", description: "Process array items" },
-  { type: "delay",            label: "Delay",            category: "flow",   color: "#94a3b8", description: "Wait for specified duration" },
-  { type: "sub_workflow",     label: "Sub-Workflow",     category: "flow",   color: "#0ea5e9", description: "Execute another workflow" },
-  { type: "agent",            label: "Agent",            category: "ai",     color: "#a855f7", description: "Full agent session with tools" },
-  { type: "llm",              label: "LLM",              category: "ai",     color: "#d946ef", description: "Direct LLM call — prompt in, text out" },
-  { type: "knowledge_search", label: "Knowledge Search", category: "ai",     color: "#ec4899", description: "Query knowledge base (RAG)" },
-  { type: "tool",             label: "Tool",             category: "action", color: "#14b8a6", description: "Execute a tool directly" },
-  { type: "http_request",     label: "HTTP Request",     category: "action", color: "#06b6d4", description: "Call an external API" },
-  { type: "code",             label: "Code",             category: "action", color: "#64748b", description: "Run JavaScript code" },
-  { type: "transform",        label: "Transform",        category: "data",   color: "#0891b2", description: "Map/reshape data" },
-  { type: "aggregate",        label: "Aggregate",        category: "data",   color: "#059669", description: "Merge parallel branch outputs" },
-  { type: "human_review",     label: "Human Review",     category: "human",  color: "#ef4444", description: "Pause for human decision" },
+  { type: "input",            label: "Input",            category: "flow",   color: "#3b82f6", icon: Play,           description: "Entry point — passes trigger data" },
+  { type: "output",           label: "Output",           category: "flow",   color: "#10b981", icon: Flag,           description: "Terminal — formats final result" },
+  { type: "condition",        label: "Condition",        category: "flow",   color: "#f59e0b", icon: GitBranch,      description: "If/else branch on expression" },
+  { type: "switch",           label: "Switch",           category: "flow",   color: "#ea580c", icon: Route,          description: "Multi-branch routing by value" },
+  { type: "loop",             label: "Loop",             category: "flow",   color: "#6366f1", icon: Repeat,         description: "Repeat until condition met" },
+  { type: "iteration",        label: "Iteration",        category: "flow",   color: "#7c3aed", icon: Layers,         description: "Process array items" },
+  { type: "delay",            label: "Delay",            category: "flow",   color: "#94a3b8", icon: Timer,          description: "Wait for specified duration" },
+  { type: "sub_workflow",     label: "Sub-Workflow",     category: "flow",   color: "#0284c7", icon: Workflow,       description: "Execute another workflow" },
+  { type: "agent",            label: "Agent",            category: "ai",     color: "#9333ea", icon: Bot,            description: "Full agent session with tools" },
+  { type: "llm",              label: "LLM",              category: "ai",     color: "#c026d3", icon: Sparkles,       description: "Direct LLM call — prompt in, text out" },
+  { type: "knowledge_search", label: "Knowledge Search", category: "ai",     color: "#db2777", icon: Search,         description: "Query knowledge base (RAG)" },
+  { type: "tool",             label: "Tool",             category: "action", color: "#0d9488", icon: Wrench,         description: "Execute a tool directly" },
+  { type: "http_request",     label: "HTTP Request",     category: "action", color: "#0891b2", icon: Globe,          description: "Call an external API" },
+  { type: "code",             label: "Code",             category: "action", color: "#475569", icon: Code,           description: "Run sandboxed JavaScript" },
+  { type: "transform",        label: "Transform",        category: "data",   color: "#0e7490", icon: ArrowLeftRight, description: "Map/reshape data" },
+  { type: "aggregate",        label: "Aggregate",        category: "data",   color: "#059669", icon: Combine,        description: "Merge parallel branch outputs" },
+  { type: "human_review",     label: "Human Review",     category: "human",  color: "#dc2626", icon: UserCheck,      description: "Pause for human decision" },
 ];
 
 const NODE_COLOR_MAP = Object.fromEntries(NODE_REGISTRY.map((n) => [n.type, n.color]));
 const NODE_LABEL_MAP = Object.fromEntries(NODE_REGISTRY.map((n) => [n.type, n.label]));
+const NODE_ICON_MAP = Object.fromEntries(NODE_REGISTRY.map((n) => [n.type, n.icon]));
 
 const CATEGORY_LABELS: Record<string, string> = {
   flow: "Flow Control",
@@ -105,98 +113,84 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const EDGE_STYLES: Record<string, { stroke: string; strokeDasharray?: string; animated: boolean }> = {
-  normal:    { stroke: "#9ca3af", animated: true },
-  error:     { stroke: "#ef4444", strokeDasharray: "5,5", animated: false },
+  normal:    { stroke: "#94a3b8", animated: false },
+  error:     { stroke: "#ef4444", strokeDasharray: "6,4", animated: false },
   loop_body: { stroke: "#6366f1", animated: true },
-  loop_back: { stroke: "#6366f1", strokeDasharray: "3,3", animated: false },
-  loop_done: { stroke: "#22c55e", animated: true },
+  loop_back: { stroke: "#6366f1", strokeDasharray: "4,4", animated: false },
+  loop_done: { stroke: "#10b981", animated: false },
 };
 
 // ---------------------------------------------------------------------------
 // Custom Node Component
 // ---------------------------------------------------------------------------
 
+function getNodeSubtitle(nodeType: string, config: Record<string, unknown>, agentName?: string): string | null {
+  switch (nodeType) {
+    case "agent": return agentName || null;
+    case "llm": return config.userMessage ? String(config.userMessage).slice(0, 45) : null;
+    case "condition": return config.expression ? String(config.expression).slice(0, 40) : null;
+    case "switch": return config.value ? String(config.value).slice(0, 40) : null;
+    case "http_request": return config.url ? `${config.method || "GET"} ${String(config.url).slice(0, 30)}` : null;
+    case "loop": return config.mode === "for_count" ? `${config.maxCount || 0} iterations` : "while condition";
+    case "iteration": return config.arrayPath ? `${config.parallel ? "parallel" : "seq"} · ${String(config.arrayPath).slice(0, 25)}` : null;
+    case "delay": return config.delayMs ? `${Number(config.delayMs) / 1000}s` : "dynamic";
+    case "code": return config.code ? String(config.code).split("\n")[0]?.slice(0, 35) || "empty" : null;
+    case "aggregate": return (config.strategy as string) || "merge";
+    default: return null;
+  }
+}
+
 function CustomNode({ data, selected }: { data: Record<string, unknown>; selected?: boolean }) {
   const nodeType = data.nodeType as string;
   const color = NODE_COLOR_MAP[nodeType] || "#6b7280";
+  const Icon = NODE_ICON_MAP[nodeType] || Play;
   const label = data.label as string;
   const config = (data.config || {}) as Record<string, unknown>;
   const agentName = data.agentName as string | undefined;
   const runStatus = data.runStatus as string | undefined;
+  const subtitle = getNodeSubtitle(nodeType, config, agentName);
 
-  const statusRing = runStatus === "completed" ? "ring-2 ring-green-500"
-    : runStatus === "running" ? "ring-2 ring-blue-500 animate-pulse"
-    : runStatus === "failed" ? "ring-2 ring-red-500"
-    : runStatus === "skipped" ? "opacity-50"
+  const statusRing = runStatus === "completed" ? "ring-2 ring-green-500/60"
+    : runStatus === "running" ? "ring-2 ring-blue-500/60 animate-pulse"
+    : runStatus === "failed" ? "ring-2 ring-red-500/60"
+    : runStatus === "skipped" ? "opacity-40"
     : "";
 
   return (
-    <div className={`rounded-lg border-2 bg-card shadow-md min-w-[180px] max-w-[240px] ${statusRing}`} style={{ borderColor: color }}>
-      <Handle type="target" position={Position.Top} className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white" />
-      <div className="px-3 py-1.5 rounded-t-md text-white text-[10px] font-semibold uppercase tracking-wider flex items-center justify-between" style={{ backgroundColor: color }}>
-        <span>{NODE_LABEL_MAP[nodeType] || nodeType}</span>
-        {runStatus && (
-          <span className="text-[8px] font-normal opacity-80">
-            {runStatus === "completed" ? "Done" : runStatus === "running" ? "Running" : runStatus === "failed" ? "Failed" : runStatus}
-          </span>
+    <div
+      className={`rounded-xl bg-card min-w-[200px] max-w-[260px] border border-border transition-shadow ${statusRing} ${selected ? "shadow-lg" : "shadow-sm"}`}
+      style={{ borderTopColor: color, borderTopWidth: 3 }}
+    >
+      <Handle type="target" position={Position.Top} className="!w-2.5 !h-2.5 !border-2 !border-card !rounded-full" style={{ backgroundColor: color }} />
+      <div className="px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <div className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg" style={{ backgroundColor: `${color}15` }}>
+            <Icon className="w-3.5 h-3.5" style={{ color }} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[13px] font-medium leading-tight truncate">{label}</div>
+            <div className="text-[10px] text-muted-foreground/60 uppercase tracking-wider font-medium">
+              {NODE_LABEL_MAP[nodeType] || nodeType}
+            </div>
+          </div>
+          {runStatus && (
+            <div className={`shrink-0 w-2 h-2 rounded-full ${
+              runStatus === "completed" ? "bg-green-500" :
+              runStatus === "running" ? "bg-blue-500 animate-pulse" :
+              runStatus === "failed" ? "bg-red-500" : "bg-gray-400"
+            }`} />
+          )}
+        </div>
+        {subtitle && (
+          <div className="mt-1.5 text-[10px] text-muted-foreground font-mono bg-muted/40 rounded-md px-2 py-1 truncate leading-relaxed">
+            {subtitle}
+          </div>
+        )}
+        {(data.durationMs as number) > 0 && (
+          <div className="mt-1 text-[9px] text-muted-foreground/50 tabular-nums">{Number(data.durationMs)}ms</div>
         )}
       </div>
-      <div className="px-3 py-2">
-        <div className="text-sm font-medium truncate">{label}</div>
-        {nodeType === "agent" && agentName ? (
-          <div className="text-[11px] text-muted-foreground mt-0.5">{agentName}</div>
-        ) : null}
-        {nodeType === "agent" && config.message ? (
-          <div className="text-[10px] text-muted-foreground mt-1 font-mono bg-muted/50 rounded px-1.5 py-0.5 truncate">
-            {String(config.message).slice(0, 50)}
-          </div>
-        ) : null}
-        {nodeType === "llm" && config.userMessage ? (
-          <div className="text-[10px] text-muted-foreground mt-1 font-mono bg-muted/50 rounded px-1.5 py-0.5 truncate">
-            {String(config.userMessage).slice(0, 50)}
-          </div>
-        ) : null}
-        {nodeType === "condition" && config.expression ? (
-          <div className="text-[10px] text-muted-foreground mt-1 font-mono bg-amber-50 dark:bg-amber-950/30 rounded px-1.5 py-0.5 truncate">
-            {String(config.expression).slice(0, 40)}
-          </div>
-        ) : null}
-        {nodeType === "switch" && config.value ? (
-          <div className="text-[10px] text-muted-foreground mt-1 font-mono bg-orange-50 dark:bg-orange-950/30 rounded px-1.5 py-0.5 truncate">
-            {String(config.value).slice(0, 40)}
-          </div>
-        ) : null}
-        {nodeType === "http_request" && config.url ? (
-          <div className="text-[10px] text-muted-foreground mt-1 font-mono bg-muted/50 rounded px-1.5 py-0.5 truncate">
-            {(config.method as string || "GET")} {String(config.url).slice(0, 35)}
-          </div>
-        ) : null}
-        {nodeType === "loop" ? (
-          <div className="text-[10px] text-muted-foreground mt-1">
-            {config.mode === "for_count" ? `${config.maxCount || 0} iterations` : "while condition"}
-          </div>
-        ) : null}
-        {nodeType === "iteration" ? (
-          <div className="text-[10px] text-muted-foreground mt-1 font-mono bg-muted/50 rounded px-1.5 py-0.5 truncate">
-            {config.parallel ? "parallel" : "sequential"} &middot; {String(config.arrayPath || "").slice(0, 30)}
-          </div>
-        ) : null}
-        {nodeType === "delay" ? (
-          <div className="text-[10px] text-muted-foreground mt-1">{config.delayMs ? `${Number(config.delayMs) / 1000}s` : "dynamic"}</div>
-        ) : null}
-        {nodeType === "code" ? (
-          <div className="text-[10px] text-muted-foreground mt-1 font-mono bg-muted/50 rounded px-1.5 py-0.5 truncate">
-            {String(config.code || "").split("\n")[0]?.slice(0, 40) || "empty"}
-          </div>
-        ) : null}
-        {nodeType === "aggregate" ? (
-          <div className="text-[10px] text-muted-foreground mt-1">{(config.strategy as string) || "merge"}</div>
-        ) : null}
-        {(data.durationMs as number) > 0 ? (
-          <div className="text-[9px] text-muted-foreground mt-1 tabular-nums">{Number(data.durationMs)}ms</div>
-        ) : null}
-      </div>
-      <Handle type="source" position={Position.Bottom} className="!w-3 !h-3 !bg-gray-400 !border-2 !border-white" />
+      <Handle type="source" position={Position.Bottom} className="!w-2.5 !h-2.5 !border-2 !border-card !rounded-full" style={{ backgroundColor: color }} />
     </div>
   );
 }
@@ -245,27 +239,39 @@ function NodePalette({ onAdd }: { onAdd: (type: string) => void }) {
   const categories = Object.entries(CATEGORY_LABELS);
 
   return (
-    <div className="w-48 shrink-0 border-r border-border bg-muted/20 overflow-y-auto">
-      <div className="px-3 py-2 border-b border-border">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Nodes</p>
+    <div className="w-56 shrink-0 border-r border-border bg-muted/10 overflow-y-auto">
+      <div className="px-4 py-3 border-b border-border">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Add Node</p>
       </div>
       {categories.map(([cat, label]) => {
         const items = NODE_REGISTRY.filter((n) => n.category === cat);
         if (items.length === 0) return null;
         return (
-          <div key={cat} className="px-2 py-1.5">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 px-1 mb-1">{label}</p>
-            {items.map((item) => (
-              <button
-                key={item.type}
-                onClick={() => onAdd(item.type)}
-                className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-xs hover:bg-muted transition-colors cursor-pointer text-left"
-                title={item.description}
-              >
-                <div className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: item.color }} />
-                <span className="truncate">{item.label}</span>
-              </button>
-            ))}
+          <div key={cat} className="px-3 py-2">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">{label}</p>
+            <div className="space-y-0.5">
+              {items.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.type}
+                    onClick={() => onAdd(item.type)}
+                    className="flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 hover:bg-muted/60 transition-colors cursor-pointer text-left group"
+                  >
+                    <div
+                      className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg transition-transform group-hover:scale-105"
+                      style={{ backgroundColor: `${item.color}15` }}
+                    >
+                      <Icon className="w-3.5 h-3.5" style={{ color: item.color }} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-medium leading-tight">{item.label}</div>
+                      <div className="text-[10px] text-muted-foreground/50 leading-tight truncate">{item.description}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         );
       })}
@@ -314,9 +320,13 @@ function NodeConfigPanel({
 
   return (
     <div className="w-72 shrink-0 border-l border-border bg-card overflow-y-auto">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
         <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: NODE_COLOR_MAP[nodeType] || "#6b7280" }} />
+          {(() => { const Icon = NODE_ICON_MAP[nodeType] || Play; const c = NODE_COLOR_MAP[nodeType] || "#6b7280"; return (
+            <div className="flex items-center justify-center w-6 h-6 rounded-md" style={{ backgroundColor: `${c}15` }}>
+              <Icon className="w-3.5 h-3.5" style={{ color: c }} />
+            </div>
+          ); })()}
           <span className="text-xs font-semibold">{NODE_LABEL_MAP[nodeType]}</span>
         </div>
         <div className="flex items-center gap-1">
@@ -719,36 +729,18 @@ export function WorkflowCanvas({
   const selectedNode = selectedNodeId ? nodes.find((n) => n.id === selectedNodeId) : null;
 
   return (
-    <div className="border border-border rounded-lg overflow-hidden flex" style={{ height: 600 }}>
+    <div className="border border-border rounded-xl overflow-hidden flex" style={{ height: 640 }}>
       <NodePalette onAdd={handleAddNodeFromPalette} />
 
-      <div className="flex-1 flex flex-col">
-        <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30">
-          <div className="flex items-center gap-3 flex-wrap">
-            {["flow", "ai", "action", "data", "human"].map((cat) => {
-              const items = NODE_REGISTRY.filter((n) => n.category === cat);
-              return (
-                <div key={cat} className="flex items-center gap-1">
-                  {items.slice(0, 3).map((item) => (
-                    <div key={item.type} className="flex items-center gap-0.5">
-                      <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: item.color }} />
-                      <span className="text-[9px] text-muted-foreground">{item.label}</span>
-                    </div>
-                  ))}
-                  {items.length > 3 && <span className="text-[9px] text-muted-foreground">+{items.length - 3}</span>}
-                </div>
-              );
-            })}
+      <div className="flex-1 flex flex-col relative">
+        {hasChanges && (
+          <div className="absolute top-3 right-3 z-10">
+            <Button size="sm" onClick={handleSave} disabled={saving} className="shadow-md">
+              {saving ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+              Save
+            </Button>
           </div>
-          <div className="flex items-center gap-2">
-            {hasChanges && (
-              <Button size="sm" onClick={handleSave} disabled={saving}>
-                {saving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Save className="h-3 w-3 mr-1" />}
-                Save
-              </Button>
-            )}
-          </div>
-        </div>
+        )}
         <div className="flex-1">
           <ReactFlow
             nodes={nodes}
@@ -761,13 +753,24 @@ export function WorkflowCanvas({
             onPaneClick={onPaneClick}
             nodeTypes={nodeTypes}
             fitView
-            fitViewOptions={{ padding: 0.3 }}
+            fitViewOptions={{ padding: 0.2 }}
             proOptions={{ hideAttribution: true }}
             deleteKeyCode={["Backspace", "Delete"]}
+            snapToGrid
+            snapGrid={[20, 20]}
+            defaultEdgeOptions={{
+              style: { strokeWidth: 2, stroke: "#9ca3af" },
+              markerEnd: { type: MarkerType.ArrowClosed, width: 14, height: 14, color: "#9ca3af" },
+            }}
           >
-            <Background gap={20} size={1} />
-            <Controls showInteractive={false} />
-            <MiniMap nodeColor={(n) => NODE_COLOR_MAP[(n.data as Record<string, unknown>).nodeType as string] || "#6b7280"} style={{ height: 80 }} />
+            <Background gap={24} size={1.2} color="#e2e8f0" />
+            <Controls showInteractive={false} className="!rounded-lg !border-border !shadow-sm" />
+            <MiniMap
+              nodeColor={(n) => NODE_COLOR_MAP[(n.data as Record<string, unknown>).nodeType as string] || "#6b7280"}
+              maskColor="rgba(0,0,0,0.08)"
+              className="!rounded-lg !border-border !shadow-sm"
+              style={{ height: 90, width: 140 }}
+            />
           </ReactFlow>
         </div>
       </div>

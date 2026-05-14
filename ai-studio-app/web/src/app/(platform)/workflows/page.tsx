@@ -10,6 +10,7 @@ import {
   CheckCircle2, XCircle, Clock, Zap, ChevronDown, ChevronRight, FolderOpen,
 } from "lucide-react";
 import { FileBrowser } from "@/components/workspace/file-browser";
+import { EventFeed, HistoricalEventFeed } from "@/components/activity/event-feed";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -79,22 +80,41 @@ export default function WorkflowsPage() {
       </PageHeader>
       {!loading && workflows.length === 0 ? (
         <EmptyState icon={GitBranch} title="No workflows yet" description="Create a workflow to chain agents and tools together." actionLabel="Create Workflow" onAction={() => setShowCreate(true)} />
+      ) : loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="border border-border rounded-xl p-4 h-28 animate-pulse bg-muted/30" />
+          ))}
+        </div>
       ) : (
-        <Card><Table>
-          <TableHeader><TableRow>
-            <TableHead>Workflow</TableHead><TableHead>Status</TableHead><TableHead>Version</TableHead><TableHead>Created</TableHead>
-          </TableRow></TableHeader>
-          <TableBody>
-            {loading ? <TableSkeleton columns={4} /> : workflows.map((w) => (
-              <TableRow key={w.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedId(w.id)}>
-                <TableCell><div className="font-medium">{w.name}</div>{w.description && <div className="text-xs text-muted-foreground line-clamp-1">{w.description}</div>}</TableCell>
-                <TableCell><Badge variant={STATUS_VARIANT[w.status] || "secondary"}>{w.status}</Badge></TableCell>
-                <TableCell className="text-muted-foreground">v{w.version}</TableCell>
-                <TableCell className="text-muted-foreground text-xs">{formatRelativeTime(w.createdAt)}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table></Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {workflows.map((w) => (
+            <button
+              key={w.id}
+              onClick={() => setSelectedId(w.id)}
+              className="border border-border rounded-xl p-4 text-left hover:shadow-md hover:border-border/80 transition-all cursor-pointer group bg-card"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="shrink-0 flex items-center justify-center w-8 h-8 rounded-lg bg-primary/5">
+                    <GitBranch className="w-4 h-4 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate group-hover:text-primary transition-colors">{w.name}</div>
+                    {w.description && <div className="text-xs text-muted-foreground truncate mt-0.5">{w.description}</div>}
+                  </div>
+                </div>
+                <div className={`shrink-0 w-2 h-2 rounded-full mt-1.5 ${
+                  w.status === "active" ? "bg-green-500" : w.status === "draft" ? "bg-amber-500" : "bg-gray-400"
+                }`} />
+              </div>
+              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border/50">
+                <span className="text-[11px] text-muted-foreground">v{w.version}</span>
+                <span className="text-[11px] text-muted-foreground">{formatRelativeTime(w.createdAt)}</span>
+              </div>
+            </button>
+          ))}
+        </div>
       )}
       <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
       <Dialog open={showCreate} onOpenChange={setShowCreate} size="xl">
@@ -473,6 +493,12 @@ function RunDetail({ workflowId, runId, onBack }: { workflowId: string; runId: s
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{run.errorMessage}</div>
       )}
 
+      {(run.status === "running" || run.status === "waiting") ? (
+        <EventFeed traceId={runId} enabled height={400} />
+      ) : (
+        <HistoricalEventFeed traceId={runId} height={350} />
+      )}
+
       <div className="border border-border rounded-lg">
         <div className="px-4 py-3 border-b bg-muted/30">
           <h2 className="text-sm font-semibold">Execution Steps</h2>
@@ -516,25 +542,39 @@ function RunFilesSection({ runId }: { runId: string }) {
   );
 }
 
+const STEP_NODE_COLORS: Record<string, string> = {
+  input: "#3b82f6", output: "#10b981", condition: "#f59e0b", switch: "#ea580c",
+  loop: "#6366f1", iteration: "#7c3aed", delay: "#94a3b8", sub_workflow: "#0284c7",
+  agent: "#9333ea", llm: "#c026d3", knowledge_search: "#db2777",
+  tool: "#0d9488", http_request: "#0891b2", code: "#475569",
+  transform: "#0e7490", aggregate: "#059669", human_review: "#dc2626",
+};
+
 function StepRow({ step, index }: { step: RunStep; index: number }) {
   const [expanded, setExpanded] = useState(false);
+  const color = STEP_NODE_COLORS[step.nodeType] || "#6b7280";
   const statusIcon = step.status === "completed" ? <CheckCircle2 className="h-4 w-4 text-green-600" /> :
     step.status === "failed" ? <XCircle className="h-4 w-4 text-red-600" /> :
     step.status === "waiting_human" ? <Clock className="h-4 w-4 text-amber-600" /> :
+    step.status === "running" ? <Loader2 className="h-4 w-4 text-blue-600 animate-spin" /> :
     <Zap className="h-4 w-4 text-blue-600" />;
 
+  const durationLabel = step.durationMs != null
+    ? step.durationMs < 1000 ? `${step.durationMs}ms` : `${(step.durationMs / 1000).toFixed(1)}s`
+    : null;
+
   return (
-    <div className="px-4 py-3">
-      <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-3 w-full text-left">
+    <div className="border-l-3 transition-colors" style={{ borderLeftColor: color }}>
+      <button onClick={() => setExpanded(!expanded)} className="flex items-center gap-3 w-full text-left px-4 py-3 hover:bg-muted/30 transition-colors">
         {expanded ? <ChevronDown className="h-3 w-3 text-muted-foreground" /> : <ChevronRight className="h-3 w-3 text-muted-foreground" />}
-        <span className="text-xs text-muted-foreground w-5">{index + 1}</span>
+        <span className="text-xs text-muted-foreground/60 w-5 tabular-nums">{index + 1}</span>
         {statusIcon}
         <span className="text-sm font-medium">{step.nodeName}</span>
-        <Badge variant="outline" className="text-[10px]">{step.nodeType}</Badge>
-        {step.durationMs != null && <span className="text-[11px] text-muted-foreground ml-auto">{step.durationMs}ms</span>}
+        <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded" style={{ backgroundColor: `${color}15`, color }}>{step.nodeType}</span>
+        {durationLabel && <span className="text-[11px] text-muted-foreground/60 ml-auto tabular-nums">{durationLabel}</span>}
       </button>
       {expanded && step.output && (
-        <pre className="mt-2 ml-12 text-[11px] font-mono bg-muted/50 rounded-md p-2.5 overflow-x-auto max-h-48 overflow-y-auto">{JSON.stringify(step.output, null, 2)}</pre>
+        <pre className="mx-4 mb-3 ml-16 text-[11px] font-mono bg-muted/40 rounded-lg p-3 overflow-x-auto max-h-48 overflow-y-auto border border-border/30 text-muted-foreground">{JSON.stringify(step.output, null, 2)}</pre>
       )}
     </div>
   );
