@@ -5,6 +5,7 @@ export const MODULES = [
   { id: "KNOWLEDGE",  label: "Knowledge Bases",  section: "build",   href: "/knowledge" },
   { id: "WORKFLOWS",  label: "Workflows",        section: "build",   href: "/workflows" },
   { id: "RUNS",       label: "Sessions",          section: "operate", href: "/runs" },
+  { id: "SCHEDULED",  label: "Scheduled Jobs",   section: "operate", href: "/scheduled" },
   { id: "CONNECTORS", label: "Connectors",       section: "operate", href: "/connectors" },
   { id: "PROVIDERS",  label: "Providers",        section: "operate", href: "/providers" },
   { id: "USERS",      label: "Users",            section: "admin",   href: "/users" },

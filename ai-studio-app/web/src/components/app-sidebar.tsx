@@ -21,6 +21,7 @@ import {
   Users,
   Shield,
   FileText,
+  Clock,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -30,6 +31,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   KNOWLEDGE: BookOpen,
   WORKFLOWS: GitBranch,
   RUNS: MessageSquare,
+  SCHEDULED: Clock,
   CONNECTORS: Plug,
   PROVIDERS: Server,
   USERS: Users,
