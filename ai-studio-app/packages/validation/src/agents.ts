@@ -35,3 +35,24 @@ export const updateAgentSchema = z.object({
   status: z.enum(["draft", "active", "disabled", "archived"]).optional(),
   tags: z.array(z.string()).optional(),
 });
+
+export const assignToolSchema = z.object({
+  toolId: z.string().uuid(),
+  toolConfig: z.record(z.unknown()).optional(),
+  isRequired: z.boolean().optional(),
+  priority: z.number().int().min(0).optional(),
+});
+
+export const assignConnectorSchema = z.object({
+  connectorId: z.string().uuid(),
+});
+
+export const assignKnowledgeBaseSchema = z.object({
+  knowledgeBaseId: z.string().uuid(),
+  searchConfig: z.record(z.unknown()).optional(),
+});
+
+export const agentSessionSchema = z.object({
+  message: z.string().min(1).max(50000),
+  metadata: z.record(z.unknown()).optional(),
+});
