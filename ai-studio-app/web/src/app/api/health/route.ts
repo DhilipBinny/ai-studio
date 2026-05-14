@@ -36,15 +36,17 @@ export async function GET(request: NextRequest) {
   }
 
   const mem = process.memoryUsage();
-  const heapUsedPct = Math.round((mem.heapUsed / mem.heapTotal) * 100);
+  const rssMB = Math.round(mem.rss / 1024 / 1024);
+  const maxRssMB = Number(process.env.HEALTH_MAX_RSS_MB) || 8192;
+  const memoryDegraded = rssMB > maxRssMB;
 
-  if (heapUsedPct > 90) {
+  if (memoryDegraded) {
     overall = overall === "unhealthy" ? "unhealthy" : "degraded";
   }
 
   checks.memory = {
-    status: heapUsedPct > 90 ? "degraded" : "healthy",
-    detail: `${Math.round(mem.heapUsed / 1024 / 1024)}MB / ${Math.round(mem.heapTotal / 1024 / 1024)}MB (${heapUsedPct}%)`,
+    status: memoryDegraded ? "degraded" : "healthy",
+    detail: `RSS ${rssMB}MB (threshold ${maxRssMB}MB), Heap ${Math.round(mem.heapUsed / 1024 / 1024)}MB`,
   };
 
   return NextResponse.json({
