@@ -25,7 +25,8 @@ import { TableSkeleton } from "@/components/table-skeleton";
 
 interface Workflow { id: string; name: string; description: string; status: string; version: number; createdAt: string; }
 interface WorkflowNode { id: string; nodeType: string; name: string; config: Record<string, unknown>; positionX: number; positionY: number; }
-interface WorkflowEdge { id: string; fromNodeId: string; toNodeId: string; conditionLabel: string | null; conditionExpr: string | null; sortOrder: number; }
+interface WorkflowEdge { id: string; fromNodeId: string; toNodeId: string; conditionLabel: string | null; conditionExpr: string | null; edgeType?: string; sortOrder: number; }
+interface ProviderModel { id: string; modelId: string; displayName: string; providerName: string; }
 interface WorkflowRun { id: string; status: string; input: Record<string, unknown>; output: Record<string, unknown> | null; errorMessage: string | null; startedAt: string | null; completedAt: string | null; createdAt: string; }
 interface RunStep { id: number; nodeId: string; nodeName: string; nodeType: string; status: string; output: Record<string, unknown> | null; durationMs: number | null; startedAt: string | null; }
 interface Agent { id: string; name: string; slug: string; }
@@ -131,6 +132,7 @@ function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onBack: ()
   const [edges, setEdges] = useState<WorkflowEdge[]>([]);
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [models, setModels] = useState<ProviderModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"nodes" | "runs">("nodes");
   const [running, setRunning] = useState(false);
@@ -139,10 +141,11 @@ function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onBack: ()
   const [selectedRun, setSelectedRun] = useState<string | null>(null);
 
   const fetchDetail = useCallback(async () => {
-    const [wfRes, agentsRes, runsRes] = await Promise.all([
+    const [wfRes, agentsRes, runsRes, modelsRes] = await Promise.all([
       fetch(`/api/workflows/${workflowId}`),
       fetch("/api/agents?pageSize=100"),
       fetch(`/api/workflows/${workflowId}/runs?pageSize=20`),
+      fetch("/api/models"),
     ]);
     if (wfRes.ok) {
       const d = await wfRes.json();
@@ -152,6 +155,7 @@ function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onBack: ()
     }
     if (agentsRes.ok) { const d = await agentsRes.json(); setAgents(d.data || []); }
     if (runsRes.ok) { const d = await runsRes.json(); setRuns(d.data || []); }
+    if (modelsRes.ok) { const d = await modelsRes.json(); setModels(d.data || []); }
     setLoading(false);
   }, [workflowId]);
 
@@ -183,7 +187,7 @@ function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onBack: ()
     await fetchDetail();
   }
 
-  async function handleSaveEdges(updatedEdges: Array<{ fromNodeId: string; toNodeId: string; conditionExpr?: string }>) {
+  async function handleSaveEdges(updatedEdges: Array<{ fromNodeId: string; toNodeId: string; conditionExpr?: string; conditionLabel?: string; edgeType?: string }>) {
     await fetch(`/api/workflows/${workflowId}/edges`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ edges: updatedEdges }),
@@ -232,6 +236,7 @@ function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onBack: ()
           nodes={nodes}
           edges={edges}
           agents={agents}
+          models={models}
           onSave={async (updatedNodes, updatedEdges) => {
             await handleSaveNodes(updatedNodes as WorkflowNode[]);
             await handleSaveEdges(updatedEdges);
@@ -371,9 +376,9 @@ function NodeEditor({ nodes, edges, agents, allNodes, onSaveNodes, onSaveEdges }
                 {node.nodeType === "agent" && (
                   <div className="mt-1.5 text-xs text-muted-foreground">
                     Agent: {agents.find((a) => a.id === (node.config as Record<string, unknown>).agentId)?.name || "Not set"}
-                    {(node.config as Record<string, unknown>).message && (
+                    {(node.config as Record<string, unknown>).message ? (
                       <div className="mt-0.5 font-mono bg-muted/50 rounded px-1.5 py-0.5 truncate">{String((node.config as Record<string, unknown>).message)}</div>
-                    )}
+                    ) : null}
                   </div>
                 )}
                 {targetNode && (

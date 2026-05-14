@@ -9,7 +9,7 @@ export const PUT = withRBAC("WORKFLOWS", 20, async (request, auth, params) => {
   if (!id) return errorResponse("Workflow ID required", "MISSING_ID", 400);
 
   const body = await request.json();
-  const nodes = body.nodes as Array<{ id?: string; nodeType: string; name: string; config: Record<string, unknown>; positionX: number; positionY: number }>;
+  const nodes = body.nodes as Array<{ id?: string; nodeType: string; name: string; config: Record<string, unknown>; errorPolicy?: Record<string, unknown>; positionX: number; positionY: number }>;
 
   if (!Array.isArray(nodes)) return errorResponse("nodes array required", "VALIDATION_ERROR", 400);
 
@@ -34,6 +34,7 @@ export const PUT = withRBAC("WORKFLOWS", 20, async (request, auth, params) => {
       nodeType: node.nodeType as typeof workflowNodes.nodeType.enumValues[number],
       name: node.name,
       config: node.config || {},
+      errorPolicy: node.errorPolicy || { onError: "stop", maxRetries: 0, retryDelayMs: 1000, retryBackoff: "fixed", timeoutMs: 0 },
       positionX: node.positionX,
       positionY: node.positionY,
     }).returning();

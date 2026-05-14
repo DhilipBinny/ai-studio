@@ -15,6 +15,7 @@ export const PUT = withRBAC("WORKFLOWS", 20, async (request, auth, params) => {
     toNodeId: string;
     conditionLabel?: string;
     conditionExpr?: string;
+    edgeType?: string;
     sortOrder?: number;
   }>;
 
@@ -33,6 +34,7 @@ export const PUT = withRBAC("WORKFLOWS", 20, async (request, auth, params) => {
           toNodeId: e.toNodeId,
           conditionLabel: e.conditionLabel || null,
           conditionExpr: e.conditionExpr || null,
+          edgeType: e.edgeType || "normal",
           sortOrder: e.sortOrder ?? i,
         }))
       ).returning()

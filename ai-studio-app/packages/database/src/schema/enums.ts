@@ -69,6 +69,13 @@ export const workflowNodeTypeEnum = pgEnum("workflow_node_type", [
   "input",
   "transform",
   "delay",
+  "switch",
+  "iteration",
+  "sub_workflow",
+  "knowledge_search",
+  "http_request",
+  "code",
+  "aggregate",
 ]);
 
 export const runStatusEnum = pgEnum("run_status", [
@@ -89,6 +96,7 @@ export const runStepStatusEnum = pgEnum("run_step_status", [
   "failed",
   "skipped",
   "waiting_human",
+  "retrying",
 ]);
 
 export const messageRoleEnum = pgEnum("message_role", [
