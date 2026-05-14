@@ -364,7 +364,7 @@ function NodeEditor({ nodes, edges, agents, allNodes, onSaveNodes, onSaveEdges }
                     <Badge variant="outline" className="text-[10px]">{node.nodeType}</Badge>
                     <span className="text-sm font-medium">{node.name}</span>
                   </div>
-                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleRemoveNode(idx)}>
+                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => handleRemoveNode(idx)} aria-label="Remove node">
                     <Trash2 className="h-3 w-3 text-muted-foreground" />
                   </Button>
                 </div>

@@ -134,7 +134,7 @@ function KBListView({ onSelect }: { onSelect: (id: string) => void }) {
                   <TableCell className="text-muted-foreground">{kb.chunkCount.toLocaleString()}</TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(kb.createdAt)}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={(e) => { e.stopPropagation(); setEditKB(kb); }}>
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={(e) => { e.stopPropagation(); setEditKB(kb); }} aria-label="Edit knowledge base">
                       <Pencil className="h-3 w-3" />
                     </Button>
                   </TableCell>
@@ -339,7 +339,7 @@ function KBDetailView({ kbId, onBack }: { kbId: string; onBack: () => void }) {
                       <TableCell className="text-muted-foreground">{doc.status === "ready" ? doc.chunkCount.toLocaleString() : "—"}</TableCell>
                       <TableCell className="text-muted-foreground">{formatDate(doc.createdAt)}</TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(doc.id)}>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(doc.id)} aria-label="Delete document">
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </TableCell>

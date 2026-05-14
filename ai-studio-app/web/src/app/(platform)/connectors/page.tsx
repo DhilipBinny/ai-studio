@@ -86,7 +86,7 @@ export default function ConnectorsPage() {
                     <TableCell className="text-muted-foreground">{tools.length > 0 ? tools.length : "—"}</TableCell>
                     <TableCell className="text-muted-foreground">{c.lastTestedAt ? formatRelativeTime(c.lastTestedAt) : "Never"}</TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditConnector(c)}>
+                      <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditConnector(c)} aria-label="Edit connector">
                         <Pencil className="h-3 w-3" />
                       </Button>
                     </TableCell>

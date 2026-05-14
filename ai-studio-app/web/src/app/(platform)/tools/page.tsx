@@ -110,7 +110,7 @@ export default function ToolsPage() {
                   <TableCell className="text-muted-foreground">{t.category || "—"}</TableCell>
                   <TableCell className="text-muted-foreground">v{t.version}</TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditTool(t)}>
+                    <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => setEditTool(t)} aria-label="Edit tool">
                       <Pencil className="h-3 w-3" />
                     </Button>
                   </TableCell>
