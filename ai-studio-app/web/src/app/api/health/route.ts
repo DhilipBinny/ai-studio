@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
   const auth = await getAuthContext(request);
   if (!auth) {
-    return NextResponse.json(publicResponse, { status: overall === "healthy" ? 200 : 503 });
+    return NextResponse.json({ error: "Authentication required for detail mode" }, { status: 401 });
   }
 
   const mem = process.memoryUsage();

@@ -1,6 +1,6 @@
 import { getDb } from "@ais-app/database";
 import { agents, agentSessions, agentSessionMessages, providers, providerModels, usageRecords } from "@ais-app/database";
-import { eq, and, asc } from "drizzle-orm";
+import { eq, and, asc, sql } from "drizzle-orm";
 import { buildSystemPrompt } from "./prompt-builder";
 import { callLLM } from "./llm-caller";
 import { loadToolDefinitions, executeTool, createLoopDetector } from "./tool-executor";
@@ -261,18 +261,6 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       break;
     }
 
-    const [current] = await db
-      .select({
-        inputTokens: agentSessions.totalInputTokens,
-        outputTokens: agentSessions.totalOutputTokens,
-        turns: agentSessions.totalTurns,
-        toolCallCount: agentSessions.totalToolCalls,
-        costUsd: agentSessions.totalCostUsd,
-      })
-      .from(agentSessions)
-      .where(eq(agentSessions.id, sessionId))
-      .limit(1);
-
     const [currentStatus] = await db
       .select({ status: agentSessions.status })
       .from(agentSessions)
@@ -280,17 +268,16 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       .limit(1);
 
     const nextStatus = currentStatus?.status === "waiting_approval" ? "waiting_approval" : "waiting";
-    const newCostUsd = (parseFloat(current?.costUsd || "0") + totalCost).toFixed(6);
 
     await db
       .update(agentSessions)
       .set({
         status: nextStatus,
-        totalInputTokens: (current?.inputTokens || 0) + totalInputTokens,
-        totalOutputTokens: (current?.outputTokens || 0) + totalOutputTokens,
-        totalTurns: (current?.turns || 0) + 1,
-        totalToolCalls: (current?.toolCallCount || 0) + totalToolCalls,
-        totalCostUsd: newCostUsd,
+        totalInputTokens: sql`${agentSessions.totalInputTokens} + ${totalInputTokens}`,
+        totalOutputTokens: sql`${agentSessions.totalOutputTokens} + ${totalOutputTokens}`,
+        totalTurns: sql`${agentSessions.totalTurns} + 1`,
+        totalToolCalls: sql`${agentSessions.totalToolCalls} + ${totalToolCalls}`,
+        totalCostUsd: sql`${agentSessions.totalCostUsd} + ${totalCost.toFixed(6)}::numeric`,
       })
       .where(eq(agentSessions.id, sessionId));
 

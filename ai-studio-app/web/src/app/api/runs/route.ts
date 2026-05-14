@@ -39,7 +39,8 @@ export const GET = withRBAC("RUNS", 10, async (request, auth) => {
   ]);
 
   const billingSettings = (billingRow[0]?.value ?? {}) as Record<string, unknown>;
-  const marginFactor = Number(billingSettings.cost_margin_factor) || 1.0;
+  const rawMargin = Number(billingSettings.cost_margin_factor);
+  const marginFactor = isNaN(rawMargin) || rawMargin < 1 ? 1.0 : rawMargin;
 
   const rows = data.map((s) => ({
     ...s,

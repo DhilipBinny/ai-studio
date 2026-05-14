@@ -71,10 +71,15 @@ export const GET = withRBAC("WORKSPACE", 10, async (request, auth) => {
     return errorResponse("File not found", "NOT_FOUND", 404);
   }
 
+  const stat = fs.statSync(resolved);
+  if (stat.size > 500 * 1024 * 1024) {
+    return errorResponse("File too large for download (max 500MB)", "PAYLOAD_TOO_LARGE", 413);
+  }
+
   const buffer = fs.readFileSync(resolved);
   const ext = path.extname(filePath).toLowerCase();
   const mimeType = MIME_MAP[ext] || "application/octet-stream";
-  const fileName = path.basename(filePath);
+  const fileName = path.basename(filePath).replace(/[^\w.\-]/g, "_");
 
   return new NextResponse(buffer, {
     headers: {

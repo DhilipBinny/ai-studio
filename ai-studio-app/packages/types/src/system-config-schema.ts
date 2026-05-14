@@ -77,9 +77,15 @@ export function validateConfigValue(sectionKey: string, value: Record<string, un
 
     if (val === undefined || val === null) continue;
 
-    if (field.type === "number" && typeof val === "number") {
-      if (field.min !== undefined && val < field.min) errors.push(`${field.label} must be at least ${field.min}`);
-      if (field.max !== undefined && val > field.max) errors.push(`${field.label} must be at most ${field.max}`);
+    if (field.type === "number") {
+      const num = typeof val === "number" ? val : Number(val);
+      if (isNaN(num)) { errors.push(`${field.label} must be a number`); continue; }
+      if (field.min !== undefined && num < field.min) errors.push(`${field.label} must be at least ${field.min}`);
+      if (field.max !== undefined && num > field.max) errors.push(`${field.label} must be at most ${field.max}`);
+    }
+
+    if (field.type === "select" && field.options && !field.options.includes(String(val))) {
+      errors.push(`${field.label} must be one of: ${field.options.join(", ")}`);
     }
   }
 

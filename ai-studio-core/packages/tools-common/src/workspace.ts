@@ -65,15 +65,19 @@ export function resolveTenantPath(requestedPath: string, config: WorkspaceConfig
 
   try {
     if (fs.existsSync(resolved)) {
-      const realPath = fs.realpathSync(resolved);
-      const realInWorkspace = realPath === agentBase || realPath.startsWith(agentBase + path.sep);
-      const realInShared = realPath === sharedBase || realPath.startsWith(sharedBase + path.sep);
-      if (!realInWorkspace && !realInShared) {
-        throw new Error(`Access denied: symlink "${requestedPath}" resolves outside workspace`);
+      const lstat = fs.lstatSync(resolved);
+      if (lstat.isSymbolicLink()) {
+        const realPath = fs.realpathSync(resolved);
+        const realInWorkspace = realPath === agentBase || realPath.startsWith(agentBase + path.sep);
+        const realInShared = realPath === sharedBase || realPath.startsWith(sharedBase + path.sep);
+        if (!realInWorkspace && !realInShared) {
+          throw new Error(`Access denied: symlink "${requestedPath}" resolves outside workspace`);
+        }
       }
     }
   } catch (e: unknown) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    const err = e as NodeJS.ErrnoException;
+    if (err.code !== "ENOENT") throw e;
   }
 
   return resolved;

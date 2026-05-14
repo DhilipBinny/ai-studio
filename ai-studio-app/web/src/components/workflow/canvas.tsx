@@ -503,6 +503,41 @@ function NodeConfigPanel({
               </div>
             )}
 
+            {nodeType === "knowledge_search" && (
+              <>
+                <div className="space-y-1">
+                  <Label className="text-[11px]">Knowledge Base ID</Label>
+                  <Input value={(config.knowledgeBaseId as string) || ""} onChange={(e) => updateConfig("knowledgeBaseId", e.target.value)} className="h-8 text-xs font-mono" placeholder="UUID of knowledge base" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px]">Query template</Label>
+                  <Input value={(config.query as string) || ""} onChange={(e) => updateConfig("query", e.target.value)} className="h-8 text-xs font-mono" placeholder="{{input.question}}" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px]">Max results</Label>
+                  <Input type="number" min="1" max="50" value={(config.topK as number) ?? 5} onChange={(e) => updateConfig("topK", parseInt(e.target.value))} className="h-7 text-xs" />
+                </div>
+              </>
+            )}
+
+            {nodeType === "tool" && (
+              <>
+                <div className="space-y-1">
+                  <Label className="text-[11px]">Tool name</Label>
+                  <Input value={(config.toolName as string) || ""} onChange={(e) => updateConfig("toolName", e.target.value)} className="h-8 text-xs font-mono" placeholder="read_file, web_fetch, etc." />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px]">Arguments (JSON)</Label>
+                  <Textarea
+                    value={JSON.stringify(config.arguments || {}, null, 2)}
+                    onChange={(e) => { try { updateConfig("arguments", JSON.parse(e.target.value)); } catch {} }}
+                    rows={3} className="font-mono text-[11px]"
+                    placeholder={'{"path": "{{input.filePath}}"}'}
+                  />
+                </div>
+              </>
+            )}
+
             {nodeType === "human_review" && (
               <>
                 <div className="space-y-1">

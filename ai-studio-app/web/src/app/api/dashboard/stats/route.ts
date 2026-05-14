@@ -82,7 +82,8 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
   const errorRate = totalSessions > 0 ? Math.round((failedSessions / totalSessions) * 100) : 0;
 
   const billingSettings = (billingConfig[0]?.value ?? {}) as Record<string, unknown>;
-  const marginFactor = Number(billingSettings.cost_margin_factor) || 1.0;
+  const rawMargin = Number(billingSettings.cost_margin_factor);
+  const marginFactor = isNaN(rawMargin) || rawMargin < 1 ? 1.0 : rawMargin;
   const costCurrency = (billingSettings.cost_currency as string) || "USD";
 
   const rawTotalCost = Number(tokenRow?.totalCostUsd || 0);

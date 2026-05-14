@@ -61,18 +61,22 @@ export const GET = withRBAC("WORKSPACE", 10, async (request, auth) => {
   const entries = fs.readdirSync(dirPath, { withFileTypes: true });
   const files = entries
     .filter((e) => !e.name.startsWith("."))
-    .map((entry) => {
+    .flatMap((entry) => {
       const fullPath = path.join(dirPath, entry.name);
       try {
+        if (entry.isSymbolicLink()) {
+          const realPath = fs.realpathSync(fullPath);
+          if (!realPath.startsWith(basePath + path.sep) && realPath !== basePath) return [];
+        }
         const s = fs.statSync(fullPath);
-        return {
+        return [{
           name: entry.name,
           type: entry.isDirectory() ? "directory" as const : "file" as const,
           size: entry.isDirectory() ? 0 : s.size,
           modifiedAt: s.mtime.toISOString(),
-        };
+        }];
       } catch {
-        return { name: entry.name, type: "file" as const, size: 0, modifiedAt: new Date().toISOString() };
+        return [];
       }
     })
     .sort((a, b) => {

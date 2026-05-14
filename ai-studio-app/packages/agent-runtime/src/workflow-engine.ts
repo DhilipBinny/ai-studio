@@ -1,6 +1,6 @@
 import { getDb } from "@ais-app/database";
 import { workflows, workflowNodes, workflowEdges, workflowRuns, workflowRunSteps, providerModels, providers } from "@ais-app/database";
-import { eq, and, asc, lt, isNotNull } from "drizzle-orm";
+import { eq, and, asc, lt, isNotNull, sql } from "drizzle-orm";
 import { runSession } from "./session-runner";
 import { callLLM } from "./llm-caller";
 import { createProvider } from "./provider-factory";
@@ -140,7 +140,9 @@ interface NodeResult {
 // Template / Expression Engine
 // ---------------------------------------------------------------------------
 
-const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype", "toString", "valueOf", "hasOwnProperty"]);
+const MAX_TEMPLATE_DEPTH = 10;
+const RESERVED_STATE_KEYS = new Set(["_error", "_loop", "_iteration", "_parallel", "_warnings"]);
 
 function resolveTemplate(template: string, state: WorkflowState): string {
   return template.replace(/\{\{([^}]+)\}\}/g, (_, expr: string) => {
@@ -151,10 +153,12 @@ function resolveTemplate(template: string, state: WorkflowState): string {
     const filter = pipeIdx > -1 ? trimmed.slice(pipeIdx + 1).trim() : null;
 
     const parts = path.split(".");
+    if (parts.length > MAX_TEMPLATE_DEPTH) return "";
     let current: unknown = state;
     for (const part of parts) {
       if (current === null || current === undefined) return "";
       if (BLOCKED_KEYS.has(part)) return "";
+      if (typeof current !== "object" || Array.isArray(current)) return "";
       current = (current as Record<string, unknown>)[part];
     }
     if (current === null || current === undefined) return "";
@@ -393,6 +397,22 @@ async function executeNode(
     case "http_request": {
       if (!config.url) throw new Error(`HTTP node "${node.name}" has no URL`);
       const url = resolveTemplate(config.url, state);
+
+      try {
+        const parsed = new URL(url);
+        if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only HTTP(S) allowed");
+        const host = parsed.hostname;
+        if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1"
+          || host.startsWith("10.") || host.startsWith("172.") || host.startsWith("192.168.")
+          || host.startsWith("169.254.") || host.startsWith("100.64.")
+          || host.endsWith(".internal") || host.endsWith(".local")) {
+          throw new Error("SSRF blocked: private/internal addresses not allowed");
+        }
+      } catch (e) {
+        if ((e as Error).message.includes("SSRF") || (e as Error).message.includes("Only HTTP"))
+          throw e;
+        throw new Error(`Invalid URL: ${url}`);
+      }
       const resolvedHeaders: Record<string, string> = {};
       for (const [k, v] of Object.entries(config.headers || {})) {
         resolvedHeaders[k] = resolveTemplate(v, state);
@@ -428,17 +448,23 @@ async function executeNode(
     case "code": {
       if (!config.code) throw new Error(`Code node "${node.name}" has no code`);
       const { runInNewContext } = await import("node:vm");
-      const sandbox = {
-        state: JSON.parse(JSON.stringify(state)),
-        result: {} as Record<string, unknown>,
-        console: { log: () => {}, warn: () => {}, error: () => {} },
-        JSON, Math, String, Number, Boolean, Array, Object, Date,
-        parseInt, parseFloat, isNaN, isFinite,
-      };
-      const wrappedCode = `(function(state) { ${config.code} })(state)`;
+      const frozenState = JSON.parse(JSON.stringify(state));
+      const sandbox = Object.create(null) as Record<string, unknown>;
+      sandbox.state = frozenState;
+      sandbox.result = Object.create(null) as Record<string, unknown>;
+      sandbox.console = { log: () => {}, warn: () => {}, error: () => {} };
+      sandbox.JSON = { parse: JSON.parse, stringify: JSON.stringify };
+      sandbox.Math = Math;
+      sandbox.parseInt = parseInt;
+      sandbox.parseFloat = parseFloat;
+      sandbox.isNaN = isNaN;
+      sandbox.isFinite = isFinite;
+      const wrappedCode = `"use strict"; (function(state) { ${config.code} })(state)`;
       try {
-        const returned = runInNewContext(wrappedCode, sandbox, { timeout: 5000 });
-        const output = (returned && typeof returned === "object") ? returned as Record<string, unknown> : sandbox.result;
+        const returned = runInNewContext(wrappedCode, sandbox, { timeout: 5000, microtaskMode: "afterEvaluate" });
+        const output = (returned && typeof returned === "object" && !Array.isArray(returned))
+          ? JSON.parse(JSON.stringify(returned)) as Record<string, unknown>
+          : JSON.parse(JSON.stringify(sandbox.result)) as Record<string, unknown>;
         return { output, paused: false };
       } catch (e) {
         throw new Error(`Code execution failed: ${(e as Error).message}`);
@@ -497,19 +523,18 @@ async function executeNodeWithRetry(
   while (attempt <= policy.maxRetries) {
     attempt++;
     const heartbeat = startHeartbeat(stepId);
+    let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
       const timeoutMs = policy.timeoutMs || 600_000;
       const result = await Promise.race([
         executeNode(node, state, tenantId, runId, userId),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Node "${node.name}" timed out after ${timeoutMs}ms`)), timeoutMs)
-        ),
+        new Promise<never>((_, reject) => {
+          timeoutTimer = setTimeout(() => reject(new Error(`Node "${node.name}" timed out after ${timeoutMs}ms`)), timeoutMs);
+        }),
       ]);
-      clearInterval(heartbeat);
       return { result, attempt };
     } catch (error) {
-      clearInterval(heartbeat);
 
       if (attempt <= policy.maxRetries) {
         const delay = policy.retryBackoff === "exponential"
@@ -545,6 +570,9 @@ async function executeNodeWithRetry(
         default:
           throw error;
       }
+    } finally {
+      clearInterval(heartbeat);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
     }
   }
 
@@ -629,7 +657,7 @@ function getLoopBodyNodes(loopNode: GraphNode, allEdges: GraphEdge[], allNodes: 
     const id = queue.shift()!;
     if (bodyNodeIds.has(id) || id === loopNode.id) continue;
     bodyNodeIds.add(id);
-    const outgoing = allEdges.filter((e) => e.fromNodeId === id && e.edgeType !== "loop_back");
+    const outgoing = allEdges.filter((e) => e.fromNodeId === id && (e.edgeType === "normal" || e.edgeType === "loop_body" || e.edgeType === "loop_done"));
     for (const edge of outgoing) {
       if (!bodyNodeIds.has(edge.toNodeId) && edge.toNodeId !== loopNode.id) {
         queue.push(edge.toNodeId);
@@ -694,7 +722,7 @@ async function executeIterationNode(
 
   const resolved = resolveTemplate(config.arrayPath, state);
   let items: unknown[];
-  try { items = JSON.parse(resolved); } catch { items = []; }
+  try { items = JSON.parse(resolved); } catch { throw new Error(`Iteration node "${node.name}": arrayPath resolved to invalid JSON: ${resolved.slice(0, 100)}`); }
   if (!Array.isArray(items)) throw new Error(`Iteration node "${node.name}": arrayPath did not resolve to an array`);
 
   const maxItems = config.maxItems || 1000;
@@ -909,6 +937,10 @@ async function executeGraph(
           if (failedNode) {
             completed.add(failedNode.id);
             state[normalizeKey(failedNode.name)] = { _error: true, message: (r.reason as Error).message };
+            if (failedNode.errorPolicy.onError === "error_branch") {
+              const errorNext = getNextNodes(failedNode, graph, state, true);
+              remaining.push(...errorNext);
+            }
           }
         }
       }
@@ -989,6 +1021,18 @@ async function executeGraph(
           ready.push(next);
         }
       }
+    }
+  }
+
+  const hasOutput = Array.from(completed).some((id) => graph.nodes.get(id)?.nodeType === "output");
+  if (!hasOutput && graph.nodes.size > 0) {
+    const unvisited = Array.from(graph.nodes.keys()).filter((id) => !completed.has(id));
+    if (unvisited.length > 0) {
+      const names = unvisited.map((id) => graph.nodes.get(id)?.name).filter(Boolean).join(", ");
+      (state as Record<string, unknown>)._warnings = [
+        ...((state._warnings as string[]) || []),
+        `Nodes not reached: ${names}`,
+      ];
     }
   }
 
@@ -1148,7 +1192,7 @@ export async function recoverStaleWorkflowRuns(): Promise<number> {
   }).from(workflowRunSteps)
     .where(and(
       eq(workflowRunSteps.status, "running"),
-      lt(workflowRunSteps.lastHeartbeatAt, staleThreshold),
+      sql`(${workflowRunSteps.lastHeartbeatAt} < ${staleThreshold} OR ${workflowRunSteps.lastHeartbeatAt} IS NULL)`,
     ));
 
   for (const step of staleSteps) {
