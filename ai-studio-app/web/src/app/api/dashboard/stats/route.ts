@@ -10,7 +10,6 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
 
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const [
     [{ agentCount }],
@@ -20,10 +19,9 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
     [{ workflowCount }],
     [{ totalSessions }],
     [{ sessionsToday }],
-    [{ sessionsThisWeek }],
-    [{ completedSessions }],
-    [{ failedSessions }],
-    [tokenRow],
+    [{ failedToday }],
+    [totalsRow],
+    [todayCostRow],
     topAgents,
     recentSessions,
     billingConfig,
@@ -35,14 +33,13 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
     db.select({ workflowCount: count() }).from(workflows).where(and(eq(workflows.tenantId, tid), eq(workflows.isActive, true))),
     db.select({ totalSessions: count() }).from(agentSessions).where(eq(agentSessions.tenantId, tid)),
     db.select({ sessionsToday: count() }).from(agentSessions).where(and(eq(agentSessions.tenantId, tid), gte(agentSessions.createdAt, todayStart))),
-    db.select({ sessionsThisWeek: count() }).from(agentSessions).where(and(eq(agentSessions.tenantId, tid), gte(agentSessions.createdAt, weekStart))),
-    db.select({ completedSessions: count() }).from(agentSessions).where(and(eq(agentSessions.tenantId, tid), eq(agentSessions.status, "completed"))),
-    db.select({ failedSessions: count() }).from(agentSessions).where(and(eq(agentSessions.tenantId, tid), eq(agentSessions.status, "failed"))),
+    db.select({ failedToday: count() }).from(agentSessions).where(and(eq(agentSessions.tenantId, tid), eq(agentSessions.status, "failed"), gte(agentSessions.createdAt, todayStart))),
     db.select({
-      totalTokens: sum(sql`${agentSessions.totalInputTokens} + ${agentSessions.totalOutputTokens}`),
-      totalToolCalls: sum(agentSessions.totalToolCalls),
       totalCostUsd: sum(agentSessions.totalCostUsd),
     }).from(agentSessions).where(eq(agentSessions.tenantId, tid)),
+    db.select({
+      costToday: sum(agentSessions.totalCostUsd),
+    }).from(agentSessions).where(and(eq(agentSessions.tenantId, tid), gte(agentSessions.createdAt, todayStart))),
     db.select({
       agentId: agentSessions.agentId,
       agentName: agents.name,
@@ -76,17 +73,12 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
     db.select({ value: systemConfig.value }).from(systemConfig).where(and(eq(systemConfig.tenantId, tid), eq(systemConfig.key, "billing"))).limit(1),
   ]);
 
-  const waitingSessions = totalSessions - completedSessions - failedSessions;
-  const successRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
-  const errorRate = totalSessions > 0 ? Math.round((failedSessions / totalSessions) * 100) : 0;
-
   const billingSettings = (billingConfig[0]?.value ?? {}) as Record<string, unknown>;
   const rawMargin = Number(billingSettings.cost_margin_factor);
   const marginFactor = isNaN(rawMargin) || rawMargin < 1 ? 1.0 : rawMargin;
-  const costCurrency = (billingSettings.cost_currency as string) || "USD";
 
-  const rawTotalCost = Number(tokenRow?.totalCostUsd || 0);
-  const totalCostUsd = rawTotalCost * marginFactor;
+  const totalCostUsd = Number(totalsRow?.totalCostUsd || 0) * marginFactor;
+  const costToday = Number(todayCostRow?.costToday || 0) * marginFactor;
   const avgCostPerSession = totalSessions > 0 ? totalCostUsd / totalSessions : 0;
 
   return NextResponse.json({
@@ -97,18 +89,10 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
     workflows: workflowCount,
     totalSessions,
     sessionsToday,
-    sessionsThisWeek,
-    completedSessions,
-    failedSessions,
-    waitingSessions,
-    successRate,
-    errorRate,
-    totalTokens: Number(tokenRow?.totalTokens || 0),
-    totalToolCalls: Number(tokenRow?.totalToolCalls || 0),
+    failedToday,
+    costToday,
     totalCostUsd,
     avgCostPerSession,
-    costCurrency,
-    costMarginFactor: marginFactor,
     topAgents: topAgents.map((a) => ({
       ...a,
       costUsd: Number(a.costUsd || 0) * marginFactor,

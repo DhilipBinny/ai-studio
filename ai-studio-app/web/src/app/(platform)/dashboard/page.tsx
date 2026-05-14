@@ -3,8 +3,8 @@ import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect } from "react";
 import {
-  Bot, Wrench, MessageSquare, Zap, CheckCircle, XCircle,
-  Database, Plug, GitBranch, TrendingUp, Clock, Hash, DollarSign,
+  Bot, Wrench, MessageSquare, AlertTriangle,
+  Database, Plug, DollarSign,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,17 +41,10 @@ interface Stats {
   workflows: number;
   totalSessions: number;
   sessionsToday: number;
-  sessionsThisWeek: number;
-  completedSessions: number;
-  failedSessions: number;
-  successRate: number;
-  errorRate: number;
-  totalTokens: number;
-  totalToolCalls: number;
+  failedToday: number;
+  costToday: number;
   totalCostUsd: number;
   avgCostPerSession: number;
-  costCurrency: string;
-  costMarginFactor: number;
   topAgents: TopAgent[];
   recentSessions: RecentSession[];
 }
@@ -101,17 +94,15 @@ export default function DashboardPage() {
 
   return (
     <RequirePermission module="DASHBOARD"><>
-      <PageHeader title="Dashboard" description="Platform overview, usage analytics, and agent performance." />
+      <PageHeader title="Dashboard" description="Platform overview and agent performance." />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard icon={MessageSquare} label="Sessions Today" value={stats?.sessionsToday} />
-        <StatCard icon={TrendingUp} label="This Week" value={stats?.sessionsThisWeek} />
-        <StatCard icon={Zap} label="Total Tokens" value={stats ? formatNumber(stats.totalTokens) : undefined} />
-        <StatCard icon={Wrench} label="Tool Calls" value={stats ? formatNumber(stats.totalToolCalls) : undefined} />
+        <StatCard icon={AlertTriangle} label="Failed Today" value={stats?.failedToday} variant={stats && stats.failedToday > 0 ? "error" : "default"} />
+        <StatCard icon={DollarSign} label="Cost Today" value={stats ? formatCost(stats.costToday) : undefined} />
+        <StatCard icon={MessageSquare} label="Total Sessions" value={stats?.totalSessions} />
         <StatCard icon={DollarSign} label="Total Cost" value={stats ? formatCost(stats.totalCostUsd) : undefined} />
         <StatCard icon={DollarSign} label="Avg / Session" value={stats ? formatCost(stats.avgCostPerSession) : undefined} />
-        <StatCard icon={CheckCircle} label="Success Rate" value={stats ? `${stats.successRate}%` : undefined} variant="success" />
-        <StatCard icon={XCircle} label="Error Rate" value={stats ? `${stats.errorRate}%` : undefined} variant={stats && stats.errorRate > 10 ? "error" : "default"} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -218,7 +209,7 @@ function StatCard({ icon: Icon, label, value, variant }: { icon: React.Component
 
 function MiniStat({ label, value, icon: Icon }: { label: string; value?: number; icon: React.ComponentType<{ className?: string }> }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-border border-border px-3 py-2.5">
+    <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-secondary">
         <Icon className="h-4 w-4 text-muted-foreground" />
       </div>
