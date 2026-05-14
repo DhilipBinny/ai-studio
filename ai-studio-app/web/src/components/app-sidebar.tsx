@@ -22,6 +22,7 @@ import {
   Shield,
   FileText,
   Clock,
+  FolderOpen,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -34,6 +35,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   SCHEDULED: Clock,
   CONNECTORS: Plug,
   PROVIDERS: Server,
+  WORKSPACE: FolderOpen,
   USERS: Users,
   PROFILES: Shield,
   AUDIT: FileText,

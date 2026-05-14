@@ -42,7 +42,7 @@ export async function getAuthContext(
 
     let accessRights: AccessRights = {
       DASHBOARD: 0, AGENTS: 0, TOOLS: 0, KNOWLEDGE: 0, WORKFLOWS: 0,
-      CONNECTORS: 0, RUNS: 0, SCHEDULED: 0, PROVIDERS: 0, USERS: 0, PROFILES: 0,
+      CONNECTORS: 0, RUNS: 0, SCHEDULED: 0, PROVIDERS: 0, WORKSPACE: 0, USERS: 0, PROFILES: 0,
       AUDIT: 0, SETTINGS: 0,
     };
 

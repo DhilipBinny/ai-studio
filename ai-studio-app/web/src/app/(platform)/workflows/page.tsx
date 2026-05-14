@@ -7,8 +7,9 @@ import { WorkflowCanvas } from "@/components/workflow/canvas";
 import { useState, useEffect, useCallback } from "react";
 import {
   Plus, GitBranch, ArrowLeft, Play, Pencil, Trash2, Loader2,
-  CheckCircle2, XCircle, Clock, Zap, ChevronDown, ChevronRight,
+  CheckCircle2, XCircle, Clock, Zap, ChevronDown, ChevronRight, FolderOpen,
 } from "lucide-react";
+import { FileBrowser } from "@/components/workspace/file-browser";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -489,6 +490,26 @@ function RunDetail({ workflowId, runId, onBack }: { workflowId: string; runId: s
             <h2 className="text-sm font-semibold">Final Output</h2>
           </div>
           <pre className="p-4 text-xs font-mono overflow-x-auto max-h-64 overflow-y-auto">{JSON.stringify(run.output, null, 2)}</pre>
+        </div>
+      )}
+
+      <RunFilesSection runId={runId} />
+    </div>
+  );
+}
+
+function RunFilesSection({ runId }: { runId: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="border border-border rounded-lg">
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center gap-2 px-4 py-3 hover:bg-muted/30 transition-colors text-left">
+        {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+        <FolderOpen className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold">Run Files</h2>
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4">
+          <FileBrowser scope="run" id={runId} />
         </div>
       )}
     </div>

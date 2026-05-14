@@ -8,6 +8,7 @@ export const MODULES = [
   { id: "SCHEDULED",  label: "Scheduled Jobs",   section: "operate", href: "/scheduled" },
   { id: "CONNECTORS", label: "Connectors",       section: "operate", href: "/connectors" },
   { id: "PROVIDERS",  label: "Providers",        section: "operate", href: "/providers" },
+  { id: "WORKSPACE",  label: "Workspace",        section: "operate", href: "/workspace" },
   { id: "USERS",      label: "Users",            section: "admin",   href: "/users" },
   { id: "AUDIT",      label: "Audit Log",        section: "admin",   href: "/audit-log" },
   { id: "SETTINGS",   label: "Settings",         section: "admin",   href: "/settings" },

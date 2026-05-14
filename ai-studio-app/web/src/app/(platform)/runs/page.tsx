@@ -6,8 +6,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   MessageSquare, ArrowLeft, Clock, Cpu, Wrench, AlertCircle,
   ChevronDown, ChevronRight, User, Bot, Hash, Zap, Timer,
-  CheckCircle2, XCircle, Loader2, DollarSign,
+  CheckCircle2, XCircle, Loader2, DollarSign, FolderOpen,
 } from "lucide-react";
+import { FileBrowser } from "@/components/workspace/file-browser";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -379,6 +380,26 @@ function SessionDetailView({ sessionId, onBack }: { sessionId: string; onBack: (
               ))}
             </TableBody>
           </Table>
+        </div>
+      )}
+
+      <WorkspaceFilesSection agentId={session.agentId} />
+    </div>
+  );
+}
+
+function WorkspaceFilesSection({ agentId }: { agentId: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="border border-border rounded-lg">
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center gap-2 px-4 py-3 hover:bg-muted/30 transition-colors text-left">
+        {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
+        <FolderOpen className="h-4 w-4 text-muted-foreground" />
+        <h2 className="text-sm font-semibold">Workspace Files</h2>
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4">
+          <FileBrowser scope="agent" id={agentId} />
         </div>
       )}
     </div>
