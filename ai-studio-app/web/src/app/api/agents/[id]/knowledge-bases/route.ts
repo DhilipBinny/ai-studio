@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { agentKnowledgeBases, knowledgeBases } from "@ais-app/database";
+import { assignKnowledgeBaseSchema } from "@ais-app/validation";
 import { eq, and } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
@@ -32,16 +33,15 @@ export const POST = withRBAC("AGENTS", 20, async (request, auth, params) => {
   if (!id) return errorResponse("Agent ID required", "MISSING_ID", 400);
 
   const body = await request.json();
-  const { knowledgeBaseId, searchConfig } = body;
-
-  if (!knowledgeBaseId) return errorResponse("knowledgeBaseId required", "VALIDATION_ERROR", 400);
+  const parsed = assignKnowledgeBaseSchema.safeParse(body);
+  if (!parsed.success) return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
 
   const db = getDb();
 
   const [kb] = await db
     .select({ id: knowledgeBases.id, name: knowledgeBases.name })
     .from(knowledgeBases)
-    .where(and(eq(knowledgeBases.id, knowledgeBaseId), eq(knowledgeBases.tenantId, auth.tenantId), eq(knowledgeBases.isActive, true)))
+    .where(and(eq(knowledgeBases.id, parsed.data.knowledgeBaseId), eq(knowledgeBases.tenantId, auth.tenantId), eq(knowledgeBases.isActive, true)))
     .limit(1);
 
   if (!kb) return errorResponse("Knowledge base not found", "NOT_FOUND", 404);
@@ -49,7 +49,7 @@ export const POST = withRBAC("AGENTS", 20, async (request, auth, params) => {
   const [existing] = await db
     .select({ id: agentKnowledgeBases.id })
     .from(agentKnowledgeBases)
-    .where(and(eq(agentKnowledgeBases.agentId, id), eq(agentKnowledgeBases.knowledgeBaseId, knowledgeBaseId), eq(agentKnowledgeBases.tenantId, auth.tenantId)))
+    .where(and(eq(agentKnowledgeBases.agentId, id), eq(agentKnowledgeBases.knowledgeBaseId, parsed.data.knowledgeBaseId), eq(agentKnowledgeBases.tenantId, auth.tenantId)))
     .limit(1);
 
   if (existing) return errorResponse("Knowledge base already assigned", "ALREADY_ASSIGNED", 409);
@@ -57,8 +57,8 @@ export const POST = withRBAC("AGENTS", 20, async (request, auth, params) => {
   const [assigned] = await db.insert(agentKnowledgeBases).values({
     tenantId: auth.tenantId,
     agentId: id,
-    knowledgeBaseId,
-    searchConfig: searchConfig || { top_k: 5, similarity_threshold: 0.3 },
+    knowledgeBaseId: parsed.data.knowledgeBaseId,
+    searchConfig: parsed.data.searchConfig || { top_k: 5, similarity_threshold: 0.3 },
   }).returning();
 
   await createAuditEntry({
@@ -67,7 +67,7 @@ export const POST = withRBAC("AGENTS", 20, async (request, auth, params) => {
     action: "agent.assign_knowledge_base",
     resourceType: "agent",
     resourceId: id,
-    details: { knowledgeBaseId, knowledgeBaseName: kb.name },
+    details: { knowledgeBaseId: parsed.data.knowledgeBaseId, knowledgeBaseName: kb.name },
   });
 
   return NextResponse.json(assigned, { status: 201 });

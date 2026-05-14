@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { connectors } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
+import { updateConnectorSchema } from "@ais-app/validation";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 import { encryptSecret } from "@ais-app/auth";
@@ -42,6 +43,10 @@ export const PATCH = withRBAC("CONNECTORS", 20, async (request, auth, params) =>
   if (!id) return errorResponse("Connector ID required", "MISSING_ID", 400);
 
   const body = await request.json();
+  const parsed = updateConnectorSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
+  }
   const db = getDb();
 
   const [existing] = await db
@@ -52,8 +57,8 @@ export const PATCH = withRBAC("CONNECTORS", 20, async (request, auth, params) =>
 
   if (!existing) return errorResponse("Connector not found", "NOT_FOUND", 404);
 
-  if (body.connectionConfig && existing.connectorType === "mcp") {
-    const command = (body.connectionConfig as Record<string, unknown>)?.command as string | undefined;
+  if (parsed.data.connectionConfig && existing.connectorType === "mcp") {
+    const command = (parsed.data.connectionConfig as Record<string, unknown>)?.command as string | undefined;
     if (command) {
       const base = command.includes("/") ? command.split("/").pop()! : command;
       if (!ALLOWED_COMMANDS.has(base)) {
@@ -63,12 +68,12 @@ export const PATCH = withRBAC("CONNECTORS", 20, async (request, auth, params) =>
   }
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
-  if (body.name !== undefined) updates.name = body.name;
-  if (body.description !== undefined) updates.description = body.description;
-  if (body.connectionConfig !== undefined) {
-    const cc = body.connectionConfig;
+  if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+  if (parsed.data.description !== undefined) updates.description = parsed.data.description;
+  if (parsed.data.connectionConfig !== undefined) {
+    const cc = parsed.data.connectionConfig;
     updates.connectionConfig = cc?.env
-      ? { ...cc, env: Object.fromEntries(Object.entries(cc.env as Record<string, string>).map(([k, v]) => [k, encryptSecret(v)])) }
+      ? { ...cc, env: Object.fromEntries(Object.entries((cc as Record<string, unknown>).env as Record<string, string>).map(([k, v]) => [k, encryptSecret(v)])) }
       : cc;
   }
   if (body.credentialsRef !== undefined) {

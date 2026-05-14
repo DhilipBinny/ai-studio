@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { apiKeys } from "@ais-app/database";
 import { eq, and, desc } from "drizzle-orm";
+import { createApiKeySchema } from "@ais-app/validation";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 import { generateApiKey } from "@/lib/api-key-auth";
@@ -30,10 +31,11 @@ export const GET = withRBAC("SETTINGS", 20, async (_request, auth) => {
 
 export const POST = withRBAC("SETTINGS", 20, async (request, auth) => {
   const body = await request.json();
-  const name = body.name;
-  if (!name || typeof name !== "string" || name.trim().length === 0) {
-    return errorResponse("Name is required", "VALIDATION_ERROR", 400);
+  const parsed = createApiKeySchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
   }
+  const { name, scopedAgentIds, rateLimitRpm } = parsed.data;
 
   const { key, prefix, hash } = generateApiKey();
   const db = getDb();
@@ -45,8 +47,8 @@ export const POST = withRBAC("SETTINGS", 20, async (request, auth) => {
       name: name.trim(),
       keyHash: hash,
       keyPrefix: prefix,
-      scopedAgentIds: body.scopedAgentIds || [],
-      rateLimitRpm: body.rateLimitRpm || 60,
+      scopedAgentIds: scopedAgentIds || [],
+      rateLimitRpm: rateLimitRpm || 60,
       createdBy: auth.userId,
     })
     .returning({

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runSession } from "@ais-app/agent-runtime";
+import { agentSessionSchema } from "@ais-app/validation";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
@@ -8,18 +9,16 @@ export const POST = withRBAC("AGENTS", 10, async (request, auth, params) => {
   if (!agentId) return errorResponse("Agent ID required", "MISSING_ID", 400);
 
   const body = await request.json();
-  const message = body.message;
-  if (!message || typeof message !== "string" || message.trim().length === 0) {
-    return errorResponse("Message is required", "VALIDATION_ERROR", 400);
-  }
+  const parsed = agentSessionSchema.safeParse(body);
+  if (!parsed.success) return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
 
   const result = await runSession({
     agentId,
     tenantId: auth.tenantId,
     userId: auth.userId,
-    message: message.trim(),
+    message: parsed.data.message.trim(),
     channel: "studio",
-    metadata: body.metadata,
+    metadata: parsed.data.metadata,
   });
 
   if (result.error) {

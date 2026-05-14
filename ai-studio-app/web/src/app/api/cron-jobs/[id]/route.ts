@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { cronJobs } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
+import { updateCronJobSchema } from "@ais-app/validation";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 import { runJobNow } from "@ais-app/agent-runtime";
@@ -11,6 +12,10 @@ export const PATCH = withRBAC("SETTINGS", 20, async (request, auth, params) => {
   if (!id) return errorResponse("Job ID required", "MISSING_ID", 400);
 
   const body = await request.json();
+  const parsed = updateCronJobSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
+  }
   const db = getDb();
 
   const [existing] = await db.select({ id: cronJobs.id }).from(cronJobs)
@@ -18,11 +23,11 @@ export const PATCH = withRBAC("SETTINGS", 20, async (request, auth, params) => {
   if (!existing) return errorResponse("Job not found", "NOT_FOUND", 404);
 
   const updates: Record<string, unknown> = { updatedAt: new Date() };
-  if (body.name !== undefined) updates.name = body.name;
-  if (body.enabled !== undefined) updates.enabled = body.enabled;
-  if (body.scheduleValue !== undefined) updates.scheduleValue = body.scheduleValue;
-  if (body.timezone !== undefined) updates.timezone = body.timezone;
-  if (body.prompt !== undefined) updates.prompt = body.prompt;
+  if (parsed.data.name !== undefined) updates.name = parsed.data.name;
+  if (parsed.data.enabled !== undefined) updates.enabled = parsed.data.enabled;
+  if (parsed.data.scheduleValue !== undefined) updates.scheduleValue = parsed.data.scheduleValue;
+  if (parsed.data.timezone !== undefined) updates.timezone = parsed.data.timezone;
+  if (parsed.data.prompt !== undefined) updates.prompt = parsed.data.prompt;
 
   const [updated] = await db.update(cronJobs).set(updates).where(eq(cronJobs.id, id)).returning();
 

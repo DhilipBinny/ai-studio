@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { connectors } from "@ais-app/database";
-import { paginationSchema } from "@ais-app/validation";
+import { paginationSchema, createConnectorSchema } from "@ais-app/validation";
 import { encryptSecret } from "@ais-app/auth";
 import { ALLOWED_COMMANDS } from "@ais/mcp-client";
 import { eq, and, count, desc } from "drizzle-orm";
@@ -51,8 +51,12 @@ export const GET = withRBAC("CONNECTORS", 10, async (request, auth) => {
 
 export const POST = withRBAC("CONNECTORS", 20, async (request, auth) => {
   const body = await request.json();
-  const { name, description, connectorType, connectionConfig, credentialsRef, healthCheckUrl } = body;
-  if (!name || !connectorType) return errorResponse("Name and type required", "VALIDATION_ERROR", 400);
+  const parsed = createConnectorSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
+  }
+  const { name, description, connectorType, connectionConfig, healthCheckUrl } = parsed.data;
+  const { credentialsRef } = body;
 
   if (connectorType === "mcp" && connectionConfig) {
     const cmdError = validateMcpCommand(connectionConfig as Record<string, unknown>);

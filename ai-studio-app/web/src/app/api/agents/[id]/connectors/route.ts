@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { agentConnectors, connectors } from "@ais-app/database";
+import { assignConnectorSchema } from "@ais-app/validation";
 import { eq, and } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
@@ -30,15 +31,15 @@ export const POST = withRBAC("AGENTS", 20, async (request, auth, params) => {
   if (!id) return errorResponse("Agent ID required", "MISSING_ID", 400);
 
   const body = await request.json();
-  const { connectorId } = body;
-  if (!connectorId) return errorResponse("connectorId required", "VALIDATION_ERROR", 400);
+  const parsed = assignConnectorSchema.safeParse(body);
+  if (!parsed.success) return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
 
   const db = getDb();
 
   const [connector] = await db
     .select({ id: connectors.id, name: connectors.name })
     .from(connectors)
-    .where(and(eq(connectors.id, connectorId), eq(connectors.tenantId, auth.tenantId), eq(connectors.isActive, true)))
+    .where(and(eq(connectors.id, parsed.data.connectorId), eq(connectors.tenantId, auth.tenantId), eq(connectors.isActive, true)))
     .limit(1);
 
   if (!connector) return errorResponse("Connector not found", "NOT_FOUND", 404);
@@ -46,7 +47,7 @@ export const POST = withRBAC("AGENTS", 20, async (request, auth, params) => {
   const [existing] = await db
     .select({ id: agentConnectors.id })
     .from(agentConnectors)
-    .where(and(eq(agentConnectors.agentId, id), eq(agentConnectors.connectorId, connectorId), eq(agentConnectors.tenantId, auth.tenantId)))
+    .where(and(eq(agentConnectors.agentId, id), eq(agentConnectors.connectorId, parsed.data.connectorId), eq(agentConnectors.tenantId, auth.tenantId)))
     .limit(1);
 
   if (existing) return errorResponse("Connector already assigned", "ALREADY_ASSIGNED", 409);
@@ -54,13 +55,13 @@ export const POST = withRBAC("AGENTS", 20, async (request, auth, params) => {
   const [assigned] = await db.insert(agentConnectors).values({
     tenantId: auth.tenantId,
     agentId: id,
-    connectorId,
+    connectorId: parsed.data.connectorId,
   }).returning();
 
   await createAuditEntry({
     tenantId: auth.tenantId, userId: auth.userId,
     action: "agent.assign_connector", resourceType: "agent", resourceId: id,
-    details: { connectorId, connectorName: connector.name },
+    details: { connectorId: parsed.data.connectorId, connectorName: connector.name },
   });
 
   return NextResponse.json(assigned, { status: 201 });

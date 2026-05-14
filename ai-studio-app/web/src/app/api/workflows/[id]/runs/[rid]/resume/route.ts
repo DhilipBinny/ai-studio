@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resumeWorkflow } from "@ais-app/agent-runtime";
+import { resumeWorkflowSchema } from "@ais-app/validation";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
@@ -8,10 +9,15 @@ export const POST = withRBAC("WORKFLOWS", 20, async (request, auth, params) => {
   if (!rid) return errorResponse("Run ID required", "MISSING_ID", 400);
 
   const body = await request.json();
-  const decision = body.decision || {};
+  const parsed = resumeWorkflowSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("Validation failed", "VALIDATION_ERROR", 400, {
+      errors: parsed.error.flatten(),
+    });
+  }
 
   try {
-    const result = await resumeWorkflow(rid, auth.tenantId, auth.userId, decision);
+    const result = await resumeWorkflow(rid, auth.tenantId, auth.userId, parsed.data.decision);
 
     await createAuditEntry({
       tenantId: auth.tenantId,

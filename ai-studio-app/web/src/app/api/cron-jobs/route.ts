@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { cronJobs, agents, workflows } from "@ais-app/database";
-import { paginationSchema } from "@ais-app/validation";
+import { paginationSchema, createCronJobSchema } from "@ais-app/validation";
 import { eq, and, count, desc } from "drizzle-orm";
 import { withRBAC, errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
@@ -29,11 +29,11 @@ export const GET = withRBAC("SETTINGS", 10, async (request, auth) => {
 
 export const POST = withRBAC("SETTINGS", 20, async (request, auth) => {
   const body = await request.json();
-  const { name, triggerType, agentId, workflowId, scheduleType, scheduleValue, timezone, prompt } = body;
-
-  if (!name) return errorResponse("Name required", "VALIDATION_ERROR", 400);
-  if (!scheduleValue) return errorResponse("Schedule value required", "VALIDATION_ERROR", 400);
-  if (!prompt) return errorResponse("Prompt required", "VALIDATION_ERROR", 400);
+  const parsed = createCronJobSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
+  }
+  const { name, triggerType, agentId, workflowId, scheduleType, scheduleValue, timezone, prompt } = parsed.data;
 
   if (triggerType === "agent" && !agentId) return errorResponse("Agent required for agent trigger", "VALIDATION_ERROR", 400);
   if (triggerType === "workflow" && !workflowId) return errorResponse("Workflow required for workflow trigger", "VALIDATION_ERROR", 400);
