@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken } from "@ais-app/auth";
 import { hasPermission } from "@ais-app/auth";
 import { getDb } from "@ais-app/database";
-import { users, profiles } from "@ais-app/database";
+import { users, profiles, revokedTokens } from "@ais-app/database";
 import { eq } from "drizzle-orm";
 import type { Module, PermissionLevel, AccessRights, AuthContext } from "@ais-app/types";
 
@@ -24,6 +24,15 @@ export async function getAuthContext(
   try {
     const payload = await verifyAccessToken(token);
     const db = getDb();
+
+    if (payload.jti) {
+      const [revoked] = await db
+        .select({ id: revokedTokens.id })
+        .from(revokedTokens)
+        .where(eq(revokedTokens.jti, payload.jti))
+        .limit(1);
+      if (revoked) return null;
+    }
 
     const [user] = await db
       .select({

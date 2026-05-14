@@ -21,12 +21,14 @@ export async function signAccessToken(payload: {
   accessRightsHash: string;
 }): Promise<string> {
   const secret = getSecret();
+  const jti = randomBytes(16).toString("hex");
   return new SignJWT({
     sub: payload.userId,
     tid: payload.tenantId,
     pid: payload.profileId,
     rol: payload.role,
     arh: payload.accessRightsHash,
+    jti,
   } as unknown as Record<string, unknown>)
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()

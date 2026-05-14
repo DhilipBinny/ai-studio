@@ -20,6 +20,7 @@ export interface JWTPayload {
   pid: string;
   rol: UserRole;
   arh: string;
+  jti?: string;
   iat: number;
   exp: number;
 }
