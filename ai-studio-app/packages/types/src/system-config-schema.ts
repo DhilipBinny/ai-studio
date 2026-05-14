@@ -44,6 +44,15 @@ export const SYSTEM_CONFIG_SCHEMA: ConfigSectionDef[] = [
       { key: "otp_block_duration_minutes", label: "OTP Block Duration (minutes)", type: "number", default: 30, min: 5, max: 120, description: "Block OTP requests after max resends" },
     ],
   },
+  {
+    key: "billing",
+    label: "Billing & Cost",
+    description: "Cost tracking, margin factor, and usage reporting",
+    fields: [
+      { key: "cost_margin_factor", label: "Cost Margin Factor", type: "number", default: 1.0, min: 1.0, max: 10.0, description: "Multiplier applied to raw LLM costs. 1.0 = actual cost, 1.3 = 30% markup." },
+      { key: "cost_currency", label: "Display Currency", type: "select", default: "USD", options: ["USD", "EUR", "GBP", "SGD", "INR", "JPY", "AUD"], description: "Currency label for cost display (costs are always calculated in USD)" },
+    ],
+  },
 ];
 
 export function getConfigDefaults(sectionKey: string): Record<string, unknown> {

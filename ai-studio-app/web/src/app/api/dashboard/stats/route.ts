@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
-import { agents, tools, knowledgeBases, connectors, workflows, agentSessions } from "@ais-app/database";
+import { agents, tools, knowledgeBases, connectors, workflows, agentSessions, systemConfig } from "@ais-app/database";
 import { eq, and, count, gte, sum, sql, desc } from "drizzle-orm";
 import { withRBAC } from "@/lib/api-utils";
 
@@ -26,6 +26,7 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
     [tokenRow],
     topAgents,
     recentSessions,
+    billingConfig,
   ] = await Promise.all([
     db.select({ agentCount: count() }).from(agents).where(and(eq(agents.tenantId, tid), eq(agents.isActive, true))),
     db.select({ toolCount: count() }).from(tools).where(and(eq(tools.tenantId, tid), eq(tools.isActive, true))),
@@ -41,6 +42,7 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
       totalInputTokens: sum(agentSessions.totalInputTokens),
       totalOutputTokens: sum(agentSessions.totalOutputTokens),
       totalToolCalls: sum(agentSessions.totalToolCalls),
+      totalCostUsd: sum(agentSessions.totalCostUsd),
     }).from(agentSessions).where(eq(agentSessions.tenantId, tid)),
     db.select({
       agentId: agentSessions.agentId,
@@ -48,6 +50,7 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
       sessions: count(),
       tokens: sum(sql`${agentSessions.totalInputTokens} + ${agentSessions.totalOutputTokens}`),
       toolCalls: sum(agentSessions.totalToolCalls),
+      costUsd: sum(agentSessions.totalCostUsd),
     })
     .from(agentSessions)
     .innerJoin(agents, eq(agentSessions.agentId, agents.id))
@@ -63,6 +66,7 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
       totalTurns: agentSessions.totalTurns,
       totalToolCalls: agentSessions.totalToolCalls,
       tokens: sql<number>`${agentSessions.totalInputTokens} + ${agentSessions.totalOutputTokens}`,
+      costUsd: agentSessions.totalCostUsd,
       createdAt: agentSessions.createdAt,
     })
     .from(agentSessions)
@@ -70,11 +74,20 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
     .where(eq(agentSessions.tenantId, tid))
     .orderBy(desc(agentSessions.createdAt))
     .limit(10),
+    db.select({ value: systemConfig.value }).from(systemConfig).where(and(eq(systemConfig.tenantId, tid), eq(systemConfig.key, "billing"))).limit(1),
   ]);
 
   const waitingSessions = totalSessions - completedSessions - failedSessions;
   const successRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
   const errorRate = totalSessions > 0 ? Math.round((failedSessions / totalSessions) * 100) : 0;
+
+  const billingSettings = (billingConfig[0]?.value ?? {}) as Record<string, unknown>;
+  const marginFactor = Number(billingSettings.cost_margin_factor) || 1.0;
+  const costCurrency = (billingSettings.cost_currency as string) || "USD";
+
+  const rawTotalCost = Number(tokenRow?.totalCostUsd || 0);
+  const totalCostUsd = rawTotalCost * marginFactor;
+  const avgCostPerSession = totalSessions > 0 ? totalCostUsd / totalSessions : 0;
 
   return NextResponse.json({
     agents: agentCount,
@@ -94,7 +107,17 @@ export const GET = withRBAC("DASHBOARD", 10, async (_request, auth) => {
     totalOutputTokens: Number(tokenRow?.totalOutputTokens || 0),
     totalTokens: Number(tokenRow?.totalInputTokens || 0) + Number(tokenRow?.totalOutputTokens || 0),
     totalToolCalls: Number(tokenRow?.totalToolCalls || 0),
-    topAgents,
-    recentSessions,
+    totalCostUsd,
+    avgCostPerSession,
+    costCurrency,
+    costMarginFactor: marginFactor,
+    topAgents: topAgents.map((a) => ({
+      ...a,
+      costUsd: Number(a.costUsd || 0) * marginFactor,
+    })),
+    recentSessions: recentSessions.map((s) => ({
+      ...s,
+      costUsd: Number(s.costUsd || 0) * marginFactor,
+    })),
   });
 });

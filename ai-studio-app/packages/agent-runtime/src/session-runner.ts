@@ -1,11 +1,12 @@
 import { getDb } from "@ais-app/database";
-import { agents, agentSessions, agentSessionMessages, providers, providerModels } from "@ais-app/database";
+import { agents, agentSessions, agentSessionMessages, providers, providerModels, usageRecords } from "@ais-app/database";
 import { eq, and, asc } from "drizzle-orm";
 import { buildSystemPrompt } from "./prompt-builder";
 import { callLLM } from "./llm-caller";
 import { loadToolDefinitions, executeTool, createLoopDetector } from "./tool-executor";
 import { checkAndCompact } from "./compaction";
 import { sanitizeInput, detectPromptInjection } from "@ais/security";
+import { getModelPricing, calculateCost } from "./model-pricing";
 import type { SessionInput, SessionResult, AgentConfig, ProviderConfig } from "./types";
 import type { ToolCall, ToolContext } from "./tool-executor";
 
@@ -34,8 +35,11 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
 
   const [modelRow] = await db
     .select({
+      providerModelId: providerModels.id,
       modelId: providerModels.modelId,
       displayName: providerModels.displayName,
+      costPerInputToken: providerModels.costPerInputToken,
+      costPerOutputToken: providerModels.costPerOutputToken,
       providerType: providers.providerType,
       apiKeyRef: providers.apiKeyRef,
       baseUrl: providers.baseUrl,
@@ -108,7 +112,7 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
         .update(agentSessions)
         .set({ status: "failed", errorMessage: "Message blocked by security policy" })
         .where(eq(agentSessions.id, sessionId));
-      return { sessionId, response: "", usage: { inputTokens: 0, outputTokens: 0 }, status: "failed", error: "Message blocked by security policy" };
+      return { sessionId, response: "", usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, status: "failed", error: "Message blocked by security policy" };
     }
 
     await db.insert(agentSessionMessages).values({
@@ -123,9 +127,17 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
     const loopDetector = createLoopDetector();
     const toolContext: ToolContext = { agentId: input.agentId, tenantId: input.tenantId, sessionId };
 
+    const pricing = getModelPricing(
+      modelRow.providerType,
+      modelRow.modelId,
+      modelRow.costPerInputToken,
+      modelRow.costPerOutputToken,
+    );
+
     let totalInputTokens = 0;
     let totalOutputTokens = 0;
     let totalToolCalls = 0;
+    let totalCost = 0;
     let finalText = "";
 
     for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
@@ -174,6 +186,23 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
 
       totalInputTokens += response.inputTokens;
       totalOutputTokens += response.outputTokens;
+
+      const roundCost = calculateCost(pricing, response.inputTokens, response.outputTokens);
+      totalCost += roundCost;
+
+      await db.insert(usageRecords).values({
+        tenantId: input.tenantId,
+        userId: input.userId || null,
+        agentId: input.agentId,
+        agentSessionId: sessionId,
+        providerModelId: modelRow.providerModelId,
+        model: modelRow.modelId,
+        provider: modelRow.providerType,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        costUsd: roundCost.toFixed(6),
+        requestType: "chat",
+      });
 
       if (response.toolCalls.length > 0) {
         const toolCallBlocks: ToolCallBlock[] = [];
@@ -237,6 +266,7 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
         outputTokens: agentSessions.totalOutputTokens,
         turns: agentSessions.totalTurns,
         toolCallCount: agentSessions.totalToolCalls,
+        costUsd: agentSessions.totalCostUsd,
       })
       .from(agentSessions)
       .where(eq(agentSessions.id, sessionId))
@@ -249,6 +279,7 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       .limit(1);
 
     const nextStatus = currentStatus?.status === "waiting_approval" ? "waiting_approval" : "waiting";
+    const newCostUsd = (parseFloat(current?.costUsd || "0") + totalCost).toFixed(6);
 
     await db
       .update(agentSessions)
@@ -258,13 +289,14 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
         totalOutputTokens: (current?.outputTokens || 0) + totalOutputTokens,
         totalTurns: (current?.turns || 0) + 1,
         totalToolCalls: (current?.toolCallCount || 0) + totalToolCalls,
+        totalCostUsd: newCostUsd,
       })
       .where(eq(agentSessions.id, sessionId));
 
     return {
       sessionId,
       response: finalText,
-      usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+      usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens, costUsd: totalCost },
       status: "waiting",
     };
   } catch (e) {
@@ -274,10 +306,10 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       .set({ status: "failed", errorMessage: errorMsg, completedAt: new Date() })
       .where(eq(agentSessions.id, sessionId));
 
-    return { sessionId, response: "", usage: { inputTokens: 0, outputTokens: 0 }, status: "failed", error: errorMsg };
+    return { sessionId, response: "", usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, status: "failed", error: errorMsg };
   }
 }
 
 function fail(error: string): SessionResult {
-  return { sessionId: "", response: "", usage: { inputTokens: 0, outputTokens: 0 }, status: "failed", error };
+  return { sessionId: "", response: "", usage: { inputTokens: 0, outputTokens: 0, costUsd: 0 }, status: "failed", error };
 }

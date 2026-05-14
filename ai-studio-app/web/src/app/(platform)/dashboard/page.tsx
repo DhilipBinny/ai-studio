@@ -4,7 +4,7 @@ import { RequirePermission } from "@/components/require-permission";
 import { useState, useEffect } from "react";
 import {
   Bot, Wrench, MessageSquare, Zap, CheckCircle, XCircle,
-  Database, Plug, GitBranch, TrendingUp, Clock, Hash,
+  Database, Plug, GitBranch, TrendingUp, Clock, Hash, DollarSign,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +18,7 @@ interface TopAgent {
   sessions: number;
   tokens: string | number;
   toolCalls: string | number;
+  costUsd: number;
 }
 
 interface RecentSession {
@@ -28,6 +29,7 @@ interface RecentSession {
   totalTurns: number;
   totalToolCalls: number;
   tokens: number;
+  costUsd: number;
   createdAt: string;
 }
 
@@ -48,6 +50,10 @@ interface Stats {
   totalInputTokens: number;
   totalOutputTokens: number;
   totalToolCalls: number;
+  totalCostUsd: number;
+  avgCostPerSession: number;
+  costCurrency: string;
+  costMarginFactor: number;
   topAgents: TopAgent[];
   recentSessions: RecentSession[];
 }
@@ -64,6 +70,14 @@ function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
   return n.toLocaleString();
+}
+
+function formatCost(usd: number): string {
+  if (usd === 0) return "$0.00";
+  if (usd < 0.01) return `$${usd.toFixed(4)}`;
+  if (usd < 1) return `$${usd.toFixed(3)}`;
+  if (usd >= 1000) return `$${(usd / 1000).toFixed(1)}K`;
+  return `$${usd.toFixed(2)}`;
 }
 
 function formatTime(ts: string): string {
@@ -91,11 +105,13 @@ export default function DashboardPage() {
     <RequirePermission module="DASHBOARD"><>
       <PageHeader title="Dashboard" description="Platform overview, usage analytics, and agent performance." />
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
         <StatCard icon={MessageSquare} label="Sessions Today" value={stats?.sessionsToday} />
         <StatCard icon={TrendingUp} label="This Week" value={stats?.sessionsThisWeek} />
         <StatCard icon={Zap} label="Total Tokens" value={stats ? formatNumber(stats.totalTokens) : undefined} />
         <StatCard icon={Wrench} label="Tool Calls" value={stats ? formatNumber(stats.totalToolCalls) : undefined} />
+        <StatCard icon={DollarSign} label="Total Cost" value={stats ? formatCost(stats.totalCostUsd) : undefined} />
+        <StatCard icon={DollarSign} label="Avg / Session" value={stats ? formatCost(stats.avgCostPerSession) : undefined} />
         <StatCard icon={CheckCircle} label="Success Rate" value={stats ? `${stats.successRate}%` : undefined} variant="success" />
         <StatCard icon={XCircle} label="Error Rate" value={stats ? `${stats.errorRate}%` : undefined} variant={stats && stats.errorRate > 10 ? "error" : "default"} />
       </div>
@@ -124,6 +140,7 @@ export default function DashboardPage() {
                     <TableHead>Agent</TableHead>
                     <TableHead className="text-right">Sessions</TableHead>
                     <TableHead className="text-right">Tokens</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
                     <TableHead className="text-right">Tool Calls</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -133,6 +150,7 @@ export default function DashboardPage() {
                       <TableCell className="font-medium">{a.agentName}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{Number(a.sessions)}</TableCell>
                       <TableCell className="text-right text-muted-foreground font-mono text-xs">{formatNumber(Number(a.tokens || 0))}</TableCell>
+                      <TableCell className="text-right text-muted-foreground font-mono text-xs">{formatCost(a.costUsd)}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{Number(a.toolCalls || 0)}</TableCell>
                     </TableRow>
                   ))}
@@ -165,6 +183,7 @@ export default function DashboardPage() {
                         <span>{s.totalTurns} turn{s.totalTurns !== 1 ? "s" : ""}</span>
                         {s.totalToolCalls > 0 && <span>{s.totalToolCalls} tool{s.totalToolCalls !== 1 ? "s" : ""}</span>}
                         <span>{formatNumber(s.tokens)} tokens</span>
+                        {s.costUsd > 0 && <span className="font-mono">{formatCost(s.costUsd)}</span>}
                       </div>
                     </div>
                     <span className="text-[11px] text-muted-foreground shrink-0">{formatTime(s.createdAt)}</span>

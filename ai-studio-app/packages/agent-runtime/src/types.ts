@@ -41,7 +41,7 @@ export interface SessionInput {
 export interface SessionResult {
   sessionId: string;
   response: string;
-  usage: { inputTokens: number; outputTokens: number };
+  usage: { inputTokens: number; outputTokens: number; costUsd: number };
   status: string;
   error?: string;
 }

@@ -17,6 +17,7 @@
     "@ais/provider-bridge": "workspace:*",
     "@ais/rag-engine": "workspace:*",
     "@ais/types": "workspace:*",
+    "@ais-app/auth": "workspace:*",
     "@ais-app/database": "workspace:*",
     "@ais-app/types": "workspace:*",
     "@huggingface/transformers": "^3.4.0",

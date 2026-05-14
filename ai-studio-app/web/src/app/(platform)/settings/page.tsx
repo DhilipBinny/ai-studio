@@ -42,7 +42,7 @@ export default function SettingsPage() {
   );
 }
 
-import { SYSTEM_CONFIG_SCHEMA, type ConfigSectionDef, type ConfigFieldDef } from "@ais-app/types";
+import { SYSTEM_CONFIG_SCHEMA, getConfigDefaults, type ConfigSectionDef, type ConfigFieldDef } from "@ais-app/types";
 
 function GeneralTab() {
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
@@ -164,6 +164,60 @@ function GeneralTab() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </Card>
+          );
+        })}
+
+        {/* Schema sections not yet saved — show defaults with edit option */}
+        {SYSTEM_CONFIG_SCHEMA.filter((s) => !configs.some((c) => c.key === s.key)).map((schema) => {
+          const isEditing = editingKey === schema.key;
+          const defaults = getConfigDefaults(schema.key);
+
+          return (
+            <Card key={schema.key} className="p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-sm font-semibold">{schema.label}</p>
+                  <p className="text-xs text-muted-foreground">{schema.description}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-[9px]">Default</Badge>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => {
+                    if (isEditing) { setEditingKey(null); } else {
+                      setEditingKey(schema.key);
+                      setEditForm({ ...defaults });
+                      setMessage(null);
+                    }
+                  }} aria-label="Edit config">
+                    {isEditing ? "Cancel" : "Edit"}
+                  </Button>
+                </div>
+              </div>
+
+              {isEditing ? (
+                <div className="mt-3 space-y-3">
+                  {schema.fields.map((field) => (
+                    <ConfigField
+                      key={field.key}
+                      field={field}
+                      value={editForm[field.key]}
+                      onChange={(val) => setEditForm((f) => ({ ...f, [field.key]: val }))}
+                    />
+                  ))}
+                  <Button size="sm" onClick={() => saveStructured(schema.key)} disabled={saving}>
+                    {saving ? <><Loader2 className="mr-2 h-3 w-3 animate-spin" /> Saving...</> : "Save"}
+                  </Button>
+                </div>
+              ) : (
+                <div className="mt-3 space-y-1.5">
+                  {schema.fields.map((field) => (
+                    <div key={field.key} className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{field.label}</span>
+                      <span className="font-medium">{field.type === "boolean" ? (defaults[field.key] ? "Enabled" : "Disabled") : String(defaults[field.key] ?? "—")}</span>
+                    </div>
+                  ))}
                 </div>
               )}
             </Card>

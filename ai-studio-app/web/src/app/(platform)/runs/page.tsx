@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import {
   MessageSquare, ArrowLeft, Clock, Cpu, Wrench, AlertCircle,
   ChevronDown, ChevronRight, User, Bot, Hash, Zap, Timer,
-  CheckCircle2, XCircle, Loader2,
+  CheckCircle2, XCircle, Loader2, DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -77,6 +77,14 @@ const STATUS_VARIANT: Record<string, "info" | "success" | "error" | "warning" | 
 const CHANNEL_LABEL: Record<string, string> = {
   studio: "Studio", api: "API", embedded: "Embedded", workflow: "Workflow", connector: "Connector",
 };
+
+function formatCost(usd: number): string {
+  if (usd === 0) return "$0.00";
+  if (usd < 0.01) return `$${usd.toFixed(4)}`;
+  if (usd < 1) return `$${usd.toFixed(3)}`;
+  if (usd >= 1000) return `$${(usd / 1000).toFixed(1)}K`;
+  return `$${usd.toFixed(2)}`;
+}
 
 function formatDuration(startedAt: string | null, completedAt: string | null): string {
   if (!startedAt) return "—";
@@ -176,12 +184,13 @@ export default function SessionsPage() {
                 <TableHead>Turns</TableHead>
                 <TableHead>Tool Calls</TableHead>
                 <TableHead>Tokens</TableHead>
+                <TableHead>Cost</TableHead>
                 <TableHead>Duration</TableHead>
                 <TableHead>Started</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? <TableSkeleton columns={8} /> : sessions.map((s) => (
+              {loading ? <TableSkeleton columns={9} /> : sessions.map((s) => (
                 <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedSessionId(s.id)}>
                   <TableCell>
                     <div className="font-medium">{s.agentName}</div>
@@ -192,6 +201,7 @@ export default function SessionsPage() {
                   <TableCell className="text-muted-foreground">{s.totalTurns}</TableCell>
                   <TableCell className="text-muted-foreground">{s.totalToolCalls || 0}</TableCell>
                   <TableCell className="text-muted-foreground text-xs font-mono">{(s.totalInputTokens + s.totalOutputTokens).toLocaleString()}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs font-mono">{formatCost(parseFloat(s.totalCostUsd))}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">{formatDuration(s.startedAt, s.completedAt)}</TableCell>
                   <TableCell className="text-muted-foreground text-xs">{formatTime(s.startedAt)}</TableCell>
                 </TableRow>
@@ -257,6 +267,7 @@ function SessionDetailView({ sessionId, onBack }: { sessionId: string; onBack: (
 
   const totalTokens = session.totalInputTokens + session.totalOutputTokens;
   const duration = formatDuration(session.startedAt, session.completedAt);
+  const sessionCost = parseFloat(session.totalCostUsd);
 
   return (
     <div className="space-y-4">
@@ -273,10 +284,11 @@ function SessionDetailView({ sessionId, onBack }: { sessionId: string; onBack: (
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <MetricCard icon={Hash} label="Turns" value={String(session.totalTurns)} />
         <MetricCard icon={Wrench} label="Tool Calls" value={String(session.totalToolCalls)} />
         <MetricCard icon={Zap} label="Tokens" value={totalTokens.toLocaleString()} detail={`${session.totalInputTokens.toLocaleString()} in / ${session.totalOutputTokens.toLocaleString()} out`} />
+        <MetricCard icon={DollarSign} label="Cost" value={formatCost(sessionCost)} detail={sessionCost > 0 ? `${session.totalInputTokens.toLocaleString()} in + ${session.totalOutputTokens.toLocaleString()} out` : undefined} />
         <MetricCard icon={Timer} label="Duration" value={duration} />
         <MetricCard icon={Cpu} label="Model" value={session.modelUsed || "—"} />
         <MetricCard icon={MessageSquare} label="Channel" value={CHANNEL_LABEL[session.channel] || session.channel} />

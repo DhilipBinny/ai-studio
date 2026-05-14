@@ -10,6 +10,9 @@ importers:
 
   ai-studio-app/packages/agent-runtime:
     dependencies:
+      '@ais-app/auth':
+        specifier: workspace:*
+        version: link:../auth
       '@ais-app/database':
         specifier: workspace:*
         version: link:../database
