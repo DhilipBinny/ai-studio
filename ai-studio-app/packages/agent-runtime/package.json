@@ -10,22 +10,23 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ais/agent-core": "workspace:*",
-    "@ais/mcp-client": "workspace:*",
-    "@ais/tool-platform": "workspace:*",
-    "@ais/tools-common": "workspace:*",
-    "@ais/security": "workspace:*",
-    "@ais/memory-engine": "workspace:*",
-    "@ais/provider-bridge": "workspace:*",
-    "@ais/rag-engine": "workspace:*",
-    "@ais/types": "workspace:*",
     "@ais-app/auth": "workspace:*",
     "@ais-app/database": "workspace:*",
     "@ais-app/types": "workspace:*",
-    "@huggingface/transformers": "^3.4.0",
+    "@ais/agent-core": "workspace:*",
+    "@ais/mcp-client": "workspace:*",
+    "@ais/memory-engine": "workspace:*",
+    "@ais/provider-bridge": "workspace:*",
+    "@ais/rag-engine": "workspace:*",
+    "@ais/security": "workspace:*",
+    "@ais/tool-platform": "workspace:*",
+    "@ais/tools-common": "workspace:*",
+    "@ais/types": "workspace:*",
     "@anthropic-ai/sdk": "^0.95.2",
-    "openai": "^6.37.0",
-    "drizzle-orm": "^0.44.2"
+    "@huggingface/transformers": "^3.4.0",
+    "@qdrant/js-client-rest": "^1.18.0",
+    "drizzle-orm": "^0.44.2",
+    "openai": "^6.37.0"
   },
   "devDependencies": {
     "vitest": "^3.2.4"

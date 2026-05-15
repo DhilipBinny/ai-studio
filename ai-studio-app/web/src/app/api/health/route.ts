@@ -3,6 +3,7 @@ import { getDb } from "@ais-app/database";
 import { sql } from "drizzle-orm";
 import { getAuthContext } from "@/lib/api-utils";
 import { progressBus } from "@ais-app/agent-runtime/src/progress-bus";
+import { getQdrantClient } from "@ais-app/agent-runtime/src/stores/qdrant-client";
 
 const startTime = Date.now();
 
@@ -18,6 +19,19 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     checks.database = { status: "unhealthy", latencyMs: Math.round(performance.now() - dbStart), detail: (e as Error).message };
     overall = "unhealthy";
+  }
+
+  // Qdrant health check — only when VECTOR_DB=qdrant
+  if (process.env.VECTOR_DB === "qdrant") {
+    const qdrantStart = performance.now();
+    try {
+      const qdrant = getQdrantClient();
+      await qdrant.versionInfo();
+      checks.qdrant = { status: "healthy", latencyMs: Math.round(performance.now() - qdrantStart) };
+    } catch (e) {
+      checks.qdrant = { status: "unhealthy", latencyMs: Math.round(performance.now() - qdrantStart), detail: (e as Error).message };
+      overall = "unhealthy";
+    }
   }
 
   const publicResponse = {

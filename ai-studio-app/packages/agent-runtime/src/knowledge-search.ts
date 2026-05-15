@@ -2,6 +2,7 @@ import { searchKnowledge as ragSearchKnowledge, type SearchResult, type SearchOp
 import { type EmbeddingConfig } from "@ais/provider-bridge";
 import { type RerankConfig } from "@ais/provider-bridge";
 import { DrizzleSearchStore } from "./stores/drizzle-search-store";
+import { QdrantSearchStore } from "./stores/qdrant-search-store";
 import type { AgentKBInfo } from "@ais/rag-engine";
 
 export type { SearchResult } from "@ais/rag-engine";
@@ -28,7 +29,8 @@ export async function searchKnowledge(
   tenantId: string,
   options: SearchOptions = {},
 ): Promise<SearchResult[]> {
-  const store = new DrizzleSearchStore();
+  const useQdrant = process.env.VECTOR_DB === "qdrant";
+  const store = useQdrant ? new QdrantSearchStore() : new DrizzleSearchStore();
   const kbs = await store.getAgentKBs(agentId, tenantId);
   if (kbs.length === 0) return [];
 

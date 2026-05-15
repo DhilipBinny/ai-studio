@@ -18,5 +18,8 @@
       "onnxruntime-node",
       "protobufjs"
     ]
+  },
+  "dependencies": {
+    "@qdrant/js-client-rest": "^1.18.0"
   }
 }

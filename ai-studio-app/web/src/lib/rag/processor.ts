@@ -3,6 +3,7 @@ import { documents, knowledgeBases, providers, graphEntities, graphRelationships
 import { eq, and, sql } from "drizzle-orm";
 import { processDocument as ragProcessDocument, type KBConfig, type DocumentInfo, type LLMCaller, type GraphExtractionOutput } from "@ais/rag-engine";
 import { DrizzleDocumentStore } from "@ais-app/agent-runtime/src/stores/drizzle-document-store";
+import { QdrantDocumentStore } from "@ais-app/agent-runtime/src/stores/qdrant-document-store";
 import { createTextExtractor } from "./text-extractor";
 import { createEmbedder, buildEmbeddingConfig } from "./embedder";
 import type { ChunkConfig } from "@ais/rag-engine";
@@ -88,7 +89,8 @@ export async function processDocument(
     } : null,
   });
 
-  const store = new DrizzleDocumentStore(tenantId);
+  const useQdrant = process.env.VECTOR_DB === "qdrant";
+  const store = useQdrant ? new QdrantDocumentStore(tenantId) : new DrizzleDocumentStore(tenantId);
   const extractor = createTextExtractor();
   const embedder = createEmbedder(embeddingConfig);
 
