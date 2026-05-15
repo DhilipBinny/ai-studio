@@ -92,9 +92,10 @@ export async function processDocument(
   const extractor = createTextExtractor();
   const embedder = createEmbedder(embeddingConfig);
 
-  // Create LLM caller for contextual enrichment or graph extraction
+  // Create LLM callers for contextual enrichment and/or graph extraction
   const needsLLM = enrichmentMode === "llm" || kbConfig.graphExtraction;
   let llmCaller: LLMCaller | undefined;
+  let graphLLMCaller: LLMCaller | undefined;
   if (needsLLM) {
     // Find an active provider for LLM calls (prefer Anthropic/OpenAI)
     const [llmProvider] = await db
@@ -112,22 +113,35 @@ export async function processDocument(
         ? (isEncrypted(llmProvider.apiKeyRef) ? decryptSecret(llmProvider.apiKeyRef) : llmProvider.apiKeyRef)
         : undefined;
 
-      // Use graph extraction model if set, otherwise contextual model, otherwise provider default
-      const model = kb.graphExtractionModel
-        || kb.contextualModel
-        || (llmProvider.providerType === "anthropic" ? "claude-haiku-4-20250514" : "gpt-4o-mini");
+      const defaultModel = llmProvider.providerType === "anthropic" ? "claude-haiku-4-20250514" : "gpt-4o-mini";
 
+      // Enrichment caller: use contextual model, fallback to provider default
+      const enrichmentModel = kb.contextualModel || defaultModel;
       llmCaller = createLLMCaller({
         providerType: llmProvider.providerType,
-        model,
+        model: enrichmentModel,
         apiKey,
         baseUrl: llmProvider.baseUrl || undefined,
       });
+
+      // Graph extraction caller: use graph model if different from enrichment model
+      const graphModel = kb.graphExtractionModel || defaultModel;
+      if (graphModel !== enrichmentModel) {
+        graphLLMCaller = createLLMCaller({
+          providerType: llmProvider.providerType,
+          model: graphModel,
+          apiKey,
+          baseUrl: llmProvider.baseUrl || undefined,
+        });
+      }
     }
   }
 
   try {
-    const result = await ragProcessDocument(docInfo, kbConfig, store, extractor, embedder, llmCaller);
+    const result = await ragProcessDocument(
+      docInfo, kbConfig, store, extractor, embedder,
+      llmCaller, undefined, graphLLMCaller, tenantId,
+    );
 
     // Persist graph entities and relationships if graph extraction produced results
     if (result.graphExtractions && result.graphExtractions.length > 0) {

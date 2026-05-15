@@ -21,10 +21,12 @@ export interface GraphSearchStore {
 
   findConnectedEntities(
     entityIds: string[],
+    tenantId: string,
   ): Promise<Array<{ entityId: string; sourceChunkId: number }>>;
 
   getChunksByIds(
     chunkIds: number[],
+    tenantId: string,
   ): Promise<Array<{ id: number; content: string; metadata: Record<string, unknown> }>>;
 }
 
@@ -64,7 +66,7 @@ export async function graphExpand(
 
   // 3. Expand to 1-hop connected entities via relationships
   const entityIds = matchedEntities.map((e) => e.id);
-  const connectedEntities = await store.findConnectedEntities(entityIds);
+  const connectedEntities = await store.findConnectedEntities(entityIds, tenantId);
 
   // 4. Collect unique chunk IDs from matched + connected entities
   const chunkIds = new Set<number>();
@@ -80,7 +82,7 @@ export async function graphExpand(
   }
 
   // 5. Fetch chunk content
-  const chunks = await store.getChunksByIds([...chunkIds]);
+  const chunks = await store.getChunksByIds([...chunkIds], tenantId);
 
   // 6. Return with a base score of 0.01
   return chunks.map((chunk) => ({

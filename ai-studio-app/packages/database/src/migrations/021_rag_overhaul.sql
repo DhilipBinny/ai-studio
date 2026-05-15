@@ -69,3 +69,19 @@ CREATE TABLE IF NOT EXISTS graph_relationships (
 CREATE INDEX IF NOT EXISTS idx_graph_relationships_kb ON graph_relationships(knowledge_base_id);
 CREATE INDEX IF NOT EXISTS idx_graph_relationships_source ON graph_relationships(source_entity_id);
 CREATE INDEX IF NOT EXISTS idx_graph_relationships_target ON graph_relationships(target_entity_id);
+
+-- RLS for new RAG tables
+ALTER TABLE rag_evaluations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rag_evaluations FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_rag_evaluations ON rag_evaluations
+  USING (tenant_id = current_tenant_id());
+
+ALTER TABLE graph_entities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE graph_entities FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_graph_entities ON graph_entities
+  USING (tenant_id = current_tenant_id());
+
+ALTER TABLE graph_relationships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE graph_relationships FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_graph_relationships ON graph_relationships
+  USING (tenant_id = current_tenant_id());

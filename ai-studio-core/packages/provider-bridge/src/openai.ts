@@ -88,6 +88,12 @@ export class OpenAIProvider implements ProviderInterface {
       messages: apiMessages,
       stream: true,
     };
+    if (args.maxTokens !== undefined) {
+      params.max_tokens = args.maxTokens;
+    }
+    if (args.temperature !== undefined) {
+      params.temperature = args.temperature;
+    }
     if (openaiTools.length > 0) {
       params.tools = openaiTools;
     }

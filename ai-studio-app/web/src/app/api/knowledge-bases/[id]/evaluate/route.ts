@@ -5,15 +5,23 @@ import { eq, and } from "drizzle-orm";
 import { decryptSecret, isEncrypted } from "@ais-app/auth";
 import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { evaluateRAG, type EvaluationQuestion } from "@/lib/rag/evaluate";
+import { createAuditEntry } from "@/lib/services/audit";
+import { z } from "zod";
 
-interface EvalRequestBody {
-  questions: Array<{ question: string; groundTruth?: string }>;
-  agentId: string;
-  /** Provider ID for the LLM judge model. If omitted, uses the KB's embedding provider. */
-  evaluationProviderId?: string;
-  /** Model ID for the LLM judge. If omitted, uses a sensible default for the provider. */
-  evaluationModel?: string;
-}
+const evalRequestSchema = z.object({
+  questions: z
+    .array(
+      z.object({
+        question: z.string().min(1).max(2000),
+        groundTruth: z.string().max(5000).optional(),
+      }),
+    )
+    .min(1)
+    .max(50),
+  agentId: z.string().uuid(),
+  evaluationProviderId: z.string().uuid().optional(),
+  evaluationModel: z.string().max(200).optional(),
+});
 
 export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth, params) => {
   const kbId = params?.id;
@@ -22,15 +30,14 @@ export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth, params) => {
   const body = await parseJsonBody(request);
   if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
 
-  const typedBody = body as unknown as EvalRequestBody;
-  const { questions, agentId, evaluationProviderId, evaluationModel } = typedBody;
+  const parsed = evalRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("Validation failed", "VALIDATION_ERROR", 400, {
+      issues: parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+    });
+  }
 
-  if (!questions || !Array.isArray(questions) || questions.length === 0) {
-    return errorResponse("questions array is required", "VALIDATION_ERROR", 400);
-  }
-  if (!agentId) {
-    return errorResponse("agentId is required", "VALIDATION_ERROR", 400);
-  }
+  const { questions, agentId, evaluationProviderId, evaluationModel } = parsed.data;
 
   const db = getDb();
 
@@ -55,11 +62,15 @@ export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth, params) => {
   const kb = kbRows[0];
   if (!kb) return errorResponse("Knowledge base not found", "NOT_FOUND", 404);
 
-  // Verify agent is assigned to this KB
+  // Verify agent is assigned to this KB (scoped to tenant)
   const [assignment] = await db
     .select({ id: agentKnowledgeBases.id })
     .from(agentKnowledgeBases)
-    .where(and(eq(agentKnowledgeBases.agentId, agentId), eq(agentKnowledgeBases.knowledgeBaseId, kbId)))
+    .where(and(
+      eq(agentKnowledgeBases.agentId, agentId),
+      eq(agentKnowledgeBases.knowledgeBaseId, kbId),
+      eq(agentKnowledgeBases.tenantId, auth.tenantId),
+    ))
     .limit(1);
 
   if (!assignment) return errorResponse("Agent is not assigned to this knowledge base", "NOT_ASSIGNED", 400);
@@ -119,7 +130,7 @@ export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth, params) => {
         baseUrl: providers.baseUrl,
       })
       .from(providers)
-      .where(eq(providers.id, kb.embeddingProviderId))
+      .where(and(eq(providers.id, kb.embeddingProviderId), eq(providers.tenantId, auth.tenantId)))
       .limit(1);
 
     if (embProvider) {
@@ -182,6 +193,15 @@ export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth, params) => {
       createdBy: auth.userId,
     })
     .returning({ id: ragEvaluations.id });
+
+  await createAuditEntry({
+    tenantId: auth.tenantId,
+    userId: auth.userId,
+    action: "rag_evaluation.create",
+    resourceType: "knowledge_base",
+    resourceId: kbId,
+    details: { evaluationId: inserted.id, agentId, questionCount: evalQuestions.length, model: modelId },
+  });
 
   return NextResponse.json({
     evaluationId: inserted.id,

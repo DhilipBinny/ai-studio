@@ -57,7 +57,15 @@ export async function searchKnowledge(
     // Create an LLM caller using the KB's configured provider
     const { createLLMCaller } = await import("@/lib/rag/llm-caller");
     const providerType = firstKB.providerType || "openai";
-    const model = firstKB.queryExpansionModel || firstKB.embeddingModel;
+    // Use query expansion model if set; otherwise pick a default chat model per provider
+    // (embedding models cannot generate text, so never fall back to embeddingModel)
+    const defaultChatModels: Record<string, string> = {
+      anthropic: "claude-haiku-4-5-20251001",
+      openai: "gpt-4o-mini",
+      openai_compatible: "gpt-4o-mini",
+      ollama: "llama3.2",
+    };
+    const model = firstKB.queryExpansionModel || defaultChatModels[providerType] || "gpt-4o-mini";
     llmCaller = createLLMCaller({
       providerType,
       model,

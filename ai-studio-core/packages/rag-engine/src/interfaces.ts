@@ -64,7 +64,7 @@ export interface SearchStore {
   getAgentKBs(agentId: string, tenantId: string): Promise<AgentKBInfo[]>;
   vectorSearch(embedding: number[], tenantId: string, kbIds: string[], limit: number, threshold: number): Promise<SearchHit[]>;
   bm25Search(query: string, tenantId: string, kbIds: string[], limit: number): Promise<SearchHit[]>;
-  getParentChunks(ids: number[]): Promise<Map<number, string>>;
+  getParentChunks(ids: number[], tenantId: string): Promise<Map<number, string>>;
 }
 
 export interface TextExtractor {

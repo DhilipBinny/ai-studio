@@ -151,10 +151,13 @@ export class AnthropicProvider implements ProviderInterface {
 
     const params: Anthropic.MessageCreateParams = {
       model: modelId,
-      max_tokens: caps.maxOutputTokens,
+      max_tokens: args.maxTokens ?? caps.maxOutputTokens,
       system: systemContent,
       messages: apiMessages,
     };
+    if (args.temperature !== undefined) {
+      params.temperature = args.temperature;
+    }
     if (anthropicTools.length > 0) {
       params.tools = anthropicTools;
     }

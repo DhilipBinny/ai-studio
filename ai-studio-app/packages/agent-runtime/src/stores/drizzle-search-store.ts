@@ -136,13 +136,13 @@ export class DrizzleSearchStore implements SearchStore {
     }));
   }
 
-  async getParentChunks(ids: number[]): Promise<Map<number, string>> {
+  async getParentChunks(ids: number[], tenantId: string): Promise<Map<number, string>> {
     if (ids.length === 0) return new Map();
     const db = getDb();
     const parents = await db
       .select({ id: documentChunks.id, content: documentChunks.content })
       .from(documentChunks)
-      .where(inArray(documentChunks.id, ids));
+      .where(and(inArray(documentChunks.id, ids), eq(documentChunks.tenantId, tenantId)));
     return new Map(parents.map((p) => [p.id, p.content]));
   }
 }

@@ -133,16 +133,17 @@ Answer:`;
 // ── Helpers ──
 
 function safeParseJSON(text: string): unknown {
-  try {
-    // Try to extract JSON from the response if it contains extra text
-    const jsonMatch = text.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
-    if (jsonMatch) {
-      return JSON.parse(jsonMatch[1]);
+  try { return JSON.parse(text); } catch { /* fall through */ }
+  // Strip markdown code fences and retry
+  const cleaned = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+  try { return JSON.parse(cleaned); } catch { /* fall through */ }
+  // Find first { or [ and try parsing from there (avoids greedy regex across multiple objects)
+  for (let i = 0; i < cleaned.length; i++) {
+    if (cleaned[i] === "{" || cleaned[i] === "[") {
+      try { return JSON.parse(cleaned.slice(i)); } catch { continue; }
     }
-    return JSON.parse(text);
-  } catch {
-    return null;
   }
+  return null;
 }
 
 function cosineSimilarity(a: number[], b: number[]): number {

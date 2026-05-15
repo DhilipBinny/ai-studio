@@ -133,11 +133,20 @@ async function lateChunkSection(
 
   // Step 3: For each chunk, find token range and mean-pool
   const results: LateChunkResult[] = [];
+  let searchFrom = 0;
 
-  for (const chunk of chunks) {
-    // Calculate approximate character offsets for this chunk
-    const chunkStart = text.indexOf(chunk.content);
-    const chunkEnd = chunkStart >= 0 ? chunkStart + chunk.content.length : text.length;
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    // Track a running offset so duplicate/trimmed content maps correctly
+    let chunkStart = text.indexOf(chunk.content, searchFrom);
+    if (chunkStart === -1) {
+      // Proportional estimation fallback for trimmed/modified chunks
+      const proportionalToken = Math.floor((i / chunks.length) * tokenBoundaries.length);
+      chunkStart = proportionalToken < tokenBoundaries.length ? tokenBoundaries[proportionalToken] : 0;
+    } else {
+      searchFrom = chunkStart + chunk.content.length;
+    }
+    const chunkEnd = chunkStart + chunk.content.length;
     const effectiveStart = Math.max(chunkStart, 0);
 
     // Map character offsets to token indices

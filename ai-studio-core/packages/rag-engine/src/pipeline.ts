@@ -26,6 +26,8 @@ export async function processDocument(
   embedder: Embedder,
   llmCaller?: LLMCaller,
   lateChunkEmbedder?: LateChunkEmbedder,
+  graphLLMCaller?: LLMCaller,
+  tenantId?: string,
 ): Promise<ProcessDocumentResult> {
   await store.updateDocumentStatus(doc.id, "processing", 0);
 
@@ -38,6 +40,9 @@ export async function processDocument(
     const isParentChild = chunkConfig.method === "parent_child";
 
     await store.deleteChunks(doc.id);
+
+    const effectiveTenantId = tenantId ?? "";
+    const effectiveGraphLLM = graphLLMCaller ?? llmCaller;
 
     const enrichmentMode = config.contextualEnrichment ?? "static";
     const enrichmentConfig: EnrichmentConfig = {
@@ -68,13 +73,13 @@ export async function processDocument(
         metadata: { fileName: doc.fileName, fileType: doc.fileType },
       }));
 
-      const lateChunkIds = await store.insertChunks("", records);
+      const lateChunkIds = await store.insertChunks(effectiveTenantId,records);
 
       // Graph extraction for late chunking path
       let graphExtractions: GraphExtractionOutput[] | undefined;
-      if (config.graphExtraction && llmCaller) {
+      if (config.graphExtraction && effectiveGraphLLM) {
         graphExtractions = await runGraphExtraction(
-          lateChunks, lateChunkIds, doc.fileName, llmCaller,
+          lateChunks, lateChunkIds, doc.fileName, effectiveGraphLLM,
         );
       }
 
@@ -122,7 +127,7 @@ export async function processDocument(
         metadata: { fileName: doc.fileName, fileType: doc.fileType },
       }));
 
-      const parentIds = await store.insertChunks("", parentRecords);
+      const parentIds = await store.insertChunks(effectiveTenantId,parentRecords);
       const parentIdMap = new Map(parentChunks.map((p, i) => [p.index, parentIds[i]]));
 
       const childRecords: ChunkRecord[] = childChunks.map((c, i) => ({
@@ -137,13 +142,13 @@ export async function processDocument(
         contextualDescription: childDescriptions[i],
       }));
 
-      const childIds = await store.insertChunks("", childRecords);
+      const childIds = await store.insertChunks(effectiveTenantId,childRecords);
 
       // Graph extraction for parent-child chunking path (extract from child chunks only)
       let graphExtractions: GraphExtractionOutput[] | undefined;
-      if (config.graphExtraction && llmCaller) {
+      if (config.graphExtraction && effectiveGraphLLM) {
         graphExtractions = await runGraphExtraction(
-          childChunks, childIds, doc.fileName, llmCaller,
+          childChunks, childIds, doc.fileName, effectiveGraphLLM,
         );
       }
 
@@ -191,13 +196,13 @@ export async function processDocument(
       contextualDescription: descriptions[i],
     }));
 
-    const chunkIds = await store.insertChunks("", records);
+    const chunkIds = await store.insertChunks(effectiveTenantId,records);
 
     // Graph extraction for standard/fixed chunking path
     let graphExtractions: GraphExtractionOutput[] | undefined;
-    if (config.graphExtraction && llmCaller) {
+    if (config.graphExtraction && effectiveGraphLLM) {
       graphExtractions = await runGraphExtraction(
-        chunks, chunkIds, doc.fileName, llmCaller,
+        chunks, chunkIds, doc.fileName, effectiveGraphLLM,
       );
     }
 
@@ -223,23 +228,26 @@ async function runGraphExtraction(
   llmCaller: LLMCaller,
 ): Promise<GraphExtractionOutput[]> {
   const results: GraphExtractionOutput[] = [];
+  const concurrency = 5;
 
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
-    const chunkId = chunkIds[i];
-    const extraction = await extractEntitiesFromChunk(
-      chunk.content,
-      documentName,
-      llmCaller,
+  for (let i = 0; i < chunks.length; i += concurrency) {
+    const batch = chunks.slice(i, i + concurrency);
+    const batchResults = await Promise.all(
+      batch.map((chunk) =>
+        extractEntitiesFromChunk(chunk.content, documentName, llmCaller),
+      ),
     );
 
-    if (extraction.entities.length > 0 || extraction.relationships.length > 0) {
-      results.push({
-        chunkId,
-        chunkIndex: chunk.index,
-        entities: extraction.entities,
-        relationships: extraction.relationships,
-      });
+    for (let j = 0; j < batchResults.length; j++) {
+      const extraction = batchResults[j];
+      if (extraction.entities.length > 0 || extraction.relationships.length > 0) {
+        results.push({
+          chunkId: chunkIds[i + j],
+          chunkIndex: batch[j].index,
+          entities: extraction.entities,
+          relationships: extraction.relationships,
+        });
+      }
     }
   }
 

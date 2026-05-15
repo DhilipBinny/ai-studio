@@ -42,14 +42,13 @@ export async function searchKnowledge(
     const decomposition = await decomposeQuery(query, llmCaller);
 
     if (decomposition.shouldDecompose && decomposition.subQueries.length > 1) {
-      const subQueryResults: RRFResult[][] = [];
-
-      for (const subQuery of decomposition.subQueries) {
-        const subRRF = await runSingleQuerySearch(
-          subQuery, kbIds, tenantId, store, embedder, topK, threshold, hydeConfig, llmCaller,
-        );
-        subQueryResults.push(subRRF);
-      }
+      const subQueryResults = await Promise.all(
+        decomposition.subQueries.map((subQuery) =>
+          runSingleQuerySearch(
+            subQuery, kbIds, tenantId, store, embedder, topK, threshold, hydeConfig, llmCaller,
+          ),
+        ),
+      );
 
       let candidates = mergeDecomposedResults(subQueryResults);
 
@@ -71,7 +70,7 @@ export async function searchKnowledge(
         }));
       }
 
-      return buildSearchResults(candidates.slice(0, topK), kbNameMap, store);
+      return buildSearchResults(candidates.slice(0, topK), kbNameMap, store, tenantId);
     }
   }
 
@@ -99,7 +98,7 @@ export async function searchKnowledge(
     }));
   }
 
-  return buildSearchResults(finalCandidates.slice(0, topK), kbNameMap, store);
+  return buildSearchResults(finalCandidates.slice(0, topK), kbNameMap, store, tenantId);
 }
 
 /**
@@ -161,13 +160,14 @@ async function buildSearchResults(
   candidates: RRFResult[],
   kbNameMap: Map<string, string>,
   store: SearchStore,
+  tenantId: string,
 ): Promise<SearchResult[]> {
   const parentIds = candidates
     .map((c) => (c.metadata as Record<string, unknown>)?.parentChunkId as number | null)
     .filter((id): id is number => id !== null);
 
   const parentContentMap = parentIds.length > 0
-    ? await store.getParentChunks(parentIds)
+    ? await store.getParentChunks(parentIds, tenantId)
     : new Map<number, string>();
 
   return candidates.map((item) => {
@@ -197,9 +197,10 @@ async function buildSearchResults(
 }
 
 /**
- * Run graph expansion and merge graph-expanded chunks into the existing RRF candidates.
- * Graph chunks get a low base score (0.01) so RRF will boost them if they also appear
- * in vector/BM25 results.
+ * Merge graph-expanded chunks into the existing RRF candidates.
+ * For chunks already in candidates, boost their score by 10%.
+ * For new graph chunks, append with a low base score (0.01).
+ * This preserves existing RRF scores instead of resetting them via re-fusion.
  */
 async function applyGraphExpansion(
   query: string,
@@ -216,27 +217,38 @@ async function applyGraphExpansion(
       return existingCandidates;
     }
 
-    // Convert graph results to RankedItems for RRF fusion
-    const graphItems: RankedItem[] = graphResults.map((chunk) => ({
-      id: chunk.id,
-      content: chunk.content,
-      score: chunk.score,
-      source: "hybrid" as const,
-      metadata: {},
-    }));
+    // Build a set of existing candidate IDs for fast lookup
+    const candidateMap = new Map<string | number, number>();
+    for (let i = 0; i < existingCandidates.length; i++) {
+      candidateMap.set(existingCandidates[i].id, i);
+    }
 
-    // Convert existing candidates back to RankedItems for re-fusion
-    const existingItems: RankedItem[] = existingCandidates.map((c) => ({
-      id: c.id,
-      content: c.content,
-      score: c.rrfScore,
-      source: "hybrid" as const,
-      metadata: c.metadata,
-    }));
+    // Merge: boost existing candidates, append new ones
+    const merged = [...existingCandidates];
+    for (const graphChunk of graphResults) {
+      const existingIdx = candidateMap.get(graphChunk.id);
+      if (existingIdx !== undefined) {
+        // Boost existing candidate's score by 10%
+        merged[existingIdx] = {
+          ...merged[existingIdx],
+          rrfScore: merged[existingIdx].rrfScore * 1.1,
+        };
+      } else {
+        // Append new graph chunk with low base score
+        merged.push({
+          id: graphChunk.id,
+          content: graphChunk.content,
+          rrfScore: 0.01,
+          vectorRank: null,
+          bm25Rank: null,
+          metadata: {},
+        });
+      }
+    }
 
-    // Re-fuse: existing candidates as "vector" signal, graph as "bm25" signal
-    // This way RRF will properly merge and boost overlapping results
-    return rrfFuse(existingItems, graphItems);
+    // Sort by final score descending
+    merged.sort((a, b) => b.rrfScore - a.rrfScore);
+    return merged;
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
     console.warn(`Graph expansion failed, continuing without graph signal: ${message}`);

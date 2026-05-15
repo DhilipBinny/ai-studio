@@ -1,6 +1,6 @@
 import { getDb } from "@ais-app/database";
 import { graphEntities, graphRelationships, documentChunks } from "@ais-app/database";
-import { sql, inArray } from "drizzle-orm";
+import { sql, inArray, eq, and } from "drizzle-orm";
 import type { GraphSearchStore } from "@ais/rag-engine";
 
 export class DrizzleGraphStore implements GraphSearchStore {
@@ -44,6 +44,7 @@ export class DrizzleGraphStore implements GraphSearchStore {
    */
   async findConnectedEntities(
     entityIds: string[],
+    tenantId: string,
   ): Promise<Array<{ entityId: string; sourceChunkId: number }>> {
     if (entityIds.length === 0) return [];
 
@@ -53,11 +54,13 @@ export class DrizzleGraphStore implements GraphSearchStore {
     const results = await db.execute(sql`
       SELECT DISTINCT target_entity_id AS entity_id, source_chunk_id
       FROM graph_relationships
-      WHERE source_entity_id IN (${idsSql})
+      WHERE tenant_id = ${tenantId}
+        AND source_entity_id IN (${idsSql})
       UNION
       SELECT DISTINCT source_entity_id AS entity_id, source_chunk_id
       FROM graph_relationships
-      WHERE target_entity_id IN (${idsSql})
+      WHERE tenant_id = ${tenantId}
+        AND target_entity_id IN (${idsSql})
     `);
 
     return ([...results] as Array<Record<string, unknown>>).map((r) => ({
@@ -71,6 +74,7 @@ export class DrizzleGraphStore implements GraphSearchStore {
    */
   async getChunksByIds(
     chunkIds: number[],
+    tenantId: string,
   ): Promise<Array<{ id: number; content: string; metadata: Record<string, unknown> }>> {
     if (chunkIds.length === 0) return [];
 
@@ -82,7 +86,7 @@ export class DrizzleGraphStore implements GraphSearchStore {
         metadata: documentChunks.metadata,
       })
       .from(documentChunks)
-      .where(inArray(documentChunks.id, chunkIds));
+      .where(and(inArray(documentChunks.id, chunkIds), eq(documentChunks.tenantId, tenantId)));
 
     return rows.map((r) => ({
       id: r.id,

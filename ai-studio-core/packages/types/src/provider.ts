@@ -89,6 +89,10 @@ export interface ChatArgs {
   _executeTool?: (name: string, args: Record<string, unknown>) => Promise<string>;
   /** Maximum tool rounds — passed to SDK provider for maxTurns. */
   _maxToolRounds?: number;
+  /** Maximum tokens to generate (overrides model default when set). */
+  maxTokens?: number;
+  /** Sampling temperature (0 = deterministic, higher = more creative). */
+  temperature?: number;
 }
 
 /**
