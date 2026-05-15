@@ -64,6 +64,15 @@ export const POST = withRBAC("USERS", 20, async (request, auth) => {
     });
   }
 
+  const ROLE_RANK: Record<string, number> = { super_admin: 40, admin: 30, member: 20, viewer: 10 };
+  if (parsed.data.role) {
+    const callerRank = ROLE_RANK[auth.role] ?? 0;
+    const targetRank = ROLE_RANK[parsed.data.role] ?? 0;
+    if (targetRank >= callerRank) {
+      return errorResponse("Cannot assign role equal to or above your own", "ROLE_ESCALATION", 403);
+    }
+  }
+
   const db = getDb();
   const { email, name, password, role, profileId } = parsed.data;
 

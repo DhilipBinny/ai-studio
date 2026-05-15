@@ -6,6 +6,7 @@ import { encryptSecret } from "@ais-app/auth";
 import { eq, and, count, desc, sql } from "drizzle-orm";
 import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
+import { validateProviderUrl } from "@/lib/services/validate-provider-url";
 
 export const GET = withRBAC("PROVIDERS", 10, async (request, auth) => {
   const db = getDb();
@@ -80,8 +81,15 @@ export const POST = withRBAC("PROVIDERS", 20, async (request, auth) => {
     return errorResponse("Invalid input", "VALIDATION_ERROR", 400, { issues: parsed.error.issues });
   }
 
-  const db = getDb();
   const { name, providerType, baseUrl, apiKeyRef, config } = parsed.data;
+
+  if (baseUrl) {
+    try { validateProviderUrl(baseUrl); } catch (e) {
+      return errorResponse((e as Error).message, "SSRF_BLOCKED", 400);
+    }
+  }
+
+  const db = getDb();
 
   const [existing] = await db
     .select({ id: providers.id })

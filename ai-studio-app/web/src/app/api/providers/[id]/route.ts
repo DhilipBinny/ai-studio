@@ -6,6 +6,7 @@ import { encryptSecret } from "@ais-app/auth";
 import { eq, and } from "drizzle-orm";
 import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
+import { validateProviderUrl } from "@/lib/services/validate-provider-url";
 
 export const GET = withRBAC("PROVIDERS", 10, async (_request, auth, params) => {
   const id = params?.id;
@@ -49,6 +50,12 @@ export const PATCH = withRBAC("PROVIDERS", 20, async (request, auth, params) => 
     .limit(1);
 
   if (!existing) return errorResponse("Provider not found", "NOT_FOUND", 404);
+
+  if (parsed.data.baseUrl) {
+    try { validateProviderUrl(parsed.data.baseUrl); } catch (e) {
+      return errorResponse((e as Error).message, "SSRF_BLOCKED", 400);
+    }
+  }
 
   const updateData = { ...parsed.data };
   if (updateData.apiKeyRef) {

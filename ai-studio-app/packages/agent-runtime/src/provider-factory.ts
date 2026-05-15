@@ -9,7 +9,33 @@ function resolveSecret(value: string | null): string | null {
   return value;
 }
 
+function validateBaseUrl(url: string | null | undefined): void {
+  if (!url) return;
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { throw new Error("Invalid provider base URL"); }
+  if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only http/https allowed for provider URL");
+  const host = parsed.hostname.toLowerCase();
+  if (host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "0.0.0.0") {
+    throw new Error("Blocked: loopback address not allowed for provider URL");
+  }
+  const v4 = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (v4) {
+    const [, aS, bS] = v4;
+    const a = Number(aS), b = Number(bS);
+    if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)
+        || (a === 169 && b === 254) || a === 127 || a === 0 || (a === 100 && b >= 64 && b <= 127) || a >= 240) {
+      throw new Error("Blocked: private/reserved IP not allowed for provider URL");
+    }
+  }
+  const blocked = ["metadata.google.internal", "metadata.google.com", "instance-data"];
+  if (blocked.some((h) => host === h || host.endsWith("." + h))) {
+    throw new Error("Blocked: cloud metadata endpoint not allowed for provider URL");
+  }
+}
+
 export function createProvider(config: ProviderConfig): ProviderInterface {
+  validateBaseUrl(config.baseUrl);
+
   const providerCfg = config.config as Record<string, unknown> || {};
   const isOAuth = providerCfg.authMethod === "oauth_token";
   const apiKey = resolveSecret(config.apiKeyRef);

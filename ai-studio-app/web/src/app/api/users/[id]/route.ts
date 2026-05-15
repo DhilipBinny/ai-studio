@@ -47,6 +47,8 @@ export const GET = withRBAC("USERS", 10, async (_request, auth, params) => {
   return NextResponse.json({ ...user, profile });
 });
 
+const ROLE_RANK: Record<string, number> = { super_admin: 40, admin: 30, member: 20, viewer: 10 };
+
 export const PATCH = withRBAC("USERS", 20, async (request, auth, params) => {
   const id = params?.id;
   if (!id) return errorResponse("User ID required", "MISSING_ID", 400);
@@ -56,6 +58,17 @@ export const PATCH = withRBAC("USERS", 20, async (request, auth, params) => {
   const parsed = updateUserSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse("Invalid input", "VALIDATION_ERROR", 400, { issues: parsed.error.issues });
+  }
+
+  if (parsed.data.role !== undefined) {
+    const callerRank = ROLE_RANK[auth.role] ?? 0;
+    const targetRank = ROLE_RANK[parsed.data.role] ?? 0;
+    if (targetRank >= callerRank) {
+      return errorResponse("Cannot assign role equal to or above your own", "ROLE_ESCALATION", 403);
+    }
+    if (id === auth.userId) {
+      return errorResponse("Cannot change your own role", "SELF_ROLE_CHANGE", 403);
+    }
   }
 
   const db = getDb();
