@@ -2,14 +2,15 @@ import { NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { providers, providerModels } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { quickChat } from "@/lib/services/provider-chat";
 
 export const POST = withRBAC("PROVIDERS", 10, async (request, auth, params) => {
   const id = params?.id;
   if (!id) return errorResponse("Provider ID required", "MISSING_ID", 400);
 
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const { modelId, message } = body as { modelId?: string; message?: string };
 
   if (!modelId || !message) {

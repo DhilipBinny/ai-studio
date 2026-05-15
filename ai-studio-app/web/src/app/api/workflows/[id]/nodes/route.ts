@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateNodesSchema } from "@ais-app/validation";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import {
   updateWorkflowNodes,
   WorkflowNotFoundError,
@@ -11,7 +11,8 @@ export const PUT = withRBAC("WORKFLOWS", 20, async (request, auth, params) => {
   const id = params?.id;
   if (!id) return errorResponse("Workflow ID required", "MISSING_ID", 400);
 
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = updateNodesSchema.safeParse(body.nodes);
   if (!parsed.success) {
     return errorResponse("Validation failed", "VALIDATION_ERROR", 400, {

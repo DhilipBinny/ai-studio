@@ -25,6 +25,7 @@ export async function executeGraph(
   const db = getDb();
   const recordStep = createStepRecorder();
   const completed = new Set<string>();
+  const processed = new Set<string>();
   const pendingInDegree = new Map(graph.inDegree);
   const nodeOutputs = new Map<string, Record<string, unknown>>();
   let stepsCompleted = 0;
@@ -100,6 +101,7 @@ export async function executeGraph(
           state[key] = output;
           nodeOutputs.set(node.id, output);
           completed.add(node.id);
+          processed.add(node.id);
 
           if (paused) {
             await db.update(workflowRuns).set({ status: "waiting", output: state }).where(eq(workflowRuns.id, runId));
@@ -109,6 +111,7 @@ export async function executeGraph(
           const failedNode = toExecute.find((_, i) => results[i] === r);
           if (failedNode) {
             completed.add(failedNode.id);
+            processed.add(failedNode.id);
             state[normalizeKey(failedNode.name)] = { _error: true, message: (r.reason as Error).message };
             if (failedNode.errorPolicy.onError === "error_branch") {
               const errorNext = getNextNodes(failedNode, graph, state, true);
@@ -125,12 +128,14 @@ export async function executeGraph(
         state[normalizeKey(node.name)] = output;
         nodeOutputs.set(node.id, output);
         completed.add(node.id);
+        processed.add(node.id);
         stepsCompleted++;
       } else if (node.nodeType === "iteration") {
         const output = await executeIterationNode(node, state, tenantId, runId, userId, allEdges, graph.nodes, recordStep);
         state[normalizeKey(node.name)] = output;
         nodeOutputs.set(node.id, output);
         completed.add(node.id);
+        processed.add(node.id);
         stepsCompleted++;
       } else if (node.nodeType === "aggregate") {
         const predIds = graph.reverseAdj.get(node.id) || [];
@@ -143,6 +148,7 @@ export async function executeGraph(
         state[normalizeKey(node.name)] = aggregated;
         nodeOutputs.set(node.id, aggregated);
         completed.add(node.id);
+        processed.add(node.id);
 
         const [step] = await db.insert(workflowRunSteps).values({
           tenantId, workflowRunId: runId, workflowNodeId: node.id,
@@ -155,6 +161,7 @@ export async function executeGraph(
         state[normalizeKey(node.name)] = stepResult.output;
         nodeOutputs.set(node.id, stepResult.output);
         completed.add(node.id);
+        processed.add(node.id);
         stepsCompleted++;
 
         if (stepResult.paused) {
@@ -180,7 +187,7 @@ export async function executeGraph(
         && doneNode.errorPolicy.onError === "error_branch";
       const nextNodes = getNextNodes(doneNode, graph, state, useErrBranch);
       for (const next of nextNodes) {
-        if (completed.has(next.id) || ready.some((r) => r.id === next.id)) continue;
+        if (processed.has(next.id) || completed.has(next.id) || ready.some((r) => r.id === next.id)) continue;
 
         const preds = graph.reverseAdj.get(next.id) || [];
         const normalPreds = preds.filter((pid) => {

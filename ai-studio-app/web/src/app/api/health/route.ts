@@ -35,6 +35,9 @@ export async function GET(request: NextRequest) {
   if (!auth) {
     return NextResponse.json({ error: "Authentication required for detail mode" }, { status: 401 });
   }
+  if (auth.role !== "super_admin" && auth.role !== "admin") {
+    return NextResponse.json({ error: "Admin access required for detail mode" }, { status: 403 });
+  }
 
   const mem = process.memoryUsage();
   const rssMB = Math.round(mem.rss / 1024 / 1024);

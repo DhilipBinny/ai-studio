@@ -3,7 +3,7 @@ import { getDb } from "@ais-app/database";
 import { auditLog } from "@ais-app/database";
 import { paginationSchema } from "@ais-app/validation";
 import { eq, and, count, desc, ilike } from "drizzle-orm";
-import { withRBAC } from "@/lib/api-utils";
+import { withRBAC, escapeLike } from "@/lib/api-utils";
 
 export const GET = withRBAC("AUDIT", 10, async (request, auth) => {
   const db = getDb();
@@ -13,7 +13,7 @@ export const GET = withRBAC("AUDIT", 10, async (request, auth) => {
   const resourceType = url.searchParams.get("resourceType");
 
   const conditions = [eq(auditLog.tenantId, auth.tenantId)];
-  if (action) conditions.push(ilike(auditLog.action, `%${action}%`));
+  if (action) conditions.push(ilike(auditLog.action, `%${escapeLike(action)}%`));
   if (resourceType) conditions.push(eq(auditLog.resourceType, resourceType));
 
   const where = and(...conditions);

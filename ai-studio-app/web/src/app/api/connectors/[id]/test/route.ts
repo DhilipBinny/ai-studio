@@ -54,7 +54,7 @@ export const POST = withRBAC("CONNECTORS", 20, async (_request, auth, params) =>
         },
         updatedAt: new Date(),
       })
-      .where(eq(connectors.id, id));
+      .where(and(eq(connectors.id, id), eq(connectors.tenantId, auth.tenantId)));
 
     await client.disconnect();
 
@@ -76,7 +76,7 @@ export const POST = withRBAC("CONNECTORS", 20, async (_request, auth, params) =>
     await db
       .update(connectors)
       .set({ status: "error", lastTestedAt: new Date(), lastError: errorMsg, updatedAt: new Date() })
-      .where(eq(connectors.id, id));
+      .where(and(eq(connectors.id, id), eq(connectors.tenantId, auth.tenantId)));
 
     await client.disconnect().catch(() => {});
 

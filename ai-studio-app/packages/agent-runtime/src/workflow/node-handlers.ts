@@ -11,7 +11,20 @@ import type { WorkspaceConfig } from "@ais/tools-common";
 import type { ToolCall, ToolContext } from "../tool-executor";
 import type { ProviderConfig } from "../types";
 import type { WorkflowState, NodeConfig, GraphNode, GraphEdge, ExecutionGraph, NodeResult } from "./types";
+import dns from "node:dns";
 import { resolveTemplate, evaluateCondition, normalizeKey } from "./expression-engine";
+
+function isPrivateIP(ip: string): boolean {
+  if (ip === "127.0.0.1" || ip === "0.0.0.0" || ip === "::1" || ip === "::") return true;
+  const parts = ip.split(".").map(Number);
+  if (parts.length !== 4) return false;
+  if (parts[0] === 10) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  if (parts[0] === 169 && parts[1] === 254) return true;
+  if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
+  return false;
+}
 
 // Lazy import to avoid circular dependency with workflow-engine
 let _triggerWorkflow: typeof import("../workflow-engine").triggerWorkflow | null = null;
@@ -183,14 +196,23 @@ export async function executeNode(
         const parsed = new URL(url);
         if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only HTTP(S) allowed");
         const host = parsed.hostname;
-        if (host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0" || host === "::1"
-          || host.startsWith("10.") || host.startsWith("172.") || host.startsWith("192.168.")
-          || host.startsWith("169.254.") || host.startsWith("100.64.")
-          || host.endsWith(".internal") || host.endsWith(".local")) {
+        if (host === "localhost" || host === "0.0.0.0" || host === "::1"
+          || host.endsWith(".internal") || host.endsWith(".local")
+          || isPrivateIP(host)) {
           throw new Error("SSRF blocked: private/internal addresses not allowed");
         }
+        // DNS rebinding check: resolve hostname and validate the resolved IP
+        try {
+          const { address } = await dns.promises.lookup(host);
+          if (isPrivateIP(address)) {
+            throw new Error("SSRF blocked: hostname resolves to private address");
+          }
+        } catch (dnsErr) {
+          if ((dnsErr as Error).message.includes("SSRF")) throw dnsErr;
+          throw new Error(`DNS resolution failed for ${host}: ${(dnsErr as Error).message}`);
+        }
       } catch (e) {
-        if ((e as Error).message.includes("SSRF") || (e as Error).message.includes("Only HTTP"))
+        if ((e as Error).message.includes("SSRF") || (e as Error).message.includes("Only HTTP") || (e as Error).message.includes("DNS resolution"))
           throw e;
         throw new Error(`Invalid URL: ${url}`);
       }

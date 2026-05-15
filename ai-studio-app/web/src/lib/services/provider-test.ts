@@ -9,6 +9,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { decryptSecret, isEncrypted } from "@ais-app/auth";
+import { validateProviderUrl } from "./validate-provider-url";
 
 export interface TestResult {
   success: boolean;
@@ -44,6 +45,15 @@ export async function testProvider(provider: ProviderRow): Promise<TestResult> {
 
 async function testProviderInternal(provider: ProviderRow): Promise<TestResult> {
   const start = Date.now();
+
+  // SSRF check: validate user-supplied base URL before any outbound request
+  if (provider.baseUrl) {
+    try {
+      validateProviderUrl(provider.baseUrl);
+    } catch (e) {
+      return { success: false, latencyMs: 0, error: (e as Error).message, models: [] };
+    }
+  }
 
   try {
     switch (provider.providerType) {
@@ -118,13 +128,15 @@ async function testAnthropic(provider: ProviderRow, start: number): Promise<Test
 }
 
 async function testOpenAI(provider: ProviderRow, start: number): Promise<TestResult> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
   const client = new OpenAI({
     apiKey: provider.apiKeyRef || "",
     ...(provider.baseUrl ? { baseURL: provider.baseUrl } : {}),
   });
 
   try {
-    const response = await client.models.list();
+    const response = await client.models.list({ signal: controller.signal });
     const latencyMs = Date.now() - start;
     const models: DiscoveredModel[] = [];
     for await (const m of response) {
@@ -145,8 +157,11 @@ async function testOpenAI(provider: ProviderRow, start: number): Promise<TestRes
   } catch (e) {
     const err = e as Error & { status?: number };
     const latencyMs = Date.now() - start;
+    if (err.name === "AbortError") return { success: false, latencyMs, error: "Connection timed out", models: [] };
     if (err.status === 401) return { success: false, latencyMs, error: "Invalid API key (401)", models: [] };
     return { success: false, latencyMs, error: err.message || String(e), models: [] };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -176,10 +191,12 @@ async function testOllama(provider: ProviderRow, start: number): Promise<TestRes
 
 async function testOpenAICompatible(provider: ProviderRow, start: number): Promise<TestResult> {
   if (!provider.baseUrl) return { success: false, latencyMs: 0, error: "Base URL is required", models: [] };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
   const client = new OpenAI({ apiKey: provider.apiKeyRef || "not-needed", baseURL: provider.baseUrl });
 
   try {
-    const response = await client.models.list();
+    const response = await client.models.list({ signal: controller.signal });
     const latencyMs = Date.now() - start;
     const models: DiscoveredModel[] = [];
     for await (const m of response) {
@@ -192,6 +209,9 @@ async function testOpenAICompatible(provider: ProviderRow, start: number): Promi
     return { success: true, latencyMs, models };
   } catch (e) {
     const latencyMs = Date.now() - start;
+    if ((e as Error).name === "AbortError") return { success: false, latencyMs, error: "Connection timed out", models: [] };
     return { success: false, latencyMs, error: (e as Error).message || String(e), models: [] };
+  } finally {
+    clearTimeout(timeout);
   }
 }

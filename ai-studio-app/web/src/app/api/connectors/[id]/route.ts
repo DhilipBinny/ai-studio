@@ -3,7 +3,7 @@ import { getDb } from "@ais-app/database";
 import { connectors } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
 import { updateConnectorSchema } from "@ais-app/validation";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 import { encryptSecret } from "@ais-app/auth";
 import { ALLOWED_COMMANDS } from "@ais/mcp-client";
@@ -42,7 +42,8 @@ export const PATCH = withRBAC("CONNECTORS", 20, async (request, auth, params) =>
   const id = params?.id;
   if (!id) return errorResponse("Connector ID required", "MISSING_ID", 400);
 
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = updateConnectorSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
@@ -76,14 +77,14 @@ export const PATCH = withRBAC("CONNECTORS", 20, async (request, auth, params) =>
       ? { ...cc, env: Object.fromEntries(Object.entries((cc as Record<string, unknown>).env as Record<string, string>).map(([k, v]) => [k, encryptSecret(v)])) }
       : cc;
   }
-  if (body.credentialsRef !== undefined) {
-    updates.credentialsRef = body.credentialsRef ? encryptSecret(body.credentialsRef) : body.credentialsRef;
+  if (parsed.data.credentialsRef !== undefined) {
+    updates.credentialsRef = parsed.data.credentialsRef ? encryptSecret(parsed.data.credentialsRef) : parsed.data.credentialsRef;
   }
 
   const [updated] = await db
     .update(connectors)
     .set(updates)
-    .where(eq(connectors.id, id))
+    .where(and(eq(connectors.id, id), eq(connectors.tenantId, auth.tenantId)))
     .returning();
 
   await createAuditEntry({
@@ -111,7 +112,7 @@ export const DELETE = withRBAC("CONNECTORS", 20, async (_request, auth, params) 
   await db
     .update(connectors)
     .set({ isActive: false, deactivatedAt: new Date(), updatedAt: new Date() })
-    .where(eq(connectors.id, id));
+    .where(and(eq(connectors.id, id), eq(connectors.tenantId, auth.tenantId)));
 
   await createAuditEntry({
     tenantId: auth.tenantId, userId: auth.userId,

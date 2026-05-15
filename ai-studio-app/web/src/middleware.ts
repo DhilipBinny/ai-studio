@@ -21,6 +21,27 @@ function getSecret(): Uint8Array | null {
   return new TextEncoder().encode(secret);
 }
 
+function getAllowedOrigins(): string[] {
+  const env = process.env.CORS_ALLOWED_ORIGINS;
+  if (!env) return [];
+  return env.split(",").map((o) => o.trim()).filter(Boolean);
+}
+
+function setCorsHeaders(request: NextRequest, response: NextResponse): void {
+  const origin = request.headers.get("origin");
+  if (!origin) return;
+
+  const allowed = getAllowedOrigins();
+  if (allowed.length === 0) return;
+
+  if (allowed.includes(origin)) {
+    response.headers.set("Access-Control-Allow-Origin", origin);
+    response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    response.headers.set("Vary", "Origin");
+  }
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -28,11 +49,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Handle CORS preflight for /api/v1/ routes (OPTIONS only)
+  if (pathname.startsWith("/api/v1/") && request.method === "OPTIONS") {
+    const preflightResponse = new NextResponse(null, { status: 204 });
+    setCorsHeaders(request, preflightResponse);
+    return preflightResponse;
+  }
+
+  // v1 routes use their own API key auth via authenticateApiKey() — skip JWT check
+  // but still apply CORS headers on the response
   if (pathname.startsWith("/api/v1/")) {
     const response = NextResponse.next();
-    response.headers.set("Access-Control-Allow-Origin", "*");
-    response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    response.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    setCorsHeaders(request, response);
     return response;
   }
 

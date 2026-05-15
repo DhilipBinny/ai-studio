@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { paginationSchema, createWorkflowSchema } from "@ais-app/validation";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import {
   getWorkflows,
   createWorkflow,
@@ -20,7 +20,8 @@ export const GET = withRBAC("WORKFLOWS", 10, async (request, auth) => {
 });
 
 export const POST = withRBAC("WORKFLOWS", 20, async (request, auth) => {
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = createWorkflowSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse("Validation failed", "VALIDATION_ERROR", 400, {
@@ -34,7 +35,7 @@ export const POST = withRBAC("WORKFLOWS", 20, async (request, auth) => {
       {
         name: parsed.data.name,
         description: parsed.data.description,
-        triggerConfig: body.triggerConfig,
+        triggerConfig: parsed.data.triggerConfig,
       },
       auth.userId,
     );

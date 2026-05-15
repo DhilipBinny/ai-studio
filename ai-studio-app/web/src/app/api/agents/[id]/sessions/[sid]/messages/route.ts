@@ -3,7 +3,7 @@ import { getDb } from "@ais-app/database";
 import { agentSessions, agentSessionMessages } from "@ais-app/database";
 import { runSession } from "@ais-app/agent-runtime";
 import { eq, and, asc } from "drizzle-orm";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 
 export const POST = withRBAC("AGENTS", 10, async (request, auth, params) => {
   const agentId = params?.id;
@@ -23,7 +23,8 @@ export const POST = withRBAC("AGENTS", 10, async (request, auth, params) => {
     return errorResponse("Session is closed", "SESSION_CLOSED", 400);
   }
 
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const message = body.message;
   if (!message || typeof message !== "string" || message.trim().length === 0) {
     return errorResponse("Message is required", "VALIDATION_ERROR", 400);

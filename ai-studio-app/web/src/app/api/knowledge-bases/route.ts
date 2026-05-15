@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { knowledgeBases } from "@ais-app/database";
-import { paginationSchema } from "@ais-app/validation";
+import { paginationSchema, createKnowledgeBaseSchema } from "@ais-app/validation";
 import { eq, and, count, desc } from "drizzle-orm";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
 export const GET = withRBAC("KNOWLEDGE", 10, async (request, auth) => {
@@ -21,9 +21,13 @@ export const GET = withRBAC("KNOWLEDGE", 10, async (request, auth) => {
 });
 
 export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth) => {
-  const body = await request.json();
-  const { name, description, embeddingSource, embeddingProviderId, embeddingModel, embeddingDimension, rerankSource, rerankProviderId, rerankModel, chunkConfig } = body;
-  if (!name) return errorResponse("Name required", "VALIDATION_ERROR", 400);
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
+  const parsed = createKnowledgeBaseSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
+  }
+  const { name, description, embeddingSource, embeddingProviderId, embeddingModel, embeddingDimension, rerankSource, rerankProviderId, rerankModel, chunkConfig } = parsed.data;
 
   const db = getDb();
   const [existing] = await db.select({ id: knowledgeBases.id }).from(knowledgeBases).where(and(eq(knowledgeBases.tenantId, auth.tenantId), eq(knowledgeBases.name, name))).limit(1);

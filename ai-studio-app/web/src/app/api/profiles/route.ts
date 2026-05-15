@@ -3,7 +3,7 @@ import { getDb } from "@ais-app/database";
 import { profiles } from "@ais-app/database";
 import { createProfileSchema } from "@ais-app/validation";
 import { eq, and } from "drizzle-orm";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
 export const GET = withRBAC("PROFILES", 10, async (_request, auth) => {
@@ -18,7 +18,8 @@ export const GET = withRBAC("PROFILES", 10, async (_request, auth) => {
 });
 
 export const POST = withRBAC("PROFILES", 20, async (request, auth) => {
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = createProfileSchema.safeParse(body);
 
   if (!parsed.success) {

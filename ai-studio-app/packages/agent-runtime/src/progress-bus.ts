@@ -203,8 +203,12 @@ export class ProgressBus {
 
 export const BACKPRESSURE_LIMIT = BACKPRESSURE_HIGH_WATER;
 
-const globalForBus = globalThis as unknown as { __progressBus?: ProgressBus };
+const globalForBus = globalThis as unknown as { __progressBus?: ProgressBus; __progressBusCleanupInterval?: ReturnType<typeof setInterval> };
 export const progressBus: ProgressBus = globalForBus.__progressBus ?? (globalForBus.__progressBus = new ProgressBus());
+
+if (!globalForBus.__progressBusCleanupInterval) {
+  globalForBus.__progressBusCleanupInterval = setInterval(() => progressBus.cleanup(), 5 * 60 * 1000);
+}
 
 function truncatePreview(value: unknown, maxLen = 500): { preview: string; len: number } {
   let str: string;

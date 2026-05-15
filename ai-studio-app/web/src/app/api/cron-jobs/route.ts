@@ -3,7 +3,7 @@ import { getDb } from "@ais-app/database";
 import { cronJobs, agents, workflows } from "@ais-app/database";
 import { paginationSchema, createCronJobSchema } from "@ais-app/validation";
 import { eq, and, count, desc } from "drizzle-orm";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
 export const GET = withRBAC("SETTINGS", 10, async (request, auth) => {
@@ -28,7 +28,8 @@ export const GET = withRBAC("SETTINGS", 10, async (request, auth) => {
 });
 
 export const POST = withRBAC("SETTINGS", 20, async (request, auth) => {
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = createCronJobSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });

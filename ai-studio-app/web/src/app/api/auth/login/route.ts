@@ -6,7 +6,7 @@ import { loginSchema } from "@ais-app/validation";
 import { sendEmail, buildOTPEmail } from "@ais-app/email";
 import { eq, and } from "drizzle-orm";
 import { createHash } from "node:crypto";
-import { errorResponse } from "@/lib/api-utils";
+import { errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 import { RateLimiter } from "@ais-app/auth";
 
@@ -15,7 +15,8 @@ const loginLimiter = new RateLimiter(5, 15 * 60 * 1000);
 const GENERIC_AUTH_ERROR = "Invalid email or password";
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = loginSchema.safeParse(body);
 
   if (!parsed.success) {

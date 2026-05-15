@@ -5,6 +5,7 @@ export const createConnectorSchema = z.object({
   description: z.string().max(2000).optional(),
   connectorType: z.enum(["database", "rest_api", "mcp", "webhook", "graphql"]),
   connectionConfig: z.record(z.unknown()),
+  credentialsRef: z.string().max(2000).optional().nullable(),
   healthCheckUrl: z.string().url().optional().nullable(),
 });
 
@@ -13,5 +14,6 @@ export const updateConnectorSchema = z.object({
   description: z.string().max(2000).optional(),
   connectorType: z.enum(["database", "rest_api", "mcp", "webhook", "graphql"]).optional(),
   connectionConfig: z.record(z.unknown()).optional(),
+  credentialsRef: z.string().max(2000).optional().nullable(),
   healthCheckUrl: z.string().url().optional().nullable(),
 });

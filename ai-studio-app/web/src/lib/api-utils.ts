@@ -6,6 +6,11 @@ import { users, profiles, revokedTokens } from "@ais-app/database";
 import { eq } from "drizzle-orm";
 import type { Module, PermissionLevel, AccessRights, AuthContext } from "@ais-app/types";
 
+/** Escape LIKE/ILIKE wildcards so user input is treated as literal text. */
+export function escapeLike(input: string): string {
+  return input.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
+
 export function errorResponse(
   error: string,
   code: string,
@@ -15,7 +20,7 @@ export function errorResponse(
   return NextResponse.json({ error, code, details }, { status });
 }
 
-export async function parseJsonBody(request: NextRequest): Promise<Record<string, unknown> | null> {
+export async function parseJsonBody(request: Request): Promise<Record<string, unknown> | null> {
   try {
     return await request.json();
   } catch {

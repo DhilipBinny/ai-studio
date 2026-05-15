@@ -4,7 +4,7 @@ import { users, profiles, passwordHistory } from "@ais-app/database";
 import { hashPassword, validatePassword, checkBreached } from "@ais-app/auth";
 import { createUserSchema, paginationSchema } from "@ais-app/validation";
 import { eq, and, count, asc, desc, ilike } from "drizzle-orm";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, escapeLike, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
 export const GET = withRBAC("USERS", 10, async (request, auth) => {
@@ -16,7 +16,7 @@ export const GET = withRBAC("USERS", 10, async (request, auth) => {
   const showAll = url.searchParams.get("showAll") === "true";
   const conditions = [eq(users.tenantId, auth.tenantId)];
   if (!showAll) conditions.push(eq(users.isActive, true));
-  if (search) conditions.push(ilike(users.email, `%${search}%`));
+  if (search) conditions.push(ilike(users.email, `%${escapeLike(search)}%`));
 
   const where = and(...conditions);
   const orderBy = pagination.sortOrder === "asc" ? asc(users.createdAt) : desc(users.createdAt);
@@ -54,7 +54,8 @@ export const GET = withRBAC("USERS", 10, async (request, auth) => {
 });
 
 export const POST = withRBAC("USERS", 20, async (request, auth) => {
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = createUserSchema.safeParse(body);
 
   if (!parsed.success) {

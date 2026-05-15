@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { updateAgentSchema } from "@ais-app/validation";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { getAgentDetail, updateAgent, AgentNotFoundError } from "@/lib/services/agent";
 
 export const GET = withRBAC("AGENTS", 10, async (_request, auth, params) => {
@@ -17,7 +17,8 @@ export const PATCH = withRBAC("AGENTS", 20, async (request, auth, params) => {
   const id = params?.id;
   if (!id) return errorResponse("Agent ID required", "MISSING_ID", 400);
 
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = updateAgentSchema.safeParse(body);
   if (!parsed.success) return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
 

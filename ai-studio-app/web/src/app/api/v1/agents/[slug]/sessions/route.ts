@@ -4,6 +4,7 @@ import { agents } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
 import { runSession } from "@ais-app/agent-runtime";
 import { authenticateApiKey, errorJson } from "@/lib/api-key-auth";
+import { parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
 export async function OPTIONS() {
@@ -37,7 +38,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sl
     return errorJson("API key does not have access to this agent", "FORBIDDEN", 403);
   }
 
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorJson("Invalid JSON body", "INVALID_JSON", 400);
   const message = body.message;
   if (!message || typeof message !== "string" || message.trim().length === 0) {
     return errorJson("Message is required", "VALIDATION_ERROR", 400);

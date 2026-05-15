@@ -4,7 +4,7 @@ import { providers, providerModels } from "@ais-app/database";
 import { createProviderSchema, paginationSchema } from "@ais-app/validation";
 import { encryptSecret } from "@ais-app/auth";
 import { eq, and, count, desc, sql } from "drizzle-orm";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
 export const GET = withRBAC("PROVIDERS", 10, async (request, auth) => {
@@ -72,7 +72,8 @@ export const GET = withRBAC("PROVIDERS", 10, async (request, auth) => {
 });
 
 export const POST = withRBAC("PROVIDERS", 20, async (request, auth) => {
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = createProviderSchema.safeParse(body);
 
   if (!parsed.success) {
@@ -113,5 +114,5 @@ export const POST = withRBAC("PROVIDERS", 20, async (request, auth) => {
     details: { name, providerType },
   });
 
-  return NextResponse.json(provider, { status: 201 });
+  return NextResponse.json({ ...provider, apiKeyRef: provider.apiKeyRef ? "****" : null }, { status: 201 });
 });

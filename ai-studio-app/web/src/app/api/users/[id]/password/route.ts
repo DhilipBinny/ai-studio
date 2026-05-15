@@ -4,7 +4,7 @@ import { users, sessions, passwordHistory } from "@ais-app/database";
 import { hashPassword, verifyPassword, validatePassword, checkBreached, canManage, checkPasswordHistory, AUTH_CONFIG } from "@ais-app/auth";
 import { changePasswordSchema } from "@ais-app/validation";
 import { eq, and, isNull, desc } from "drizzle-orm";
-import { withAuth, errorResponse } from "@/lib/api-utils";
+import { withAuth, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
 export const PATCH = withAuth(async (request, auth, params) => {
@@ -18,7 +18,8 @@ export const PATCH = withAuth(async (request, auth, params) => {
     return errorResponse("Insufficient permissions", "FORBIDDEN", 403);
   }
 
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const db = getDb();
 
   if (isSelf) {

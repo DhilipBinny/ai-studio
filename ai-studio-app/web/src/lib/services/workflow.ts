@@ -6,7 +6,7 @@ import {
   workflowRuns,
   workflowRunSteps,
 } from "@ais-app/database";
-import { eq, and, count, desc, asc } from "drizzle-orm";
+import { eq, and, count, desc, asc, sql } from "drizzle-orm";
 import { createAuditEntry } from "./audit";
 
 // ---------------------------------------------------------------------------
@@ -135,26 +135,29 @@ export async function createWorkflow(
 ) {
   const db = getDb();
 
-  const [existing] = await db
-    .select({ id: workflows.id })
-    .from(workflows)
-    .where(
-      and(eq(workflows.tenantId, tenantId), eq(workflows.name, data.name)),
-    )
-    .limit(1);
-
-  if (existing) throw new WorkflowNameExistsError();
-
-  const [workflow] = await db
-    .insert(workflows)
-    .values({
-      tenantId,
-      name: data.name,
-      description: data.description || "",
-      triggerConfig: data.triggerConfig || { type: "manual" },
-      createdBy: userId,
-    })
-    .returning();
+  let workflow;
+  try {
+    [workflow] = await db
+      .insert(workflows)
+      .values({
+        tenantId,
+        name: data.name,
+        description: data.description || "",
+        triggerConfig: data.triggerConfig || { type: "manual" },
+        createdBy: userId,
+      })
+      .returning();
+  } catch (err: unknown) {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code: string }).code === "23505"
+    ) {
+      throw new WorkflowNameExistsError();
+    }
+    throw err;
+  }
 
   await createAuditEntry({
     tenantId,
@@ -180,18 +183,8 @@ export async function updateWorkflow(
 ) {
   const db = getDb();
 
-  const [existing] = await db
-    .select({ id: workflows.id, version: workflows.version })
-    .from(workflows)
-    .where(
-      and(eq(workflows.id, workflowId), eq(workflows.tenantId, tenantId)),
-    )
-    .limit(1);
-
-  if (!existing) throw new WorkflowNotFoundError();
-
   const updateData: Record<string, unknown> = {
-    version: existing.version + 1,
+    version: sql`${workflows.version} + 1`,
   };
   if (data.name !== undefined) updateData.name = data.name;
   if (data.description !== undefined) updateData.description = data.description;
@@ -206,6 +199,8 @@ export async function updateWorkflow(
       and(eq(workflows.id, workflowId), eq(workflows.tenantId, tenantId)),
     )
     .returning();
+
+  if (!updated) throw new WorkflowNotFoundError();
 
   await createAuditEntry({
     tenantId,
@@ -252,40 +247,43 @@ export async function updateWorkflowNodes(
     );
   }
 
-  // Delete existing nodes and re-insert
-  await db
-    .delete(workflowNodes)
-    .where(
-      and(
-        eq(workflowNodes.workflowId, workflowId),
-        eq(workflowNodes.tenantId, tenantId),
-      ),
-    );
+  // Delete existing nodes and re-insert within a transaction
+  const inserted = await db.transaction(async (tx) => {
+    await tx
+      .delete(workflowNodes)
+      .where(
+        and(
+          eq(workflowNodes.workflowId, workflowId),
+          eq(workflowNodes.tenantId, tenantId),
+        ),
+      );
 
-  const inserted = [];
-  for (const node of nodes) {
-    const [n] = await db
-      .insert(workflowNodes)
-      .values({
-        tenantId,
-        workflowId,
-        nodeType:
-          node.nodeType as (typeof workflowNodes.nodeType.enumValues)[number],
-        name: node.name,
-        config: node.config || {},
-        errorPolicy: node.errorPolicy || {
-          onError: "stop",
-          maxRetries: 0,
-          retryDelayMs: 1000,
-          retryBackoff: "fixed",
-          timeoutMs: 0,
-        },
-        positionX: node.positionX,
-        positionY: node.positionY,
-      })
-      .returning();
-    inserted.push(n);
-  }
+    const results = [];
+    for (const node of nodes) {
+      const [n] = await tx
+        .insert(workflowNodes)
+        .values({
+          tenantId,
+          workflowId,
+          nodeType:
+            node.nodeType as (typeof workflowNodes.nodeType.enumValues)[number],
+          name: node.name,
+          config: node.config || {},
+          errorPolicy: node.errorPolicy || {
+            onError: "stop",
+            maxRetries: 0,
+            retryDelayMs: 1000,
+            retryBackoff: "fixed",
+            timeoutMs: 0,
+          },
+          positionX: node.positionX,
+          positionY: node.positionY,
+        })
+        .returning();
+      results.push(n);
+    }
+    return results;
+  });
 
   return { data: inserted };
 }
@@ -302,18 +300,18 @@ export async function updateWorkflowEdges(
 ) {
   const db = getDb();
 
-  await db
-    .delete(workflowEdges)
-    .where(
-      and(
-        eq(workflowEdges.workflowId, workflowId),
-        eq(workflowEdges.tenantId, tenantId),
-      ),
-    );
+  const inserted = await db.transaction(async (tx) => {
+    await tx
+      .delete(workflowEdges)
+      .where(
+        and(
+          eq(workflowEdges.workflowId, workflowId),
+          eq(workflowEdges.tenantId, tenantId),
+        ),
+      );
 
-  const inserted =
-    edges.length > 0
-      ? await db
+    return edges.length > 0
+      ? await tx
           .insert(workflowEdges)
           .values(
             edges.map((e, i) => ({
@@ -329,6 +327,7 @@ export async function updateWorkflowEdges(
           )
           .returning()
       : [];
+  });
 
   await createAuditEntry({
     tenantId,

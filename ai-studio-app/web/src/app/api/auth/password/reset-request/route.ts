@@ -5,13 +5,14 @@ import { passwordResetRequestSchema } from "@ais-app/validation";
 import { hashToken, AUTH_CONFIG } from "@ais-app/auth";
 import { sendEmail } from "@ais-app/email";
 import { eq } from "drizzle-orm";
-import { errorResponse } from "@/lib/api-utils";
+import { errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 import { BRAND } from "@/lib/branding";
 import { randomBytes } from "node:crypto";
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = passwordResetRequestSchema.safeParse(body);
 
   if (!parsed.success) {

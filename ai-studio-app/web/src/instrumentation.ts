@@ -1,3 +1,8 @@
+const globalForInstrumentation = globalThis as unknown as {
+  __recoverySweepInterval?: ReturnType<typeof setInterval>;
+  __revocationCleanupInterval?: ReturnType<typeof setInterval>;
+};
+
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
     const { startCronScheduler, recoverStaleWorkflowRuns, startProgressWriter } = await import("@ais-app/agent-runtime");
@@ -5,7 +10,9 @@ export async function register() {
     startProgressWriter();
 
     recoverStaleWorkflowRuns().catch(() => {});
-    setInterval(() => { recoverStaleWorkflowRuns().catch(() => {}); }, 300_000);
+    if (!globalForInstrumentation.__recoverySweepInterval) {
+      globalForInstrumentation.__recoverySweepInterval = setInterval(() => { recoverStaleWorkflowRuns().catch(() => {}); }, 120_000);
+    }
 
     async function cleanupExpiredRevocations() {
       try {
@@ -16,6 +23,8 @@ export async function register() {
         await db.delete(revokedTokens).where(lt(revokedTokens.expiresAt, new Date()));
       } catch { /* cleanup failure is non-fatal */ }
     }
-    setInterval(() => { cleanupExpiredRevocations().catch(() => {}); }, 3600_000);
+    if (!globalForInstrumentation.__revocationCleanupInterval) {
+      globalForInstrumentation.__revocationCleanupInterval = setInterval(() => { cleanupExpiredRevocations().catch(() => {}); }, 3600_000);
+    }
   }
 }

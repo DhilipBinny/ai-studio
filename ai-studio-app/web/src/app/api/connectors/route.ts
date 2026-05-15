@@ -5,7 +5,7 @@ import { paginationSchema, createConnectorSchema } from "@ais-app/validation";
 import { encryptSecret } from "@ais-app/auth";
 import { ALLOWED_COMMANDS } from "@ais/mcp-client";
 import { eq, and, count, desc } from "drizzle-orm";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
 function maskConnectorSecrets(connector: Record<string, unknown>): Record<string, unknown> {
@@ -50,13 +50,13 @@ export const GET = withRBAC("CONNECTORS", 10, async (request, auth) => {
 });
 
 export const POST = withRBAC("CONNECTORS", 20, async (request, auth) => {
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = createConnectorSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
   }
-  const { name, description, connectorType, connectionConfig, healthCheckUrl } = parsed.data;
-  const { credentialsRef } = body;
+  const { name, description, connectorType, connectionConfig, healthCheckUrl, credentialsRef } = parsed.data;
 
   if (connectorType === "mcp" && connectionConfig) {
     const cmdError = validateMcpCommand(connectionConfig as Record<string, unknown>);

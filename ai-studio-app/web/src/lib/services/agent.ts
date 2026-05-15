@@ -8,7 +8,8 @@ import {
   agentConnectors,
   connectors,
 } from "@ais-app/database";
-import { eq, and, count, desc, ilike } from "drizzle-orm";
+import { eq, and, count, desc, ilike, sql } from "drizzle-orm";
+import { escapeLike } from "@/lib/api-utils";
 import { createAuditEntry } from "./audit";
 
 // ---------------------------------------------------------------------------
@@ -58,7 +59,7 @@ export async function getAgents(tenantId: string, opts: GetAgentsOpts) {
         opts.status as (typeof agents.status.enumValues)[number],
       ),
     );
-  if (opts.search) conditions.push(ilike(agents.name, `%${opts.search}%`));
+  if (opts.search) conditions.push(ilike(agents.name, `%${escapeLike(opts.search)}%`));
 
   const where = and(...conditions);
 
@@ -124,8 +125,11 @@ export async function getAgentDetail(tenantId: string, agentId: string) {
       toolDisplayName: tools.displayName,
     })
     .from(agentTools)
-    .innerJoin(tools, eq(agentTools.toolId, tools.id))
-    .where(eq(agentTools.agentId, agentId));
+    .innerJoin(
+      tools,
+      and(eq(agentTools.toolId, tools.id), eq(tools.tenantId, tenantId)),
+    )
+    .where(and(eq(agentTools.agentId, agentId), eq(agentTools.tenantId, tenantId)));
 
   const assignedKBs = await db
     .select({
@@ -137,9 +141,12 @@ export async function getAgentDetail(tenantId: string, agentId: string) {
     .from(agentKnowledgeBases)
     .innerJoin(
       knowledgeBases,
-      eq(agentKnowledgeBases.knowledgeBaseId, knowledgeBases.id),
+      and(
+        eq(agentKnowledgeBases.knowledgeBaseId, knowledgeBases.id),
+        eq(knowledgeBases.tenantId, tenantId),
+      ),
     )
-    .where(eq(agentKnowledgeBases.agentId, agentId));
+    .where(and(eq(agentKnowledgeBases.agentId, agentId), eq(agentKnowledgeBases.tenantId, tenantId)));
 
   const assignedConnectors = await db
     .select({
@@ -150,8 +157,11 @@ export async function getAgentDetail(tenantId: string, agentId: string) {
       status: connectors.status,
     })
     .from(agentConnectors)
-    .innerJoin(connectors, eq(agentConnectors.connectorId, connectors.id))
-    .where(eq(agentConnectors.agentId, agentId));
+    .innerJoin(
+      connectors,
+      and(eq(agentConnectors.connectorId, connectors.id), eq(connectors.tenantId, tenantId)),
+    )
+    .where(and(eq(agentConnectors.agentId, agentId), eq(agentConnectors.tenantId, tenantId)));
 
   return {
     ...agent,
@@ -172,32 +182,37 @@ export async function createAgent(
 ) {
   const db = getDb();
 
-  const [existing] = await db
-    .select({ id: agents.id })
-    .from(agents)
-    .where(and(eq(agents.tenantId, tenantId), eq(agents.slug, data.slug)))
-    .limit(1);
-
-  if (existing) throw new SlugExistsError();
-
-  const [agent] = await db
-    .insert(agents)
-    .values({
-      tenantId,
-      name: data.name,
-      slug: data.slug,
-      description: data.description || "",
-      systemPrompt: data.systemPrompt || "",
-      persona: data.persona || {},
-      rules: data.rules || [],
-      providerModelId: data.providerModelId || null,
-      temperature: data.temperature?.toString() || "0.7",
-      maxTurns: data.maxTurns || 25,
-      maxTokensPerTurn: data.maxTokensPerTurn || 4096,
-      tags: data.tags || [],
-      createdBy: userId,
-    })
-    .returning();
+  let agent;
+  try {
+    [agent] = await db
+      .insert(agents)
+      .values({
+        tenantId,
+        name: data.name,
+        slug: data.slug,
+        description: data.description || "",
+        systemPrompt: data.systemPrompt || "",
+        persona: data.persona || {},
+        rules: data.rules || [],
+        providerModelId: data.providerModelId || null,
+        temperature: data.temperature?.toString() || "0.7",
+        maxTurns: data.maxTurns || 25,
+        maxTokensPerTurn: data.maxTokensPerTurn || 4096,
+        tags: data.tags || [],
+        createdBy: userId,
+      })
+      .returning();
+  } catch (err: unknown) {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code: string }).code === "23505"
+    ) {
+      throw new SlugExistsError();
+    }
+    throw err;
+  }
 
   await createAuditEntry({
     tenantId,
@@ -223,16 +238,8 @@ export async function updateAgent(
 ) {
   const db = getDb();
 
-  const [existing] = await db
-    .select({ id: agents.id, version: agents.version })
-    .from(agents)
-    .where(and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)))
-    .limit(1);
-
-  if (!existing) throw new AgentNotFoundError();
-
   const updateData: Record<string, unknown> = {
-    version: existing.version + 1,
+    version: sql`${agents.version} + 1`,
   };
   for (const [key, value] of Object.entries(data)) {
     if (value !== undefined) {
@@ -247,6 +254,8 @@ export async function updateAgent(
     .where(and(eq(agents.id, agentId), eq(agents.tenantId, tenantId)))
     .returning();
 
+  if (!updated) throw new AgentNotFoundError();
+
   await createAuditEntry({
     tenantId,
     userId,
@@ -255,7 +264,7 @@ export async function updateAgent(
     resourceId: agentId,
     details: {
       fields: Object.keys(data),
-      newVersion: existing.version + 1,
+      newVersion: updated.version,
     },
   });
 

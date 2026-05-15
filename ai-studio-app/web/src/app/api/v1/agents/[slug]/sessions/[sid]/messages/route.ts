@@ -4,6 +4,7 @@ import { agents, agentSessions, agentSessionMessages } from "@ais-app/database";
 import { eq, and, asc } from "drizzle-orm";
 import { runSession } from "@ais-app/agent-runtime";
 import { authenticateApiKey, errorJson } from "@/lib/api-key-auth";
+import { parseJsonBody } from "@/lib/api-utils";
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -43,7 +44,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sl
     return errorJson("Session is closed", "SESSION_CLOSED", 400);
   }
 
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorJson("Invalid JSON body", "INVALID_JSON", 400);
   const message = body.message;
   if (!message || typeof message !== "string" || message.trim().length === 0) {
     return errorJson("Message is required", "VALIDATION_ERROR", 400);

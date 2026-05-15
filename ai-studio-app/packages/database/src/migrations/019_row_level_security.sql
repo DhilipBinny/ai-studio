@@ -32,15 +32,10 @@ BEGIN
     ])
   LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', tbl);
+    EXECUTE format('ALTER TABLE %I FORCE ROW LEVEL SECURITY', tbl);
     EXECUTE format(
       'CREATE POLICY tenant_isolation_%I ON %I USING (tenant_id = current_tenant_id())',
       tbl, tbl
     );
   END LOOP;
 END $$;
-
--- NOTE: RLS policies are created but NOT forced on the table owner yet.
--- The table owner (aistudio) bypasses RLS by default.
--- Once the service layer wraps all queries with withTenantScope (SET LOCAL),
--- run: ALTER TABLE <each_table> FORCE ROW LEVEL SECURITY;
--- This is intentional — enables incremental migration without breaking existing code.
