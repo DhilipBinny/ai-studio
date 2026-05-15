@@ -233,13 +233,32 @@ export async function executeNode(
       const sandbox = Object.create(null) as Record<string, unknown>;
       sandbox.state = frozenState;
       sandbox.result = Object.create(null) as Record<string, unknown>;
+      sandbox.console = Object.create(null) as Record<string, unknown>;
       sandbox.console = { log: () => {}, warn: () => {}, error: () => {} };
-      sandbox.JSON = { parse: JSON.parse, stringify: JSON.stringify };
-      sandbox.Math = Math;
-      sandbox.parseInt = parseInt;
-      sandbox.parseFloat = parseFloat;
-      sandbox.isNaN = isNaN;
-      sandbox.isFinite = isFinite;
+      Object.setPrototypeOf(sandbox.console, null);
+
+      const safeJSON = Object.create(null) as Record<string, unknown>;
+      safeJSON.parse = function (s: string) { return JSON.parse(s); };
+      safeJSON.stringify = function (v: unknown) { return JSON.stringify(v); };
+      Object.setPrototypeOf(safeJSON.parse, null);
+      Object.setPrototypeOf(safeJSON.stringify, null);
+      sandbox.JSON = safeJSON;
+
+      const safeMath = Object.create(null) as Record<string, unknown>;
+      for (const key of ["abs", "ceil", "floor", "round", "max", "min", "pow", "sqrt", "random", "log", "log2", "log10", "sign", "trunc", "PI", "E"] as const) {
+        safeMath[key] = typeof Math[key] === "function" ? (...args: number[]) => (Math[key] as (...a: number[]) => number)(...args) : Math[key];
+      }
+      sandbox.Math = safeMath;
+
+      sandbox.parseInt = (s: string, r?: number) => parseInt(s, r);
+      sandbox.parseFloat = (s: string) => parseFloat(s);
+      sandbox.isNaN = (v: unknown) => isNaN(v as number);
+      sandbox.isFinite = (v: unknown) => isFinite(v as number);
+      Object.setPrototypeOf(sandbox.parseInt, null);
+      Object.setPrototypeOf(sandbox.parseFloat, null);
+      Object.setPrototypeOf(sandbox.isNaN, null);
+      Object.setPrototypeOf(sandbox.isFinite, null);
+
       const wrappedCode = `"use strict"; (function(state) { ${config.code} })(state)`;
       try {
         const returned = runInNewContext(wrappedCode, sandbox, { timeout: 5000, microtaskMode: "afterEvaluate" });

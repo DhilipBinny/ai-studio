@@ -57,7 +57,7 @@ export const PATCH = withRBAC("PROVIDERS", 20, async (request, auth, params) => 
   const [updated] = await db
     .update(providers)
     .set(updateData)
-    .where(eq(providers.id, id))
+    .where(and(eq(providers.id, id), eq(providers.tenantId, auth.tenantId)))
     .returning();
 
   await createAuditEntry({
@@ -69,5 +69,5 @@ export const PATCH = withRBAC("PROVIDERS", 20, async (request, auth, params) => 
     details: { fields: Object.keys(parsed.data) },
   });
 
-  return NextResponse.json(updated);
+  return NextResponse.json({ ...updated, apiKeyRef: updated.apiKeyRef ? "****" : null });
 });

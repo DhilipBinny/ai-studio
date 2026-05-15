@@ -4,13 +4,11 @@ import { users, passwordResetRequests } from "@ais-app/database";
 import { passwordResetRequestSchema } from "@ais-app/validation";
 import { hashToken, AUTH_CONFIG } from "@ais-app/auth";
 import { sendEmail } from "@ais-app/email";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { errorResponse } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 import { BRAND } from "@/lib/branding";
 import { randomBytes } from "node:crypto";
-
-const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -26,7 +24,7 @@ export async function POST(request: Request) {
   const [user] = await db
     .select({ id: users.id, tenantId: users.tenantId, name: users.name, isActive: users.isActive })
     .from(users)
-    .where(and(eq(users.tenantId, DEFAULT_TENANT_ID), eq(users.email, email)))
+    .where(eq(users.email, email))
     .limit(1);
 
   if (!user || !user.isActive) {

@@ -13,7 +13,6 @@ import { RateLimiter } from "@ais-app/auth";
 const loginLimiter = new RateLimiter(5, 15 * 60 * 1000);
 
 const GENERIC_AUTH_ERROR = "Invalid email or password";
-const DEFAULT_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
 export async function POST(request: NextRequest) {
   const body = await request.json();
@@ -54,7 +53,7 @@ export async function POST(request: NextRequest) {
       otpBlockedUntil: users.otpBlockedUntil,
     })
     .from(users)
-    .where(and(eq(users.tenantId, DEFAULT_TENANT_ID), eq(users.email, email)))
+    .where(eq(users.email, email))
     .limit(1);
 
   if (!user || !user.isActive || user.isLocked) {
