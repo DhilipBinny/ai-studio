@@ -32,11 +32,11 @@ export function createLLMCaller(config: LLMCallerConfig): LLMCaller {
     });
 
     return {
-      async call(prompt: string, options?: { maxTokens?: number; temperature?: number }): Promise<string> {
+      async call(prompt: string, options?: { maxTokens?: number; temperature?: number; systemMessage?: string }): Promise<string> {
         const response = await provider.chat({
           model,
           messages: [{ role: "user", content: prompt }],
-          systemPrompt: "",
+          systemPrompt: options?.systemMessage || "",
           maxTokens: options?.maxTokens,
           temperature: options?.temperature,
         });
@@ -54,11 +54,11 @@ export function createLLMCaller(config: LLMCallerConfig): LLMCaller {
   });
 
   return {
-    async call(prompt: string, options?: { maxTokens?: number; temperature?: number }): Promise<string> {
+    async call(prompt: string, options?: { maxTokens?: number; temperature?: number; systemMessage?: string }): Promise<string> {
       const response = await provider.chat({
         model,
         messages: [{ role: "user", content: prompt }],
-        systemPrompt: "",
+        systemPrompt: options?.systemMessage || "",
         maxTokens: options?.maxTokens,
         temperature: options?.temperature,
       });

@@ -233,5 +233,17 @@ async function lateChunkLongDocument(
     indexOffset += sectionResults.length;
   }
 
-  return allResults;
+  // Deduplicate chunks produced by section overlap.
+  // When two chunks have identical content (after trimming), keep the one with the lower index.
+  const seen = new Set<string>();
+  const deduplicated: LateChunkResult[] = [];
+  for (const chunk of allResults) {
+    const key = chunk.content.trim();
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduplicated.push(chunk);
+    }
+  }
+
+  return deduplicated;
 }

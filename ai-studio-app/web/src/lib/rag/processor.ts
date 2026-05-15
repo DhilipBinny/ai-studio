@@ -292,15 +292,18 @@ async function persistGraphExtractions(
     }
   }
 
+  // Build a reverse lookup Map keyed by lowercase entity name for O(1) relationship resolution
+  const nameToKey = new Map<string, string>();
+  for (const key of entityMap.keys()) {
+    const name = key.split("::")[0];
+    nameToKey.set(name, key);
+  }
+
   // Insert relationships (only if both source and target entities exist)
   for (const rel of pendingRelationships) {
-    // Find entity IDs by name (case-insensitive match within known entities)
-    const sourceKey = [...entityMap.keys()].find((k) =>
-      k.startsWith(rel.sourceEntity.toLowerCase() + "::")
-    );
-    const targetKey = [...entityMap.keys()].find((k) =>
-      k.startsWith(rel.targetEntity.toLowerCase() + "::")
-    );
+    // Find entity IDs by name (case-insensitive O(1) lookup)
+    const sourceKey = nameToKey.get(rel.sourceEntity.toLowerCase());
+    const targetKey = nameToKey.get(rel.targetEntity.toLowerCase());
 
     const sourceId = sourceKey ? entityIdMap.get(sourceKey) : undefined;
     const targetId = targetKey ? entityIdMap.get(targetKey) : undefined;

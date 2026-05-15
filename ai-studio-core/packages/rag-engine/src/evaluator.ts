@@ -290,7 +290,7 @@ export async function evaluateRAG(
 ): Promise<{ results: EvaluationResult[]; summary: EvaluationSummary }> {
   const results: EvaluationResult[] = [];
 
-  for (const q of questions) {
+  async function processQuestion(q: EvaluationQuestion): Promise<EvaluationResult> {
     // Step 1: Retrieve chunks
     const searchResults = await searchFn(q.question);
     const chunks = searchResults.map((r) => r.content);
@@ -308,20 +308,15 @@ export async function evaluateRAG(
       generatedAnswer = "Failed to generate answer.";
     }
 
-    // Step 3: Score all four metrics
-    const [contextPrecision, faithfulness, answerRelevancy] = await Promise.all([
+    // Step 3: Score all four metrics in parallel (including context recall)
+    const [contextPrecision, faithfulness, answerRelevancy, contextRecall] = await Promise.all([
       scoreContextPrecision(q.question, chunks, llmCaller),
       scoreFaithfulness(generatedAnswer, chunks, llmCaller),
       scoreAnswerRelevancy(q.question, generatedAnswer, embedder, llmCaller),
+      q.groundTruth ? scoreContextRecall(q.groundTruth, chunks, llmCaller) : Promise.resolve(null),
     ]);
 
-    // Context recall requires ground truth
-    let contextRecall: number | null = null;
-    if (q.groundTruth) {
-      contextRecall = await scoreContextRecall(q.groundTruth, chunks, llmCaller);
-    }
-
-    results.push({
+    return {
       question: q.question,
       retrievedChunks: chunks,
       generatedAnswer,
@@ -331,7 +326,15 @@ export async function evaluateRAG(
         faithfulness,
         answerRelevancy,
       },
-    });
+    };
+  }
+
+  // Process questions with bounded concurrency of 3
+  const concurrency = 3;
+  for (let i = 0; i < questions.length; i += concurrency) {
+    const batch = questions.slice(i, i + concurrency);
+    const batchResults = await Promise.all(batch.map((q) => processQuestion(q)));
+    results.push(...batchResults);
   }
 
   // Compute summary

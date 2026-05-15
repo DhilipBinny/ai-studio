@@ -9,19 +9,19 @@ export interface EnrichmentConfig {
   concurrency?: number;
 }
 
-const CONTEXTUAL_PROMPT_TEMPLATE = (docText: string, chunkText: string) =>
+const CONTEXTUAL_SYSTEM_TEMPLATE = (docText: string) =>
   `<document>
 ${docText}
 </document>
 
-Here is a chunk from that document:
-<chunk>
+You will receive individual chunks from this document. For each chunk, give a short, succinct context (1-2 sentences) to situate it within the overall document.
+Focus on: what topic/section the chunk belongs to, what entity or concept it describes, and how it relates to surrounding content.
+Do NOT summarize the chunk itself — describe its CONTEXT.`;
+
+const CONTEXTUAL_CHUNK_TEMPLATE = (chunkText: string) =>
+  `<chunk>
 ${chunkText}
 </chunk>
-
-Give a short, succinct context (1-2 sentences) to situate this chunk within the overall document.
-Focus on: what topic/section this belongs to, what entity or concept it describes, and how it relates to surrounding content.
-Do NOT summarize the chunk itself — describe its CONTEXT.
 
 Context:`;
 
@@ -70,6 +70,11 @@ export async function enrichChunks(
   const concurrency = config.concurrency ?? DEFAULT_CONCURRENCY;
   const truncatedDoc = fullDocText.slice(0, MAX_DOC_CHARS);
 
+  // Build the system message once (document context) — enables prompt caching
+  // for providers that support it (Anthropic, OpenAI). The per-chunk user
+  // message is the only part that changes between calls.
+  const systemMessage = CONTEXTUAL_SYSTEM_TEMPLATE(truncatedDoc);
+
   const enrichedTexts: string[] = new Array(chunks.length);
   const descriptions: (string | null)[] = new Array(chunks.length);
 
@@ -80,10 +85,11 @@ export async function enrichChunks(
       batch.map(async (chunk, batchIdx) => {
         const idx = i + batchIdx;
         try {
-          const prompt = CONTEXTUAL_PROMPT_TEMPLATE(truncatedDoc, chunk.content);
+          const prompt = CONTEXTUAL_CHUNK_TEMPLATE(chunk.content);
           const description = await llmCaller.call(prompt, {
             maxTokens: 150,
             temperature: 0.0,
+            systemMessage,
           });
           const trimmedDescription = description.trim();
           return {

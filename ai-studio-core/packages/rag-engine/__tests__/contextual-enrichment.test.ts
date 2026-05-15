@@ -222,24 +222,24 @@ describe("enrichChunks()", () => {
   });
 
   describe("security", () => {
-    it("should truncate very long document text to ~8000 chars in the LLM prompt", async () => {
+    it("should truncate very long document text to ~8000 chars in the system message", async () => {
       const longDocText = "A".repeat(20_000);
       const chunks = [makeChunk(0, "Test chunk")];
       const config: EnrichmentConfig = { mode: "llm" };
 
-      let capturedPrompt = "";
+      let capturedSystemMessage = "";
       const spyLLM: LLMCaller = {
-        call: async (prompt: string) => {
-          capturedPrompt = prompt;
+        call: async (_prompt: string, options?: { maxTokens?: number; temperature?: number; systemMessage?: string }) => {
+          capturedSystemMessage = options?.systemMessage || "";
           return "Context description.";
         },
       };
 
       await enrichChunks(chunks, longDocText, "doc.md", undefined, config, spyLLM);
 
-      // The prompt should contain the document text truncated to MAX_DOC_CHARS (8000)
+      // The system message should contain the document text truncated to MAX_DOC_CHARS (8000)
       // The document section is between <document> and </document> tags
-      const docMatch = capturedPrompt.match(/<document>\n([\s\S]*?)\n<\/document>/);
+      const docMatch = capturedSystemMessage.match(/<document>\n([\s\S]*?)\n<\/document>/);
       expect(docMatch).not.toBeNull();
       expect(docMatch![1].length).toBeLessThanOrEqual(8000);
       // The original doc is 20k chars, so it must have been truncated

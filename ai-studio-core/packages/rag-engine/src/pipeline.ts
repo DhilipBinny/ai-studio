@@ -97,7 +97,7 @@ export async function processDocument(
       let childTextsForEmbedding: string[];
       let childDescriptions: (string | null)[];
 
-      if (enrichmentMode !== "none" && enrichmentMode !== "static") {
+      if (enrichmentMode === "llm") {
         // For LLM enrichment, enrich child chunks
         const enrichResult = await enrichChunks(
           childChunks,
@@ -109,8 +109,20 @@ export async function processDocument(
         );
         childTextsForEmbedding = enrichResult.enrichedTexts;
         childDescriptions = enrichResult.descriptions;
+      } else if (enrichmentMode === "static") {
+        // Static enrichment: add [Document: fileName | Section: heading] prefix via enrichChunks
+        // parentChildChunkText only adds [Document: fileName], missing the section heading
+        const enrichResult = await enrichChunks(
+          childChunks,
+          text,
+          doc.fileName,
+          undefined,
+          { mode: "static" },
+        );
+        childTextsForEmbedding = enrichResult.enrichedTexts;
+        childDescriptions = enrichResult.descriptions;
       } else {
-        // "none" or "static" — child chunks already have contextual prefix from parentChildChunkText
+        // "none" — child chunks use their raw content
         childTextsForEmbedding = childChunks.map((c) => c.content);
         childDescriptions = childChunks.map(() => null);
       }

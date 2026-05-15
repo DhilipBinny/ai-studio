@@ -14,7 +14,7 @@ export interface HyDEConfig {
 }
 
 export interface LLMCaller {
-  call(prompt: string, options?: { maxTokens?: number; temperature?: number }): Promise<string>;
+  call(prompt: string, options?: { maxTokens?: number; temperature?: number; systemMessage?: string }): Promise<string>;
 }
 
 const HYDE_PROMPT_TEMPLATE = `Answer the following question in a detailed paragraph, as if you were writing
