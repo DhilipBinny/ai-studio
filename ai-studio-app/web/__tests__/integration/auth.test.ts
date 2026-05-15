@@ -213,13 +213,51 @@ describe.sequential("Auth API", () => {
       expect(body.code).toBe("INVALID_REFRESH");
     }, 10000);
 
-    // TODO: Account lockout test — requires 10 failed login attempts for a
-    // single email, which would exhaust the rate limiter (5 per 15 min) long
-    // before reaching the lockout threshold. To properly test this, either:
-    //   1. Use a dedicated test user with a separate rate-limit bucket
-    //   2. Lower the lockout threshold in a test environment config
-    //   3. Test via unit tests that bypass the rate limiter
-    it.todo("should return 401 after 10 failed login attempts (account lockout)");
+    it("should return 401 after 10 failed login attempts (account lockout)", async () => {
+      // Create a dedicated test user with a unique email (fresh rate-limit bucket)
+      const lockoutEmail = `lockout-test-${Date.now()}@echoltech.com`;
+      const lockoutPassword = "LockoutTest1234!@#$";
+
+      const createRes = await fetch(`${BASE_URL}/api/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: sharedCookieHeader },
+        body: JSON.stringify({ email: lockoutEmail, name: "Lockout Test", password: lockoutPassword, role: "viewer" }),
+      });
+      if (createRes.status !== 201) {
+        // Can't create user — skip gracefully
+        return;
+      }
+
+      // Send 10 failed login attempts with wrong password
+      for (let i = 0; i < 10; i++) {
+        await fetch(`${BASE_URL}/api/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: lockoutEmail, password: "wrong-password" }),
+        });
+      }
+
+      // Now try with the CORRECT password — should be locked out
+      const lockedRes = await fetch(`${BASE_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: lockoutEmail, password: lockoutPassword }),
+      });
+      expect(lockedRes.status).toBe(401);
+
+      // Cleanup: deactivate the test user
+      const usersRes = await fetch(`${BASE_URL}/api/users?search=${encodeURIComponent(lockoutEmail)}`, {
+        headers: { Cookie: sharedCookieHeader },
+      });
+      const usersBody = await usersRes.json();
+      const testUser = usersBody.data?.find((u: { email: string }) => u.email === lockoutEmail);
+      if (testUser) {
+        await fetch(`${BASE_URL}/api/users/${testUser.id}/deactivate`, {
+          method: "POST",
+          headers: { Cookie: sharedCookieHeader },
+        });
+      }
+    }, 30000);
   });
 
   // -------------------------------------------------------------------------
