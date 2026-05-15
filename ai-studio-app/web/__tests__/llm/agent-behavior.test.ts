@@ -241,11 +241,12 @@ describe("LLM Agent Behavior", () => {
     skipIfNoAuth(ctx);
 
     // Server Health Monitor has exec_command and get_current_time tools.
-    // A simple "what time is it" should trigger get_current_time.
+    // Ask explicitly for the REAL current time to force tool usage —
+    // vague phrasing lets the LLM answer from training data.
     const agentId = AGENTS.serverHealth ?? DEFAULT_AGENT;
     const result = await sendMessage(
       agentId,
-      "What is the current time? Just tell me the time.",
+      "Use your get_current_time tool to tell me the exact current date and time right now. Do not guess — you must call the tool.",
     );
 
     expect(result.sessionId).toBeTruthy();
