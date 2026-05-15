@@ -61,7 +61,7 @@ export async function triggerWorkflow(
   });
 
   try {
-    const { stepsCompleted, paused } = await executeGraph(graph, graphEdges, state, run.id, tenantId, userId);
+    const { stepsCompleted, paused } = await executeGraph(graph, graphEdges, state, run.id, tenantId, userId, undefined, run.timeoutAt);
 
     if (paused) {
       progressBus.emit({
@@ -152,7 +152,7 @@ export async function resumeWorkflow(
   const nextNodeIds = nextEdges.map((e) => e.toNodeId);
 
   try {
-    const result = await executeGraph(graph, graphEdges, state, runId, tenantId, userId, nextNodeIds);
+    const result = await executeGraph(graph, graphEdges, state, runId, tenantId, userId, nextNodeIds, run.timeoutAt);
     const stepsCompleted = steps.length + result.stepsCompleted;
 
     if (result.paused) {

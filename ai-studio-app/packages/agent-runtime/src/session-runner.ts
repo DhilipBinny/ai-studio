@@ -126,7 +126,8 @@ export async function runSession(input: SessionInput): Promise<SessionResult> {
       content: sanitized,
     });
     const { definitions: toolDefs, mcpConnectorMap, workspaceConfig } = await loadToolDefinitions(input.agentId, input.tenantId, sessionId, workflowRunId);
-    const systemPrompt = buildSystemPrompt(agentConfig, { timezone: "Asia/Singapore" });
+    const timezone = (agent.modelConfig as Record<string, unknown>)?.timezone as string || "UTC";
+    const systemPrompt = buildSystemPrompt(agentConfig, { timezone });
     const loopDetector = createLoopDetector();
     const toolContext: ToolContext = { agentId: input.agentId, tenantId: input.tenantId, sessionId };
 

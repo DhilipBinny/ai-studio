@@ -13,18 +13,7 @@ import type { ProviderConfig } from "../types";
 import type { WorkflowState, NodeConfig, GraphNode, GraphEdge, ExecutionGraph, NodeResult } from "./types";
 import dns from "node:dns";
 import { resolveTemplate, evaluateCondition, normalizeKey } from "./expression-engine";
-
-function isPrivateIP(ip: string): boolean {
-  if (ip === "127.0.0.1" || ip === "0.0.0.0" || ip === "::1" || ip === "::") return true;
-  const parts = ip.split(".").map(Number);
-  if (parts.length !== 4) return false;
-  if (parts[0] === 10) return true;
-  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
-  if (parts[0] === 192 && parts[1] === 168) return true;
-  if (parts[0] === 169 && parts[1] === 254) return true;
-  if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
-  return false;
-}
+import { isPrivateIP } from "../ssrf-utils";
 
 // Lazy import to avoid circular dependency with workflow-engine
 let _triggerWorkflow: typeof import("../workflow-engine").triggerWorkflow | null = null;

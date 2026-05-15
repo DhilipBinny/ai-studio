@@ -21,6 +21,7 @@ export async function executeGraph(
   tenantId: string,
   userId: string | null,
   resumeFromNodeIds?: string[],
+  timeoutAt?: Date | null,
 ): Promise<{ stepsCompleted: number; paused: boolean }> {
   const db = getDb();
   const recordStep = createStepRecorder();
@@ -51,6 +52,10 @@ export async function executeGraph(
   }
 
   while (ready.length > 0 && stepsCompleted < MAX_STEPS) {
+    if (timeoutAt && Date.now() > timeoutAt.getTime()) {
+      throw new Error("Workflow execution timed out (wall-clock limit exceeded)");
+    }
+
     const sequential: GraphNode[] = [];
     const parallel: GraphNode[] = [];
 

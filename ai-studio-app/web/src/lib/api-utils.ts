@@ -61,6 +61,7 @@ export async function getAuthContext(
       .limit(1);
 
     if (!user || !user.isActive || user.isLocked) return null;
+    if (user.tenantId !== (payload.tid as string)) return null;
 
     let accessRights: AccessRights = {
       DASHBOARD: 0, AGENTS: 0, TOOLS: 0, KNOWLEDGE: 0, WORKFLOWS: 0,

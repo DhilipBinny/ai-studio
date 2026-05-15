@@ -53,11 +53,15 @@ export async function callLLM(
 
   return {
     text: response.text || "",
-    toolCalls: (response.toolCalls || []).map((tc) => ({
-      id: tc.id,
-      name: tc.function.name,
-      input: JSON.parse(tc.function.arguments),
-    })),
+    toolCalls: (response.toolCalls || []).map((tc) => {
+      let input: Record<string, unknown>;
+      try {
+        input = JSON.parse(tc.function.arguments);
+      } catch {
+        input = {};
+      }
+      return { id: tc.id, name: tc.function.name, input };
+    }),
     inputTokens: response.usage.inputTokens,
     outputTokens: response.usage.outputTokens,
     stopReason: response.toolCalls?.length ? "tool_use" : "end_turn",

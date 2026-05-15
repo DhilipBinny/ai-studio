@@ -1,6 +1,6 @@
 import { getDb } from "@ais-app/database";
 import { agentSessionMessages, providerModels } from "@ais-app/database";
-import { eq, asc, lt } from "drizzle-orm";
+import { eq, and, asc, lt } from "drizzle-orm";
 import { createProvider } from "./provider-factory";
 import type { ProviderConfig } from "./types";
 
@@ -95,29 +95,24 @@ ${conversationLines.join("\n")}
     if (!response.text) return { compacted: false };
 
     const oldestRecentId = recentMessages[0].id;
-    await db
-      .delete(agentSessionMessages)
-      .where(
-        eq(agentSessionMessages.agentSessionId, sessionId),
-      );
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(agentSessionMessages)
+        .where(
+          and(
+            eq(agentSessionMessages.agentSessionId, sessionId),
+            lt(agentSessionMessages.id, oldestRecentId),
+          ),
+        );
 
-    await db.insert(agentSessionMessages).values({
-      tenantId,
-      agentSessionId: sessionId,
-      role: "system",
-      content: `[Context Summary]\n${response.text}`,
-      metadata: { compacted: true, originalMessageCount: olderMessages.length },
-    });
-
-    for (const m of recentMessages) {
-      await db.insert(agentSessionMessages).values({
+      await tx.insert(agentSessionMessages).values({
         tenantId,
         agentSessionId: sessionId,
-        role: m.role as "user" | "assistant" | "system" | "tool",
-        content: m.content,
-        toolCalls: m.toolCalls,
+        role: "system",
+        content: `[Context Summary]\n${response.text}`,
+        metadata: { compacted: true, originalMessageCount: olderMessages.length },
       });
-    }
+    });
 
     const newMessages = await db
       .select({ content: agentSessionMessages.content, toolCalls: agentSessionMessages.toolCalls })
