@@ -12,10 +12,9 @@ export {
   MODEL_DEFAULTS, getModelCapabilities, estimateCost, stripProviderPrefix,
   parseAnthropicModels, parseOllamaModel, mergeCapabilities,
 } from './models';
-export {
-  testProviderConnection,
-  type TestResult, type DiscoveredModel, type ProviderTestConfig,
-} from './test-connection';
+// test-connection.ts removed — canonical implementation is in
+// ai-studio-app/web/src/lib/services/provider-test.ts (includes SSRF, decryption, timeouts)
+export type { TestResult, DiscoveredModel, ProviderTestConfig } from './test-connection';
 export {
   embedText, embedSingle,
   type EmbeddingConfig,

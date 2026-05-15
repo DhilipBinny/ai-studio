@@ -1,9 +1,8 @@
 /**
- * Provider Test Service
+ * Provider Test Service — canonical implementation
  *
  * Tests provider connectivity and discovers available models.
- * This code is duplicated from ai-studio-core/packages/provider-bridge/src/test-connection.ts
- * TODO: Replace with import from @ais/provider-bridge once core workspace is linked.
+ * Includes SSRF validation, secret decryption, and abort timeouts.
  */
 
 import Anthropic from "@anthropic-ai/sdk";
