@@ -293,6 +293,18 @@ export async function executeNode(
       }
     }
 
+    case "knowledge_search": {
+      if (!config.knowledgeBaseId) throw new Error(`Knowledge search node "${node.name}" has no knowledgeBaseId`);
+      const query = config.query ? resolveTemplate(config.query, state) : "";
+      if (!query) throw new Error(`Knowledge search node "${node.name}" resolved to empty query`);
+      const { searchKnowledge } = await import("../knowledge-search");
+      const results = await searchKnowledge(tenantId, config.knowledgeBaseId, query, {
+        topK: config.topK || 5,
+        similarityThreshold: config.scoreThreshold || 0.3,
+      });
+      return { output: { results, query, count: results.length }, paused: false };
+    }
+
     case "aggregate":
       return { output: {}, paused: false };
 

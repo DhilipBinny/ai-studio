@@ -63,12 +63,13 @@ export async function POST(request: NextRequest) {
       name: users.name,
       role: users.role,
       isActive: users.isActive,
+      isLocked: users.isLocked,
     })
     .from(users)
     .where(eq(users.id, otpRecord.userId))
     .limit(1);
 
-  if (!user || !user.isActive) {
+  if (!user || !user.isActive || user.isLocked) {
     return errorResponse("Account unavailable", "ACCOUNT_UNAVAILABLE", 401);
   }
 

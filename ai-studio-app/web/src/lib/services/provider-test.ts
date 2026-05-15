@@ -102,9 +102,11 @@ async function testAnthropic(provider: ProviderRow, start: number): Promise<Test
   }
 
   const client = new Anthropic(clientOpts as ConstructorParameters<typeof Anthropic>[0]);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TEST_TIMEOUT_MS);
 
   try {
-    const response = await client.models.list();
+    const response = await client.models.list({ signal: controller.signal } as Parameters<typeof client.models.list>[0]);
     const latencyMs = Date.now() - start;
     const models: DiscoveredModel[] = response.data.map((m) => {
       const raw = m as unknown as Record<string, unknown>;
@@ -124,6 +126,8 @@ async function testAnthropic(provider: ProviderRow, start: number): Promise<Test
     if (err.status === 403) return { success: false, latencyMs, error: "Access denied (403)", models: [] };
     if (err.name === "AbortError") return { success: false, latencyMs, error: "Connection timed out", models: [] };
     return { success: false, latencyMs, error: err.message || String(e), models: [] };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

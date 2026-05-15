@@ -88,7 +88,7 @@ export async function middleware(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret, { issuer: "ais", audience: "ais-app" });
 
     const response = NextResponse.next();
     response.headers.set("x-tenant-id", (payload.tid as string) || "");
