@@ -54,5 +54,5 @@ export function decryptSecret(encrypted: string): string {
 }
 
 export function isEncrypted(value: string): boolean {
-  return /^v\d+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+$/.test(value);
+  return /^v\d+:[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]*:[A-Za-z0-9+/=]+$/.test(value);
 }

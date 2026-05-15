@@ -7,8 +7,8 @@ const MIN_CHUNK_LENGTH = 10;
 const SEPARATORS = ["\n\n", "\n", ". ", " ", ""];
 
 export function chunkText(text: string, config: ChunkConfig = {}): Chunk[] {
-  const chunkSize = config.chunk_size || DEFAULT_CHUNK_SIZE;
-  const overlap = config.chunk_overlap || DEFAULT_CHUNK_OVERLAP;
+  const chunkSize = config.chunk_size ?? DEFAULT_CHUNK_SIZE;
+  const overlap = config.chunk_overlap ?? DEFAULT_CHUNK_OVERLAP;
   const method = config.method || "recursive";
 
   const cleaned = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
@@ -116,9 +116,9 @@ export function parentChildChunkText(
   config: ChunkConfig,
   context?: ChunkContext,
 ): ParentChildChunk[] {
-  const parentSize = config.parent_chunk_size || DEFAULT_PARENT_SIZE;
-  const childSize = config.child_chunk_size || DEFAULT_CHILD_SIZE;
-  const overlap = config.chunk_overlap || 100;
+  const parentSize = config.parent_chunk_size ?? DEFAULT_PARENT_SIZE;
+  const childSize = config.child_chunk_size ?? DEFAULT_CHILD_SIZE;
+  const overlap = config.chunk_overlap ?? 100;
 
   const parentChunks = chunkText(text, { ...config, chunk_size: parentSize, chunk_overlap: overlap });
   const results: ParentChildChunk[] = [];

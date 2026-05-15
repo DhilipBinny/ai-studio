@@ -30,6 +30,18 @@ function isPrivateIP(ip: string): boolean {
   const v4Mapped = lower.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
   if (v4Mapped) return isPrivateIP(v4Mapped[1]);
 
+  // Handle hex-encoded IPv4-mapped IPv6 (e.g. ::ffff:c0a8:101 from URL parser)
+  const v4MappedHex = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (v4MappedHex) {
+    const high = parseInt(v4MappedHex[1], 16);
+    const low = parseInt(v4MappedHex[2], 16);
+    const a = (high >> 8) & 0xff;
+    const b = high & 0xff;
+    const c = (low >> 8) & 0xff;
+    const d = low & 0xff;
+    return isPrivateIP(`${a}.${b}.${c}.${d}`);
+  }
+
   return false;
 }
 

@@ -5,7 +5,9 @@
   "type": "module",
   "main": "./src/index.ts",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@ais/agent-core": "workspace:*",
@@ -24,5 +26,8 @@
     "@anthropic-ai/sdk": "^0.95.2",
     "openai": "^6.37.0",
     "drizzle-orm": "^0.44.2"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
   }
 }

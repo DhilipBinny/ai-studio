@@ -203,11 +203,14 @@ export async function createAgent(
       })
       .returning();
   } catch (err: unknown) {
+    const errStr = String(err);
+    const errObj = err as Record<string, unknown> | null;
     if (
-      typeof err === "object" &&
-      err !== null &&
-      "code" in err &&
-      (err as { code: string }).code === "23505"
+      errObj?.code === "23505" ||
+      errObj?.constraint_name?.toString().includes("tenant_slug") ||
+      errStr.includes("23505") ||
+      errStr.includes("unique") ||
+      errStr.includes("duplicate key")
     ) {
       throw new SlugExistsError();
     }

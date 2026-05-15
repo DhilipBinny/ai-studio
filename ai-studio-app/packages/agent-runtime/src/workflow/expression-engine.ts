@@ -61,22 +61,22 @@ export function evaluateCondition(expr: string, state: WorkflowState): boolean {
   const notEqualsMatch = resolved.match(/^(.+?)\s+not_equals\s+"([^"]*)"$/i);
   if (notEqualsMatch) return notEqualsMatch[1].trim() !== notEqualsMatch[2];
 
-  const gtMatch = resolved.match(/^(.+?)\s+greater_than\s+(\d+(?:\.\d+)?)$/i);
+  const gtMatch = resolved.match(/^(.+?)\s+greater_than\s+(-?\d+(?:\.\d+)?)$/i);
   if (gtMatch) return Number(gtMatch[1]) > Number(gtMatch[2]);
 
-  const ltMatch = resolved.match(/^(.+?)\s+less_than\s+(\d+(?:\.\d+)?)$/i);
+  const ltMatch = resolved.match(/^(.+?)\s+less_than\s+(-?\d+(?:\.\d+)?)$/i);
   if (ltMatch) return Number(ltMatch[1]) < Number(ltMatch[2]);
 
-  const gteMatch = resolved.match(/^(.+?)\s+gte\s+(\d+(?:\.\d+)?)$/i);
+  const gteMatch = resolved.match(/^(.+?)\s+gte\s+(-?\d+(?:\.\d+)?)$/i);
   if (gteMatch) return Number(gteMatch[1]) >= Number(gteMatch[2]);
 
-  const lteMatch = resolved.match(/^(.+?)\s+lte\s+(\d+(?:\.\d+)?)$/i);
+  const lteMatch = resolved.match(/^(.+?)\s+lte\s+(-?\d+(?:\.\d+)?)$/i);
   if (lteMatch) return Number(lteMatch[1]) <= Number(lteMatch[2]);
 
-  const isEmptyMatch = resolved.match(/^(.+?)\s+is_empty$/i);
+  const isEmptyMatch = resolved.match(/^(.*?)\s+is_empty$/i);
   if (isEmptyMatch) { const v = isEmptyMatch[1].trim(); return v === "" || v === "null" || v === "undefined" || v === "[]" || v === "{}"; }
 
-  const isNotEmptyMatch = resolved.match(/^(.+?)\s+is_not_empty$/i);
+  const isNotEmptyMatch = resolved.match(/^(.*?)\s+is_not_empty$/i);
   if (isNotEmptyMatch) { const v = isNotEmptyMatch[1].trim(); return v !== "" && v !== "null" && v !== "undefined" && v !== "[]" && v !== "{}"; }
 
   return resolved.toLowerCase() === "true" || resolved === "1";
