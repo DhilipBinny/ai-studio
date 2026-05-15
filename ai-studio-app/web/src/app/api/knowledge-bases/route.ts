@@ -31,7 +31,7 @@ export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth) => {
     name, description, embeddingSource, embeddingProviderId, embeddingModel, embeddingDimension,
     rerankSource, rerankProviderId, rerankModel, chunkConfig,
     contextualEnrichment, contextualModel, queryExpansion, queryExpansionModel,
-    queryDecomposition, graphExtraction, graphExtractionModel,
+    queryDecomposition, graphExtraction, graphExtractionModel, modalityType,
   } = parsed.data;
 
   const db = getDb();
@@ -58,6 +58,7 @@ export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth) => {
     queryDecomposition: queryDecomposition ?? false,
     graphExtraction: graphExtraction ?? false,
     graphExtractionModel: graphExtractionModel || null,
+    modalityType: modalityType || "text",
     createdBy: auth.userId,
   }).returning();
 
