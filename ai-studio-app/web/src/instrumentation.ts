@@ -10,6 +10,11 @@ export async function register() {
     startProgressWriter();
 
     recoverStaleWorkflowRuns().catch(() => {});
+
+    if (process.env.VECTOR_DB === "qdrant") {
+      const { ensureQdrantCollections } = await import("@ais-app/agent-runtime");
+      ensureQdrantCollections().catch((err: unknown) => console.warn("Qdrant collection init failed:", err));
+    }
     if (!globalForInstrumentation.__recoverySweepInterval) {
       globalForInstrumentation.__recoverySweepInterval = setInterval(() => { recoverStaleWorkflowRuns().catch(() => {}); }, 120_000);
     }

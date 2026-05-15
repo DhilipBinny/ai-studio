@@ -6,7 +6,7 @@ export { loadToolDefinitions, executeTool, createLoopDetector } from "./tool-exe
 export { loadMCPTools, executeMCPTool } from "./mcp-executor";
 export { checkAndCompact } from "./compaction";
 export { searchKnowledge } from "./knowledge-search";
-export { DrizzleDocumentStore, DrizzleSearchStore } from "./stores/index";
+export { DrizzleDocumentStore, DrizzleSearchStore, ensureQdrantCollections } from "./stores/index";
 export type { SessionInput, SessionResult, AgentConfig, ProviderConfig, Persona, LLMResponse } from "./types";
 export type { ToolDefinition, ToolCall, ToolResult, ToolContext } from "./tool-executor";
 export type { SearchResult } from "./knowledge-search";

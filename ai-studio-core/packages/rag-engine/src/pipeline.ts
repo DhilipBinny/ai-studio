@@ -70,7 +70,7 @@ export async function processDocument(
         embedding: c.embedding, // pre-computed by lateChunkText
         chunkType: "standard" as const,
         tokenCount: c.tokenCount,
-        metadata: { fileName: doc.fileName, fileType: doc.fileType },
+        metadata: { fileName: doc.fileName, fileType: doc.fileType, knowledgeBaseId: doc.knowledgeBaseId },
       }));
 
       const lateChunkIds = await store.insertChunks(effectiveTenantId,records);
@@ -136,7 +136,7 @@ export async function processDocument(
         embedding: null,
         chunkType: "parent" as const,
         tokenCount: p.tokenCount,
-        metadata: { fileName: doc.fileName, fileType: doc.fileType },
+        metadata: { fileName: doc.fileName, fileType: doc.fileType, knowledgeBaseId: doc.knowledgeBaseId },
       }));
 
       const parentIds = await store.insertChunks(effectiveTenantId,parentRecords);
@@ -150,7 +150,7 @@ export async function processDocument(
         chunkType: "child" as const,
         parentChunkId: c.parentIndex !== undefined ? parentIdMap.get(c.parentIndex) ?? null : null,
         tokenCount: c.tokenCount,
-        metadata: { fileName: doc.fileName, fileType: doc.fileType },
+        metadata: { fileName: doc.fileName, fileType: doc.fileType, knowledgeBaseId: doc.knowledgeBaseId },
         contextualDescription: childDescriptions[i],
       }));
 
@@ -204,7 +204,7 @@ export async function processDocument(
       embedding: embeddings[i],
       chunkType: "standard" as const,
       tokenCount: c.tokenCount,
-      metadata: { fileName: doc.fileName, fileType: doc.fileType, chunkSize: chunkConfig.chunk_size || 2048 },
+      metadata: { fileName: doc.fileName, fileType: doc.fileType, knowledgeBaseId: doc.knowledgeBaseId, chunkSize: chunkConfig.chunk_size || 2048 },
       contextualDescription: descriptions[i],
     }));
 
