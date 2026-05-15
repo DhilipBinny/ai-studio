@@ -20,7 +20,7 @@ for (const tool of allBuiltinTools) {
 
 export async function seedBuiltinToolsForTenant(tenantId: string): Promise<void> {
   const db = getDb();
-  const allNames = [...builtinToolMap.keys(), "get_current_time", "calculate"];
+  const allNames = [...builtinToolMap.keys(), "get_current_time", "calculate", "echo"];
   const seen = new Set<string>();
 
   for (const name of allNames) {
