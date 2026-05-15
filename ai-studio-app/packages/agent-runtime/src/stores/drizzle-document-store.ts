@@ -33,6 +33,7 @@ export class DrizzleDocumentStore implements DocumentStore {
           parentChunkId: c.parentChunkId ?? null,
           tokenCount: c.tokenCount,
           metadata: c.metadata,
+          contextualDescription: c.contextualDescription ?? null,
         })),
       ).returning({ id: documentChunks.id });
       ids.push(...inserted.map((r) => r.id));

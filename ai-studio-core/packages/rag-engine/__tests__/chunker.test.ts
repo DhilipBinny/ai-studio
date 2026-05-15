@@ -106,6 +106,45 @@ describe("chunkText — recursive strategy", () => {
   });
 });
 
+describe("chunkText — large overlap", () => {
+  it("should produce heavily overlapping chunks when overlap is 80% of chunk_size", () => {
+    // chunk_size=500, overlap=400 (80% of 500)
+    // With 80% overlap, the merge step takes the last 400 chars from each
+    // chunk and prepends them to the next. Each chunk advances only ~100 chars
+    // of new content, creating extensive duplication between consecutive chunks.
+    const text = "Alpha Bravo Charlie Delta Echo Foxtrot Golf. ".repeat(100);
+
+    const chunks = chunkText(text, {
+      method: "recursive",
+      chunk_size: 500,
+      chunk_overlap: 400,
+    });
+
+    expect(chunks.length).toBeGreaterThan(1);
+
+    // Verify: consecutive chunks share substantial overlapping content.
+    // With 400-char overlap, at least 100 chars from end of prev should appear in next.
+    let overlapCount = 0;
+    for (let i = 1; i < chunks.length; i++) {
+      const prevContent = chunks[i - 1].content;
+      const nextContent = chunks[i].content;
+      const prevTail = prevContent.slice(-100);
+      if (prevTail.length > 0 && nextContent.includes(prevTail)) {
+        overlapCount++;
+      }
+    }
+
+    // Most consecutive chunk pairs should share overlapping content
+    expect(overlapCount).toBeGreaterThan(0);
+
+    // All chunks should have valid content
+    for (const chunk of chunks) {
+      expect(chunk.content.length).toBeGreaterThan(0);
+      expect(chunk.tokenCount).toBeGreaterThan(0);
+    }
+  });
+});
+
 describe("chunkText — fixed strategy", () => {
   it("should split 1000-char text with size=200 into multiple chunks", () => {
     // fixedSplit produces 5 segments of 200 chars each. The mergeWithOverlap

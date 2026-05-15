@@ -1,4 +1,4 @@
-import { searchKnowledge as ragSearchKnowledge, type SearchResult, type SearchOptions } from "@ais/rag-engine";
+import { searchKnowledge as ragSearchKnowledge, type SearchResult, type SearchOptions, type HyDEConfig, type DecompositionOptions } from "@ais/rag-engine";
 import { type EmbeddingConfig } from "@ais/provider-bridge";
 import { type RerankConfig } from "@ais/provider-bridge";
 import { DrizzleSearchStore } from "./stores/drizzle-search-store";
@@ -6,7 +6,13 @@ import type { AgentKBInfo } from "@ais/rag-engine";
 
 export type { SearchResult } from "@ais/rag-engine";
 
-function buildEmbeddingConfig(kb: AgentKBInfo & { providerType?: string | null; apiKeyRef?: string | null; baseUrl?: string | null }): EmbeddingConfig {
+type ExtendedKBInfo = AgentKBInfo & {
+  providerType?: string | null;
+  apiKeyRef?: string | null;
+  baseUrl?: string | null;
+};
+
+function buildEmbeddingConfig(kb: ExtendedKBInfo): EmbeddingConfig {
   if (kb.embeddingSource === "builtin") {
     return { source: "builtin", model: kb.embeddingModel || "Xenova/bge-small-en-v1.5", dimension: kb.embeddingDimension || 384 };
   }
@@ -26,7 +32,7 @@ export async function searchKnowledge(
   const kbs = await store.getAgentKBs(agentId, tenantId);
   if (kbs.length === 0) return [];
 
-  const firstKB = kbs[0] as AgentKBInfo & { providerType?: string | null; apiKeyRef?: string | null; baseUrl?: string | null };
+  const firstKB = kbs[0] as ExtendedKBInfo;
   const embeddingConfig = buildEmbeddingConfig(firstKB);
 
   const { createEmbedder } = await import("@/lib/rag/embedder");
@@ -41,5 +47,34 @@ export async function searchKnowledge(
     reranker = createReranker(rerankConfig);
   }
 
-  return ragSearchKnowledge(query, agentId, tenantId, store, embedder, reranker, options);
+  // Build HyDE config from KB settings
+  let hydeConfig: HyDEConfig | undefined;
+  let llmCaller;
+
+  const needsLLM = (firstKB.queryExpansion === "hyde" && firstKB.queryExpansionModel) || firstKB.queryDecomposition;
+
+  if (needsLLM) {
+    // Create an LLM caller using the KB's configured provider
+    const { createLLMCaller } = await import("@/lib/rag/llm-caller");
+    const providerType = firstKB.providerType || "openai";
+    const model = firstKB.queryExpansionModel || firstKB.embeddingModel;
+    llmCaller = createLLMCaller({
+      providerType,
+      model,
+      apiKey: firstKB.apiKeyRef || undefined,
+      baseUrl: firstKB.baseUrl || undefined,
+    });
+  }
+
+  if (firstKB.queryExpansion === "hyde" && firstKB.queryExpansionModel) {
+    hydeConfig = { enabled: true, model: firstKB.queryExpansionModel };
+  }
+
+  // Build decomposition options from KB settings
+  let decompositionOptions: DecompositionOptions | undefined;
+  if (firstKB.queryDecomposition && llmCaller) {
+    decompositionOptions = { decompositionEnabled: true };
+  }
+
+  return ragSearchKnowledge(query, agentId, tenantId, store, embedder, reranker, options, hydeConfig, llmCaller, decompositionOptions);
 }

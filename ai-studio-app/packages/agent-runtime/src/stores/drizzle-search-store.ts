@@ -17,6 +17,9 @@ export class DrizzleSearchStore implements SearchStore {
         rerankSource: knowledgeBases.rerankSource,
         rerankModel: knowledgeBases.rerankModel,
         rerankProviderId: knowledgeBases.rerankProviderId,
+        queryExpansion: knowledgeBases.queryExpansion,
+        queryExpansionModel: knowledgeBases.queryExpansionModel,
+        queryDecomposition: knowledgeBases.queryDecomposition,
         providerType: providers.providerType,
         apiKeyRef: providers.apiKeyRef,
         baseUrl: providers.baseUrl,
@@ -42,6 +45,9 @@ export class DrizzleSearchStore implements SearchStore {
       apiKeyRef: r.apiKeyRef && isEncrypted(r.apiKeyRef) ? decryptSecret(r.apiKeyRef) : r.apiKeyRef,
       baseUrl: r.baseUrl,
       rerankProviderId: r.rerankProviderId,
+      queryExpansion: r.queryExpansion,
+      queryExpansionModel: r.queryExpansionModel,
+      queryDecomposition: r.queryDecomposition,
     }));
   }
 

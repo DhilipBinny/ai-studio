@@ -223,6 +223,22 @@ describe("rrfFuse", () => {
     expect(dupItem.rrfScore).toBeCloseTo(1 / (k + 3), 10);
   });
 
+  it("should produce NaN or Infinity scores when k is negative (documents behavior)", () => {
+    const vectorResults: RankedItem[] = [
+      makeItem("a", "Doc A", "vector"),
+    ];
+    const bm25Results: RankedItem[] = [
+      makeItem("a", "Doc A", "bm25"),
+    ];
+
+    // k=-1: for rank 1, score = 1/(-1+1) = 1/0 = Infinity
+    const results = rrfFuse(vectorResults, bm25Results, -1);
+
+    const itemA = results.find((r) => r.id === "a")!;
+    // 1 / (-1 + 1) = 1 / 0 = Infinity, so vector + bm25 = Infinity
+    expect(itemA.rrfScore).toBe(Infinity);
+  });
+
   it("should produce valid scores when k=0", () => {
     const vectorResults: RankedItem[] = [
       makeItem("a", "Doc A", "vector"),

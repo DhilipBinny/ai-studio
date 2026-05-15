@@ -27,7 +27,12 @@ export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth) => {
   if (!parsed.success) {
     return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
   }
-  const { name, description, embeddingSource, embeddingProviderId, embeddingModel, embeddingDimension, rerankSource, rerankProviderId, rerankModel, chunkConfig } = parsed.data;
+  const {
+    name, description, embeddingSource, embeddingProviderId, embeddingModel, embeddingDimension,
+    rerankSource, rerankProviderId, rerankModel, chunkConfig,
+    contextualEnrichment, contextualModel, queryExpansion, queryExpansionModel,
+    queryDecomposition, graphExtraction, graphExtractionModel,
+  } = parsed.data;
 
   const db = getDb();
   const [existing] = await db.select({ id: knowledgeBases.id }).from(knowledgeBases).where(and(eq(knowledgeBases.tenantId, auth.tenantId), eq(knowledgeBases.name, name))).limit(1);
@@ -46,6 +51,13 @@ export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth) => {
     rerankProviderId: rerankSource === "provider" ? rerankProviderId : null,
     rerankModel: rerankModel || null,
     chunkConfig: chunkConfig || { method: "recursive", chunk_size: 2048, chunk_overlap: 200 },
+    contextualEnrichment: contextualEnrichment || "static",
+    contextualModel: contextualModel || null,
+    queryExpansion: queryExpansion || "none",
+    queryExpansionModel: queryExpansionModel || null,
+    queryDecomposition: queryDecomposition ?? false,
+    graphExtraction: graphExtraction ?? false,
+    graphExtractionModel: graphExtractionModel || null,
     createdBy: auth.userId,
   }).returning();
 

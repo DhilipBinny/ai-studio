@@ -1,6 +1,19 @@
 import { rrfFuse } from "./rrf";
-import type { RankedItem } from "./types";
+import type { RankedItem, RRFResult } from "./types";
 import type { SearchStore, Embedder, Reranker, SearchOptions, SearchResult } from "./interfaces";
+import { hydeExpand, type HyDEConfig, type LLMCaller } from "./hyde";
+import { decomposeQuery } from "./query-decomposition";
+import { mergeDecomposedResults } from "./merge-results";
+import { graphExpand, type GraphSearchStore } from "./graph-search";
+
+export interface DecompositionOptions {
+  decompositionEnabled?: boolean;
+}
+
+export interface GraphSearchOptions {
+  enabled: boolean;
+  graphStore: GraphSearchStore;
+}
 
 export async function searchKnowledge(
   query: string,
@@ -10,10 +23,13 @@ export async function searchKnowledge(
   embedder: Embedder,
   reranker?: Reranker,
   options: SearchOptions = {},
+  hydeConfig?: HyDEConfig,
+  llmCaller?: LLMCaller,
+  decompositionOptions?: DecompositionOptions,
+  graphSearchOptions?: GraphSearchOptions,
 ): Promise<SearchResult[]> {
   const topK = options.topK || 5;
   const threshold = options.similarityThreshold || 0.3;
-  const retrieveCount = topK * 4;
 
   const agentKBs = await store.getAgentKBs(agentId, tenantId);
   if (agentKBs.length === 0) return [];
@@ -21,7 +37,95 @@ export async function searchKnowledge(
   const kbIds = agentKBs.map((kb) => kb.knowledgeBaseId);
   const kbNameMap = new Map(agentKBs.map((kb) => [kb.knowledgeBaseId, kb.kbName]));
 
-  const queryEmbedding = await embedder.embedSingle(query, "query");
+  // Query decomposition: if enabled, split into sub-queries and search each independently
+  if (decompositionOptions?.decompositionEnabled && llmCaller) {
+    const decomposition = await decomposeQuery(query, llmCaller);
+
+    if (decomposition.shouldDecompose && decomposition.subQueries.length > 1) {
+      const subQueryResults: RRFResult[][] = [];
+
+      for (const subQuery of decomposition.subQueries) {
+        const subRRF = await runSingleQuerySearch(
+          subQuery, kbIds, tenantId, store, embedder, topK, threshold, hydeConfig, llmCaller,
+        );
+        subQueryResults.push(subRRF);
+      }
+
+      let candidates = mergeDecomposedResults(subQueryResults);
+
+      // Graph expansion: add graph-expanded chunks to candidate pool
+      if (graphSearchOptions?.enabled) {
+        candidates = await applyGraphExpansion(
+          query, kbIds, tenantId, embedder, graphSearchOptions.graphStore, candidates,
+        );
+      }
+
+      // Rerank the merged set
+      if (reranker) {
+        const rerankCandidates = candidates.slice(0, topK * 3);
+        const docs = rerankCandidates.map((c) => c.content);
+        const rerankResults = await reranker.rerank(query, docs, topK);
+        candidates = rerankResults.map((rr) => ({
+          ...rerankCandidates[rr.index],
+          rrfScore: rr.score,
+        }));
+      }
+
+      return buildSearchResults(candidates.slice(0, topK), kbNameMap, store);
+    }
+  }
+
+  // Single-query path (original or decomposition returned shouldDecompose=false)
+  let candidates = await runSingleQuerySearch(
+    query, kbIds, tenantId, store, embedder, topK, threshold, hydeConfig, llmCaller,
+  );
+
+  // Graph expansion: add graph-expanded chunks to candidate pool
+  if (graphSearchOptions?.enabled) {
+    candidates = await applyGraphExpansion(
+      query, kbIds, tenantId, embedder, graphSearchOptions.graphStore, candidates,
+    );
+  }
+
+  let finalCandidates = candidates;
+
+  if (reranker) {
+    const rerankCandidates = finalCandidates.slice(0, topK * 3);
+    const docs = rerankCandidates.map((c) => c.content);
+    const rerankResults = await reranker.rerank(query, docs, topK);
+    finalCandidates = rerankResults.map((rr) => ({
+      ...rerankCandidates[rr.index],
+      rrfScore: rr.score,
+    }));
+  }
+
+  return buildSearchResults(finalCandidates.slice(0, topK), kbNameMap, store);
+}
+
+/**
+ * Run the core search pipeline for a single query: HyDE expand -> embed -> vector+BM25 -> RRF fuse.
+ * Returns raw RRF candidates (no reranking, no parent expansion, no topK limit).
+ */
+async function runSingleQuerySearch(
+  query: string,
+  kbIds: string[],
+  tenantId: string,
+  store: SearchStore,
+  embedder: Embedder,
+  topK: number,
+  threshold: number,
+  hydeConfig?: HyDEConfig,
+  llmCaller?: LLMCaller,
+): Promise<RRFResult[]> {
+  const retrieveCount = topK * 4;
+
+  // HyDE: generate hypothetical answer for vector search if enabled
+  let queryForEmbedding = query;
+  if (hydeConfig?.enabled && llmCaller) {
+    queryForEmbedding = await hydeExpand(query, llmCaller);
+  }
+
+  const queryEmbedding = await embedder.embedSingle(queryForEmbedding, "query");
 
   const [vectorHits, bm25Hits] = await Promise.all([
     store.vectorSearch(queryEmbedding, tenantId, kbIds, retrieveCount, threshold),
@@ -47,21 +151,18 @@ export async function searchKnowledge(
 
   if (vectorItems.length === 0 && bm25Items.length === 0) return [];
 
-  let candidates = rrfFuse(vectorItems, bm25Items);
+  return rrfFuse(vectorItems, bm25Items);
+}
 
-  if (reranker) {
-    const rerankCandidates = candidates.slice(0, topK * 3);
-    const docs = rerankCandidates.map((c) => c.content);
-    const rerankResults = await reranker.rerank(query, docs, topK);
-    candidates = rerankResults.map((rr) => ({
-      ...rerankCandidates[rr.index],
-      rrfScore: rr.score,
-    }));
-  }
-
-  const finalCandidates = candidates.slice(0, topK);
-
-  const parentIds = finalCandidates
+/**
+ * Convert RRF candidates to SearchResult[], expanding parent chunks as needed.
+ */
+async function buildSearchResults(
+  candidates: RRFResult[],
+  kbNameMap: Map<string, string>,
+  store: SearchStore,
+): Promise<SearchResult[]> {
+  const parentIds = candidates
     .map((c) => (c.metadata as Record<string, unknown>)?.parentChunkId as number | null)
     .filter((id): id is number => id !== null);
 
@@ -69,7 +170,7 @@ export async function searchKnowledge(
     ? await store.getParentChunks(parentIds)
     : new Map<number, string>();
 
-  return finalCandidates.map((item) => {
+  return candidates.map((item) => {
     const meta = item.metadata as {
       fileName: string; kbId: string; chunkIndex: number;
       chunkType: string; parentChunkId: number | null;
@@ -89,7 +190,56 @@ export async function searchKnowledge(
       documentName: meta.fileName,
       knowledgeBaseName: kbNameMap.get(meta.kbId) || "Unknown",
       chunkIndex: meta.chunkIndex,
+      chunkId: typeof item.id === "number" ? item.id : undefined,
       source,
     };
   });
+}
+
+/**
+ * Run graph expansion and merge graph-expanded chunks into the existing RRF candidates.
+ * Graph chunks get a low base score (0.01) so RRF will boost them if they also appear
+ * in vector/BM25 results.
+ */
+async function applyGraphExpansion(
+  query: string,
+  kbIds: string[],
+  tenantId: string,
+  embedder: Embedder,
+  graphStore: GraphSearchStore,
+  existingCandidates: RRFResult[],
+): Promise<RRFResult[]> {
+  try {
+    const graphResults = await graphExpand(query, kbIds, tenantId, embedder, graphStore);
+
+    if (graphResults.length === 0) {
+      return existingCandidates;
+    }
+
+    // Convert graph results to RankedItems for RRF fusion
+    const graphItems: RankedItem[] = graphResults.map((chunk) => ({
+      id: chunk.id,
+      content: chunk.content,
+      score: chunk.score,
+      source: "hybrid" as const,
+      metadata: {},
+    }));
+
+    // Convert existing candidates back to RankedItems for re-fusion
+    const existingItems: RankedItem[] = existingCandidates.map((c) => ({
+      id: c.id,
+      content: c.content,
+      score: c.rrfScore,
+      source: "hybrid" as const,
+      metadata: c.metadata,
+    }));
+
+    // Re-fuse: existing candidates as "vector" signal, graph as "bm25" signal
+    // This way RRF will properly merge and boost overlapping results
+    return rrfFuse(existingItems, graphItems);
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.warn(`Graph expansion failed, continuing without graph signal: ${message}`);
+    return existingCandidates;
+  }
 }

@@ -9,6 +9,7 @@ export interface ChunkRecord {
   parentChunkId?: number | null;
   tokenCount: number;
   metadata: Record<string, unknown>;
+  contextualDescription?: string | null;
 }
 
 export interface KBConfig {
@@ -18,6 +19,14 @@ export interface KBConfig {
   embeddingDimension: number;
   rerankSource: string | null;
   rerankModel: string | null;
+  contextualEnrichment?: "none" | "static" | "llm";
+  contextualModel?: string | null;
+  queryExpansion?: "none" | "hyde";
+  queryExpansionModel?: string | null;
+  queryDecomposition?: boolean;
+  graphExtraction?: boolean;
+  graphExtractionModel?: string | null;
+  modalityType?: "text" | "multimodal";
 }
 
 export interface SearchHit {
@@ -39,6 +48,9 @@ export interface AgentKBInfo {
   embeddingDimension: number;
   rerankSource: string | null;
   rerankModel: string | null;
+  queryExpansion?: string | null;
+  queryExpansionModel?: string | null;
+  queryDecomposition?: boolean;
 }
 
 export interface DocumentStore {
@@ -79,6 +91,7 @@ export interface SearchResult {
   documentName: string;
   knowledgeBaseName: string;
   chunkIndex: number;
+  chunkId?: number;
   source: "vector" | "bm25" | "hybrid";
 }
 

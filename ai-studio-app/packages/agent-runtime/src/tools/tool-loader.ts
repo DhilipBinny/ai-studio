@@ -10,7 +10,7 @@ import {
 } from "@ais/tools-common";
 import type { ToolRegistration } from "@ais/tool-platform";
 import type { ToolDefinition, LoadedTools } from "./types";
-import { KNOWLEDGE_SEARCH_DEFINITION } from "./context-executors";
+import { KNOWLEDGE_SEARCH_DEFINITION, KNOWLEDGE_REFINE_SEARCH_DEFINITION } from "./context-executors";
 import { BUILTIN_TOOL_RISK, BUILTIN_TOOL_CATEGORY } from "./risk-map";
 
 export const builtinToolMap = new Map<string, ToolRegistration>();
@@ -142,6 +142,7 @@ export async function loadToolDefinitions(
 
   if (kbLinks.length > 0) {
     defs.push(KNOWLEDGE_SEARCH_DEFINITION);
+    defs.push(KNOWLEDGE_REFINE_SEARCH_DEFINITION);
   }
 
   const { tools: mcpTools, connectorMap } = await loadMCPTools(agentId, tenantId);

@@ -16,10 +16,17 @@ export interface ToolResult {
   is_error?: boolean;
 }
 
+export interface SearchSessionState {
+  seenChunkIds: Set<number>;
+  iterationCount: number;
+  previousQueries: string[];
+}
+
 export interface ToolContext {
   agentId: string;
   tenantId: string;
   sessionId: string;
+  searchState?: SearchSessionState;
 }
 
 export type ToolExecutorFn = (args: Record<string, unknown>) => Promise<string>;

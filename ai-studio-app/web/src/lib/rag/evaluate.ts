@@ -1,71 +1,52 @@
+/**
+ * RAG evaluation orchestrator.
+ *
+ * Bridges the core rag-engine evaluator with the app-layer services
+ * (search, embedding, LLM caller) to run RAGAS-style evaluations
+ * on a knowledge base.
+ */
+
 import { searchKnowledge, type SearchResult } from "@ais-app/agent-runtime";
+import { evaluateRAG as coreEvaluateRAG, type EvaluationQuestion, type EvaluationResult, type EvaluationSummary } from "@ais/rag-engine";
+import { createEmbedder, buildEmbeddingConfig, type EmbeddingKBConfig } from "./embedder";
+import { createLLMCaller, type LLMCallerConfig } from "./llm-caller";
 
-export interface EvalQuestion {
-  query: string;
-  expectedAnswer: string;
-  relevantDocNames?: string[];
+export type { EvaluationQuestion, EvaluationResult, EvaluationSummary };
+
+export interface EvaluateRAGOptions {
+  agentId: string;
+  tenantId: string;
+  questions: EvaluationQuestion[];
+  /** LLM configuration for the judge model */
+  llmConfig: LLMCallerConfig;
+  /** Embedding configuration for answer relevancy scoring */
+  embeddingConfig: EmbeddingKBConfig;
+  /** Number of results to retrieve per question */
+  topK?: number;
 }
 
-export interface EvalResult {
-  query: string;
-  retrievedChunks: number;
-  topChunkRelevant: boolean;
-  contextPrecision: number;
-  sources: Array<{ documentName: string; score: number; source: string }>;
-}
-
+/**
+ * Run a full RAGAS evaluation against a knowledge base via an agent.
+ *
+ * For each question:
+ *   1. Searches the KB to retrieve chunks
+ *   2. Generates an answer from the retrieved context
+ *   3. Scores the result on 4 RAGAS metrics (context precision, context recall,
+ *      faithfulness, answer relevancy)
+ *
+ * Returns per-question results and an aggregate summary.
+ */
 export async function evaluateRAG(
-  agentId: string,
-  tenantId: string,
-  questions: EvalQuestion[],
-): Promise<{ results: EvalResult[]; summary: { avgPrecision: number; avgChunks: number; topRelevantRate: number } }> {
-  const results: EvalResult[] = [];
+  options: EvaluateRAGOptions,
+): Promise<{ results: EvaluationResult[]; summary: EvaluationSummary }> {
+  const { agentId, tenantId, questions, llmConfig, embeddingConfig, topK = 5 } = options;
 
-  for (const q of questions) {
-    const searchResults = await searchKnowledge(q.query, agentId, tenantId, { topK: 5 });
+  const llmCaller = createLLMCaller(llmConfig);
+  const embedder = createEmbedder(buildEmbeddingConfig(embeddingConfig));
 
-    const keywords = q.expectedAnswer
-      .toLowerCase()
-      .split(/\s+/)
-      .filter((w) => w.length > 3);
-
-    let relevantCount = 0;
-    for (const chunk of searchResults) {
-      const lower = chunk.content.toLowerCase();
-      const matchedKeywords = keywords.filter((kw) => lower.includes(kw));
-      if (matchedKeywords.length >= Math.min(2, keywords.length)) {
-        relevantCount++;
-      }
-    }
-
-    const topContent = searchResults[0]?.content?.toLowerCase() || "";
-    const topRelevant = keywords.filter((kw) => topContent.includes(kw)).length >= Math.min(2, keywords.length);
-
-    results.push({
-      query: q.query,
-      retrievedChunks: searchResults.length,
-      topChunkRelevant: topRelevant,
-      contextPrecision: searchResults.length > 0 ? relevantCount / searchResults.length : 0,
-      sources: searchResults.map((r) => ({
-        documentName: r.documentName,
-        score: r.score,
-        source: r.source,
-      })),
-    });
-  }
-
-  const avgPrecision = results.length > 0
-    ? results.reduce((sum, r) => sum + r.contextPrecision, 0) / results.length
-    : 0;
-  const avgChunks = results.length > 0
-    ? results.reduce((sum, r) => sum + r.retrievedChunks, 0) / results.length
-    : 0;
-  const topRelevantRate = results.length > 0
-    ? results.filter((r) => r.topChunkRelevant).length / results.length
-    : 0;
-
-  return {
-    results,
-    summary: { avgPrecision, avgChunks, topRelevantRate },
+  const searchFn = async (query: string): Promise<SearchResult[]> => {
+    return searchKnowledge(query, agentId, tenantId, { topK });
   };
+
+  return coreEvaluateRAG(questions, searchFn, llmCaller, embedder);
 }

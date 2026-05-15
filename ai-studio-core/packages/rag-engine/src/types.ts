@@ -1,5 +1,5 @@
 export interface ChunkConfig {
-  method?: "recursive" | "fixed" | "parent_child";
+  method?: "recursive" | "fixed" | "parent_child" | "late_chunking";
   chunk_size?: number;
   chunk_overlap?: number;
   parent_chunk_size?: number;
