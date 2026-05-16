@@ -125,7 +125,7 @@ async function loadAgentAndProvider(input: SessionInput): Promise<LoadedAgentAnd
     providerModelId: agent.providerModelId,
     temperature: agent.temperature || "0.7",
     maxTurns: agent.maxTurns || 25,
-    maxTokensPerTurn: agent.maxTokensPerTurn || 4096,
+    maxTokensPerTurn: agent.maxTokensPerTurn || 16384,
   };
 
   return {

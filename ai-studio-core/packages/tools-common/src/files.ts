@@ -74,7 +74,11 @@ export const fileTools: ToolRegistration[] = [
     },
     executor: async (args, context) => {
       const ctx = getCtx(context as Record<string, unknown>);
-      const filePath = resolveTenantPath(args.path as string, ctx.workspace);
+      const requestedPath = (args.path as string || "").trim();
+      if (!requestedPath) {
+        return { error: "path is required. Provide a filename like 'MODULE_PLAN.md' or 'src/file.ts'." };
+      }
+      const filePath = resolveTenantPath(requestedPath, ctx.workspace);
       const fileContent = (args.content as string) || "";
       const contentSize = Buffer.byteLength(fileContent);
       if (contentSize > FILE_MAX_WRITE_SIZE) {
