@@ -11,7 +11,7 @@ import { progressBus, truncatePreview } from "./progress-bus";
 import type { SessionInput, SessionResult, AgentConfig, ProviderConfig } from "./types";
 import type { ToolCall, ToolContext } from "./tool-executor";
 
-const MAX_TOOL_ROUNDS = 50;
+const MAX_TOOL_ROUNDS = 100;
 
 interface ToolCallBlock {
   type: string;

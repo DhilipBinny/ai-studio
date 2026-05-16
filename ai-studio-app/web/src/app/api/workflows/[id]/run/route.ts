@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { triggerWorkflow } from "@ais-app/agent-runtime";
 import { triggerWorkflowSchema } from "@ais-app/validation";
 import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
@@ -19,20 +19,25 @@ export const POST = withRBAC("WORKFLOWS", 20, async (request, auth, params) => {
 
   const input = parsed.data.input || {};
 
-  try {
-    const result = await triggerWorkflow(id, auth.tenantId, auth.userId, input);
-
+  triggerWorkflow(id, auth.tenantId, auth.userId, input).then(async (result) => {
     await createAuditEntry({
       tenantId: auth.tenantId,
       userId: auth.userId,
-      action: "workflow.run",
+      action: "workflow.run_complete",
       resourceType: "workflow",
       resourceId: id,
       details: { runId: result.runId, status: result.status },
     });
+  }).catch(() => {});
 
-    return NextResponse.json(result, { status: 201 });
-  } catch (e) {
-    return errorResponse((e as Error).message, "WORKFLOW_ERROR", 400);
-  }
+  await createAuditEntry({
+    tenantId: auth.tenantId,
+    userId: auth.userId,
+    action: "workflow.run",
+    resourceType: "workflow",
+    resourceId: id,
+    details: { status: "triggered" },
+  });
+
+  return NextResponse.json({ status: "triggered", workflowId: id, message: "Workflow started. Check the Runs tab for progress." }, { status: 202 });
 });
