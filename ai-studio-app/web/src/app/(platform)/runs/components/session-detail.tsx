@@ -162,7 +162,7 @@ export function SessionDetailView({ sessionId, onBack }: { sessionId: string; on
           <h2 className="text-sm font-semibold">Execution Timeline</h2>
           <p className="text-xs text-muted-foreground">{session.messages.length} messages, {session.toolCalls.length} tool calls</p>
         </div>
-        <div className="divide-y">
+        <div className="divide-y divide-border">
           {session.messages.map((msg, idx) => (
             <MessageRow key={msg.id} message={msg} toolCalls={session.toolCalls} index={idx} />
           ))}

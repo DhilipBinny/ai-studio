@@ -75,7 +75,7 @@ export function RunDetail({ workflowId, runId, onBack }: { workflowId: string; r
         <div className="px-4 py-3 border-b border-border bg-muted/30">
           <h2 className="text-sm font-semibold">Execution Steps</h2>
         </div>
-        <div className="divide-y">
+        <div className="divide-y divide-border">
           {run.steps.map((step, idx) => (
             <StepRow key={step.id} step={step} index={idx} />
           ))}
