@@ -12,6 +12,7 @@ export const MODULES = [
   { id: "USERS",      label: "Users",            section: "admin",   href: "/users" },
   { id: "AUDIT",      label: "Audit Log",        section: "admin",   href: "/audit-log" },
   { id: "SETTINGS",   label: "Settings",         section: "admin",   href: "/settings" },
+  { id: "DOCS",       label: "Docs",             section: "admin",   href: "/docs" },
   { id: "PROFILES",   label: "Profiles",         section: "hidden",  href: "/settings" },
 ] as const;
 

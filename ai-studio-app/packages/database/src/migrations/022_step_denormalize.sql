@@ -19,3 +19,9 @@ SET
 FROM workflow_nodes wn
 WHERE wrs.workflow_node_id = wn.id
   AND wrs.node_name IS NULL;
+
+-- Add DOCS module to admin profiles
+UPDATE profiles
+SET access_rights = access_rights || '{"DOCS": 30}'::jsonb
+WHERE name IN ('Super Admin', 'Admin')
+  AND (access_rights->'DOCS') IS NULL;

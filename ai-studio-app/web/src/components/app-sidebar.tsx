@@ -24,6 +24,7 @@ import {
   FileText,
   Clock,
   FolderOpen,
+  BookText,
 } from "lucide-react";
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -41,6 +42,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   PROFILES: Shield,
   AUDIT: FileText,
   SETTINGS: Settings,
+  DOCS: BookText,
 };
 
 const SIDEBAR_MODULES = MODULES.filter((m) =>

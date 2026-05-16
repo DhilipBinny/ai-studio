@@ -2,8 +2,10 @@
 .data/
 AiStudio-App/.data/
 
-# Local reference docs (research, audits — not for git)
+# Local reference docs (research, design history — not for git)
 _local_reference/
+docs/_local_research/
+docs/_local_design-history/
 
 # Node
 node_modules/
