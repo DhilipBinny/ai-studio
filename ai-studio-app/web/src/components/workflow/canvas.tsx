@@ -484,7 +484,7 @@ function CanvasToolbar({
   handleSave: () => Promise<void>;
 }) {
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1.5 border-b bg-muted/20">
+    <div className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border bg-muted/20">
       <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="h-7 w-7 p-0">
         <Undo2 className="h-3.5 w-3.5" />
       </Button>

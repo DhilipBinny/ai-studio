@@ -284,7 +284,7 @@ function ConnectorDetail({ connector, onUpdated }: { connector: Connector; onUpd
           </div>
           <div className="rounded-md border border-border max-h-48 overflow-y-auto">
             {discoveredTools.map((t) => (
-              <div key={t.name} className="flex items-start gap-2 px-2.5 py-1.5 border-b last:border-b-0">
+              <div key={t.name} className="flex items-start gap-2 px-2.5 py-1.5 border-b border-border last:border-b-0">
                 <span className="text-xs font-mono font-medium shrink-0">{t.name}</span>
                 <span className="text-xs text-muted-foreground line-clamp-1">{t.description}</span>
               </div>

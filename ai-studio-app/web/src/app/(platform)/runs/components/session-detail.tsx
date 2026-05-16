@@ -158,7 +158,7 @@ export function SessionDetailView({ sessionId, onBack }: { sessionId: string; on
       )}
 
       <div className="border border-border rounded-lg">
-        <div className="px-4 py-3 border-b bg-muted/30">
+        <div className="px-4 py-3 border-b border-border bg-muted/30">
           <h2 className="text-sm font-semibold">Execution Timeline</h2>
           <p className="text-xs text-muted-foreground">{session.messages.length} messages, {session.toolCalls.length} tool calls</p>
         </div>
@@ -171,7 +171,7 @@ export function SessionDetailView({ sessionId, onBack }: { sessionId: string; on
 
       {session.toolCalls.length > 0 && (
         <div className="border border-border rounded-lg">
-          <div className="px-4 py-3 border-b bg-muted/30">
+          <div className="px-4 py-3 border-b border-border bg-muted/30">
             <h2 className="text-sm font-semibold">Tool Calls Summary</h2>
           </div>
           <Table>

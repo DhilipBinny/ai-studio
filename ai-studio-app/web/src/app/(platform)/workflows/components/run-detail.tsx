@@ -72,7 +72,7 @@ export function RunDetail({ workflowId, runId, onBack }: { workflowId: string; r
       )}
 
       <div className="border border-border rounded-lg">
-        <div className="px-4 py-3 border-b bg-muted/30">
+        <div className="px-4 py-3 border-b border-border bg-muted/30">
           <h2 className="text-sm font-semibold">Execution Steps</h2>
         </div>
         <div className="divide-y">
@@ -84,7 +84,7 @@ export function RunDetail({ workflowId, runId, onBack }: { workflowId: string; r
 
       {run.output && (
         <div className="border border-border rounded-lg">
-          <div className="px-4 py-3 border-b bg-muted/30">
+          <div className="px-4 py-3 border-b border-border bg-muted/30">
             <h2 className="text-sm font-semibold">Final Output</h2>
           </div>
           <pre className="p-4 text-xs font-mono overflow-x-auto max-h-64 overflow-y-auto">{JSON.stringify(run.output, null, 2)}</pre>

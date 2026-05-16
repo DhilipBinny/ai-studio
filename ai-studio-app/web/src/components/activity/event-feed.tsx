@@ -286,7 +286,7 @@ export function EventFeed({
 
   return (
     <div className={cn("border border-border rounded-lg overflow-hidden", className)}>
-      <div className="flex items-center justify-between px-4 py-2.5 border-b bg-muted/30">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
           {connected && (
             <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.5)]" />
@@ -450,7 +450,7 @@ export function HistoricalEventFeed({
 
   return (
     <div className={cn("border border-border rounded-lg overflow-hidden", className)}>
-      <div className="flex items-center justify-between px-4 py-2.5 border-b bg-muted/30">
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2">
           <h3 className="text-sm font-semibold">Execution Log</h3>
           <span className="text-[10px] text-muted-foreground">{spans.length} events</span>
