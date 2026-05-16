@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Plug, Pencil, Loader2, Trash2, TestTube, Check, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -255,7 +256,11 @@ function ConnectorDetail({ connector, onUpdated }: { connector: Connector; onUpd
       </div>
 
       {connector.connectorType === "mcp" && (
-        <div className="rounded-md bg-muted/50 p-3 space-y-1 text-xs font-mono">
+        <div className="relative rounded-md bg-muted/50 p-3 space-y-1 text-xs font-mono">
+          <CopyButton
+            value={`${config.command as string || ""} ${(config.args as string[])?.join(" ") || ""}`.trim()}
+            className="absolute right-2 top-2"
+          />
           <p><span className="text-muted-foreground">command:</span> {config.command as string || "—"}</p>
           <p><span className="text-muted-foreground">args:</span> {(config.args as string[])?.join(" ") || "—"}</p>
           {config.env && Object.keys(config.env as Record<string, string>).length > 0 ? (

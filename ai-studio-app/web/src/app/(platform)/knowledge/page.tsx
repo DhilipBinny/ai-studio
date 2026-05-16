@@ -4,7 +4,10 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 import { formatDate } from "@/lib/utils";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Plus, BookOpen, Upload, Pencil, Trash2, Loader2, ArrowLeft, FileText, CheckCircle, AlertCircle, Clock, RefreshCw, Cpu, Cloud } from "lucide-react";
+import { Plus, BookOpen, Upload, Pencil, Trash2, Loader2, FileText, CheckCircle, AlertCircle, Clock, RefreshCw, Cpu, Cloud } from "lucide-react";
+import {
+  Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -243,10 +246,18 @@ function KBDetailView({ kbId, onBack }: { kbId: string; onBack: () => void }) {
 
   return (
     <>
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={onBack}>
-          <ArrowLeft className="h-4 w-4 mr-1" /> Back
-        </Button>
+      <div className="mb-6 space-y-2">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#" onClick={(e) => { e.preventDefault(); onBack(); }}>Knowledge Bases</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{kb?.name || "..."}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">{kb?.name || "..."}</h1>
           {kb?.description && <p className="text-sm text-muted-foreground">{kb.description}</p>}

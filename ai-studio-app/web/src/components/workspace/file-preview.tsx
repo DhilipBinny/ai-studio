@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Download, Loader2, AlertTriangle, FileWarning } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CopyButton } from "@/components/ui/copy-button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Markdown } from "@/components/markdown";
@@ -66,6 +67,9 @@ export function FilePreview({
           {data && <Badge variant="secondary" className="text-[10px] shrink-0">{formatSize(data.size)}</Badge>}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {data && !data.binary && data.content !== null && (
+            <CopyButton value={data.content} />
+          )}
           <a href={downloadUrl} download className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-xs font-medium hover:bg-muted transition-colors">
             <Download className="h-3 w-3" /> Download
           </a>

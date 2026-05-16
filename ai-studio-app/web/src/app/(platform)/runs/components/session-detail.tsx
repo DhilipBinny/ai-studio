@@ -1,11 +1,14 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import {
-  MessageSquare, ArrowLeft, Clock, Cpu, Wrench, AlertCircle,
+  MessageSquare, Clock, Cpu, Wrench, AlertCircle,
   ChevronDown, ChevronRight, Zap, Timer,
   CheckCircle2, XCircle, Loader2, DollarSign, FolderOpen,
   Hash,
 } from "lucide-react";
+import {
+  Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { FileBrowser } from "@/components/workspace/file-browser";
 import { EventFeed, HistoricalEventFeed } from "@/components/activity/event-feed";
 import { Button } from "@/components/ui/button";
@@ -83,7 +86,7 @@ export function SessionDetailView({ sessionId, onBack }: { sessionId: string; on
   if (error || !session) {
     return (
       <div className="space-y-4">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1" /> Back</Button>
+        <Button variant="ghost" size="sm" onClick={onBack}>Back to Sessions</Button>
         <div className="text-destructive text-sm">{error || "Session not found"}</div>
       </div>
     );
@@ -96,7 +99,17 @@ export function SessionDetailView({ sessionId, onBack }: { sessionId: string; on
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1" /> Sessions</Button>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#" onClick={(e) => { e.preventDefault(); onBack(); }}>Sessions</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{session.agentName}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <div className="flex-1" />
         <Badge variant={STATUS_VARIANT[session.status] || "secondary"} className="text-xs">{session.status}</Badge>
       </div>

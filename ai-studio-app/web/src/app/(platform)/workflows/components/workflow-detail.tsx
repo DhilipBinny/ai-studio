@@ -1,10 +1,13 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import {
-  ArrowLeft, Play, Loader2,
+  Play, Loader2,
 } from "lucide-react";
 import { WorkflowCanvas } from "@/components/workflow/canvas";
 import { Button } from "@/components/ui/button";
+import {
+  Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -147,7 +150,17 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
   return (
     <div className="flex flex-col h-[calc(100vh-12rem)]">
       <div className="flex items-center gap-3 mb-4">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1" /> Workflows</Button>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#" onClick={(e) => { e.preventDefault(); onBack(); }}>Workflows</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{workflow.name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <div className="flex-1" />
         <Badge variant={STATUS_VARIANT[workflow.status] || "secondary"}>{workflow.status}</Badge>
       </div>
