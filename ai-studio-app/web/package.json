@@ -32,6 +32,7 @@
     "@base-ui/react": "^1.4.1",
     "@dagrejs/dagre": "^3.0.0",
     "@huggingface/transformers": "^3.4.0",
+    "@radix-ui/react-dialog": "^1.1.15",
     "@xyflow/react": "^12.10.2",
     "@zxcvbn-ts/core": "^3.0.4",
     "@zxcvbn-ts/language-common": "^3.0.4",
