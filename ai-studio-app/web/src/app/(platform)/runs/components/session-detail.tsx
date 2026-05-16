@@ -201,23 +201,26 @@ export function SessionDetailView({ sessionId, onBack }: { sessionId: string; on
         </div>
       )}
 
-      <WorkspaceFilesSection agentId={session.agentId} />
+      <WorkspaceFilesSection agentId={session.agentId} projectId={(session.input as Record<string, unknown>)?.projectId as string | undefined} />
     </div>
   );
 }
 
-function WorkspaceFilesSection({ agentId }: { agentId: string }) {
+function WorkspaceFilesSection({ agentId, projectId }: { agentId: string; projectId?: string }) {
   const [expanded, setExpanded] = useState(false);
+  const scope = projectId ? "project" : "agent";
+  const id = projectId || agentId;
+  const label = projectId ? "Project Files" : "Workspace Files";
   return (
     <div className="border border-border rounded-lg">
       <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center gap-2 px-4 py-3 hover:bg-muted/30 transition-colors text-left">
         {expanded ? <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" /> : <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />}
         <FolderOpen className="h-4 w-4 text-muted-foreground" />
-        <h2 className="text-sm font-semibold">Workspace Files</h2>
+        <h2 className="text-sm font-semibold">{label}</h2>
       </button>
       {expanded && (
         <div className="px-4 pb-4">
-          <FileBrowser scope="agent" id={agentId} />
+          <FileBrowser scope={scope} id={id} />
         </div>
       )}
     </div>

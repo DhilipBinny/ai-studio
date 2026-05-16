@@ -29,7 +29,7 @@ function getExtension(name: string): string {
 export function FilePreview({
   scope, id, path: filePath, onClose,
 }: {
-  scope: "agent" | "run" | "shared";
+  scope: "agent" | "run" | "shared" | "project";
   id?: string;
   path: string;
   onClose: () => void;

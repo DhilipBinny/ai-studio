@@ -18,6 +18,8 @@ function getBasePath(scope: string, id: string, tenantId: string): string {
       return path.resolve(tenantBase, "runs", id);
     case "shared":
       return path.resolve(tenantBase, "shared");
+    case "project":
+      return path.resolve(dataRoot, "tenants", tenantId, "projects", id);
     default:
       throw new Error("Invalid scope");
   }
@@ -29,11 +31,11 @@ export const GET = withRBAC("WORKSPACE", 10, async (request, auth) => {
   const id = url.searchParams.get("id") || "";
   const subpath = url.searchParams.get("path") || "";
 
-  if (!scope || !["agent", "run", "shared"].includes(scope)) {
-    return errorResponse("scope must be agent, run, or shared", "VALIDATION_ERROR", 400);
+  if (!scope || !["agent", "run", "shared", "project"].includes(scope)) {
+    return errorResponse("scope must be agent, run, shared, or project", "VALIDATION_ERROR", 400);
   }
   if (scope !== "shared" && !id) {
-    return errorResponse("id is required for agent and run scopes", "VALIDATION_ERROR", 400);
+    return errorResponse("id is required for agent, run, and project scopes", "VALIDATION_ERROR", 400);
   }
 
   const basePath = getBasePath(scope, id, auth.tenantId);

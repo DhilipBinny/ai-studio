@@ -144,6 +144,7 @@ export async function getSessionDetail(tenantId: string, sessionId: string) {
       modelUsed: agentSessions.modelUsed,
       providerUsed: agentSessions.providerUsed,
       errorMessage: agentSessions.errorMessage,
+      input: agentSessions.input,
       startedAt: agentSessions.startedAt,
       completedAt: agentSessions.completedAt,
       createdAt: agentSessions.createdAt,

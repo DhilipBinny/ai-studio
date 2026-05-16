@@ -30,7 +30,7 @@ function FileIcon({ name, type }: { name: string; type: string }) {
 export function FileBrowser({
   scope, id, className,
 }: {
-  scope: "agent" | "run" | "shared";
+  scope: "agent" | "run" | "shared" | "project";
   id?: string;
   className?: string;
 }) {

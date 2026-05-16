@@ -20,6 +20,7 @@ export interface SessionDetail extends Session {
   providerUsed: string | null;
   errorMessage: string | null;
   triggerType: string;
+  input: Record<string, unknown> | null;
   messages: SessionMessage[];
   toolCalls: SessionToolCall[];
 }

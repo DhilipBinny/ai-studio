@@ -56,4 +56,5 @@ export const agentSessionSchema = z.object({
   message: z.string().min(1).max(50000),
   metadata: z.record(z.unknown()).optional(),
   channel: z.enum(["studio", "workflow", "cron"]).optional(),
+  async: z.boolean().optional(),
 });
