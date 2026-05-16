@@ -13,12 +13,14 @@ export const POST = withRBAC("AGENTS", 10, async (request, auth, params) => {
   const parsed = agentSessionSchema.safeParse(body);
   if (!parsed.success) return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
 
+  const channel = parsed.data.channel || "studio";
+
   const result = await runSession({
     agentId,
     tenantId: auth.tenantId,
     userId: auth.userId,
     message: parsed.data.message.trim(),
-    channel: "studio",
+    channel,
     metadata: parsed.data.metadata,
   });
 
@@ -32,7 +34,7 @@ export const POST = withRBAC("AGENTS", 10, async (request, auth, params) => {
     action: "agent.session_create",
     resourceType: "agent_session",
     resourceId: result.sessionId,
-    details: { agentId, channel: "studio" },
+    details: { agentId, channel },
   });
 
   return NextResponse.json(result, { status: 201 });

@@ -11,7 +11,7 @@ import { progressBus, truncatePreview } from "./progress-bus";
 import type { SessionInput, SessionResult, AgentConfig, ProviderConfig } from "./types";
 import type { ToolCall, ToolContext } from "./tool-executor";
 
-const MAX_TOOL_ROUNDS = 10;
+const MAX_TOOL_ROUNDS = 50;
 
 interface ToolCallBlock {
   type: string;
@@ -265,8 +265,9 @@ async function executeToolLoop(
   let totalCost = 0;
   let finalText = "";
 
+  const skipCompaction = ["sub_agent", "workflow", "cron"].includes(input.channel || "");
   for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    if (agent.providerModelId) {
+    if (agent.providerModelId && !skipCompaction) {
       await checkAndCompact(sessionId, input.tenantId, agent.providerModelId, providerConfig);
     }
 
