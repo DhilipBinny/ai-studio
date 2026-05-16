@@ -10,10 +10,7 @@ import { EmptyState } from "@/components/empty-state";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
 import type { Agent, ProviderModel } from "@ais-app/types";
-
-const STATUS_VARIANT: Record<string, "success" | "warning" | "secondary" | "error"> = {
-  draft: "warning", active: "success", disabled: "secondary", archived: "error",
-};
+import { STATUS_VARIANT } from "@/lib/constants";
 
 interface AgentListProps {
   agents: Agent[];
@@ -81,11 +78,11 @@ export function AgentList({
                   <TableCell>
                     <div className="flex gap-1">
                       {a.status === "active" && a.providerModelId && (
-                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onChatClick(a)} title="Chat">
+                        <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onChatClick(a)} title="Chat" aria-label="Chat">
                           <MessageSquare className="h-3 w-3" />
                         </Button>
                       )}
-                      <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onEditClick(a)} title="Edit">
+                      <Button variant="ghost" size="sm" className="h-7 px-2" onClick={() => onEditClick(a)} title="Edit" aria-label="Edit">
                         <Pencil className="h-3 w-3" />
                       </Button>
                     </div>

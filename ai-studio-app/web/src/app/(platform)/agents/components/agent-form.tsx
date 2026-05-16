@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, X, ChevronDown, ChevronRight, BookOpen, Trash2, Plug, Wrench } from "lucide-react";
+import { FormError } from "@/components/form-error";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -78,7 +79,7 @@ function RulesEditor({ rules, onChange }: { rules: AgentRule[]; onChange: (r: Ag
             <div key={i} className="flex items-start gap-2 text-sm">
               <span className="text-muted-foreground mt-0.5 shrink-0">-</span>
               <span className="flex-1">{r.rule}</span>
-              <button type="button" onClick={() => onChange(rules.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive mt-0.5 shrink-0">
+              <button type="button" onClick={() => onChange(rules.filter((_, j) => j !== i))} className="text-muted-foreground hover:text-destructive mt-0.5 shrink-0" aria-label="Remove rule">
                 <X className="h-3 w-3" />
               </button>
             </div>
@@ -165,7 +166,7 @@ function KBAssignment({ agentId }: { agentId: string }) {
                 <span className="text-sm">{kb.kbName}</span>
                 <span className="text-xs text-muted-foreground ml-2">{kb.documentCount} docs &middot; {kb.chunkCount.toLocaleString()} chunks</span>
               </div>
-              <button type="button" onClick={() => handleRemove(kb.id)} className="text-muted-foreground hover:text-destructive">
+              <button type="button" onClick={() => handleRemove(kb.id)} className="text-muted-foreground hover:text-destructive" aria-label="Remove knowledge base">
                 <Trash2 className="h-3 w-3" />
               </button>
             </div>
@@ -256,7 +257,7 @@ function ConnectorAssignment({ agentId }: { agentId: string }) {
                 <span className="text-sm">{c.connectorName}</span>
                 <Badge variant={c.status === "active" ? "success" : "secondary"} className="ml-2 text-[9px]">{c.status}</Badge>
               </div>
-              <button type="button" onClick={() => handleRemove(c.id)} className="text-muted-foreground hover:text-destructive">
+              <button type="button" onClick={() => handleRemove(c.id)} className="text-muted-foreground hover:text-destructive" aria-label="Remove connector">
                 <Trash2 className="h-3 w-3" />
               </button>
             </div>
@@ -352,7 +353,7 @@ function ToolAssignment({ agentId }: { agentId: string }) {
                 <span className="text-sm">{t.toolDisplayName}</span>
                 <ToolRiskBadge level={t.riskLevel} />
               </div>
-              <button type="button" onClick={() => handleRemove(t.id)} className="text-muted-foreground hover:text-destructive">
+              <button type="button" onClick={() => handleRemove(t.id)} className="text-muted-foreground hover:text-destructive" aria-label="Remove tool">
                 <Trash2 className="h-3 w-3" />
               </button>
             </div>
@@ -422,7 +423,7 @@ export function CreateAgentForm({ models, onCreated }: { models: ProviderModel[]
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-      {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
+      <FormError message={error} />
       <div className="space-y-2">
         <Label>Name <span className="text-destructive">*</span></Label>
         <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required placeholder="Document Reviewer" />
@@ -547,7 +548,7 @@ export function EditAgentForm({ agent, models, onSaved }: { agent: Agent; models
 
   return (
     <form onSubmit={handleSave} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-      {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
+      <FormError message={error} />
 
       <div className="space-y-1">
         <p className="text-sm font-mono text-muted-foreground">{agent.slug}</p>

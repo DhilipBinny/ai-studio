@@ -1,6 +1,7 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
 import { formatDate, formatRelativeTime } from "@/lib/utils";
+import { SYSTEM_CONFIG_SCHEMA, getConfigDefaults, MODULES, type ConfigSectionDef, type ConfigFieldDef } from "@ais-app/types";
 
 import { useState, useEffect, useCallback } from "react";
 import { Loader2, Copy, Key, Trash2 } from "lucide-react";
@@ -10,6 +11,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { PasswordInput } from "@/components/password-input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -42,8 +44,6 @@ export default function SettingsPage() {
     </></RequirePermission>
   );
 }
-
-import { SYSTEM_CONFIG_SCHEMA, getConfigDefaults, type ConfigSectionDef, type ConfigFieldDef } from "@ais-app/types";
 
 function GeneralTab() {
   const [configs, setConfigs] = useState<SystemConfig[]>([]);
@@ -309,10 +309,10 @@ function AdvancedTab() {
         <Skeleton className="mt-3 h-32 w-full" />
       ) : editing ? (
         <div className="mt-3 space-y-2">
-          <textarea
+          <Textarea
             value={editJson}
             onChange={(e) => setEditJson(e.target.value)}
-            className="w-full rounded-md border border-slate-300 bg-background px-3 py-2 font-mono text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+            className="w-full font-mono text-xs"
             rows={Math.min(editJson.split("\n").length + 1, 20)}
           />
           <Button size="sm" onClick={handleSave} disabled={saving}>
@@ -395,7 +395,6 @@ function ConfigField({ field, value, onChange }: { field: ConfigFieldDef; value:
   );
 }
 
-import { MODULES } from "@ais-app/types";
 const MODULE_IDS = MODULES.map((m) => m.id);
 const LEVELS = [0, 10, 20] as const;
 const LEVEL_LABELS: Record<number, string> = { 0: "None", 10: "View", 20: "Full" };

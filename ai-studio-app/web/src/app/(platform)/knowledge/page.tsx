@@ -1,7 +1,9 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatSize } from "@/lib/utils";
+import { STATUS_VARIANT } from "@/lib/constants";
+import { FormError } from "@/components/form-error";
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, BookOpen, Upload, Pencil, Trash2, Loader2, FileText, CheckCircle, AlertCircle, Clock, RefreshCw, Cpu, Cloud } from "lucide-react";
@@ -62,12 +64,6 @@ const STATUS_ICON: Record<string, typeof CheckCircle> = {
   error: AlertCircle,
 };
 
-const STATUS_VARIANT: Record<string, "success" | "warning" | "secondary" | "error"> = {
-  ready: "success",
-  processing: "warning",
-  uploaded: "secondary",
-  error: "error",
-};
 
 export default function KnowledgePage() {
   const [selectedKB, setSelectedKB] = useState<string | null>(null);
@@ -238,11 +234,6 @@ function KBDetailView({ kbId, onBack }: { kbId: string; onBack: () => void }) {
     if (res.ok) { fetchDocs(); fetchKB(); }
   }
 
-  function formatSize(bytes: number): string {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
 
   return (
     <>
@@ -301,9 +292,7 @@ function KBDetailView({ kbId, onBack }: { kbId: string; onBack: () => void }) {
           </div>
         </CardHeader>
         <CardContent>
-          {uploadError && (
-            <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive mb-4">{uploadError}</div>
-          )}
+          {uploadError && <div className="mb-4"><FormError message={uploadError} /></div>}
 
           {!loading && docs.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -443,7 +432,7 @@ function CreateKBForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
+      <FormError message={error} />
       <div className="space-y-2">
         <Label>Name <span className="text-destructive">*</span></Label>
         <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required placeholder="Product Documentation" />
@@ -621,7 +610,7 @@ function EditKBForm({ kb, onSaved }: { kb: KnowledgeBase; onSaved: () => void })
 
   return (
     <form onSubmit={handleSave} className="space-y-4">
-      {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
+      <FormError message={error} />
 
       <div className="space-y-1">
         <p className="text-xs text-muted-foreground">Model: {kb.embeddingModel} &middot; {kb.documentCount} docs &middot; {kb.chunkCount.toLocaleString()} chunks</p>

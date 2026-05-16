@@ -4,6 +4,7 @@ import {
   Play, Loader2,
 } from "lucide-react";
 import { WorkflowCanvas } from "@/components/workflow/canvas";
+import { FormError } from "@/components/form-error";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
@@ -15,15 +16,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatRelativeTime } from "@/lib/utils";
+import { STATUS_VARIANT } from "@/lib/constants";
 import { RunDetail } from "./run-detail";
 import type { Workflow, WorkflowNode, WorkflowEdge, WorkflowRun, AgentSummary, ProviderModel } from "@ais-app/types";
 
 type Agent = AgentSummary;
-
-const STATUS_VARIANT: Record<string, "success" | "warning" | "secondary" | "error" | "info"> = {
-  draft: "warning", active: "success", disabled: "secondary", archived: "error",
-  pending: "secondary", running: "info", waiting: "warning", completed: "success", failed: "error", cancelled: "secondary",
-};
 
 export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onBack: () => void }) {
   const [workflow, setWorkflow] = useState<Workflow | null>(null);
@@ -33,6 +30,7 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
   const [agents, setAgents] = useState<Agent[]>([]);
   const [models, setModels] = useState<ProviderModel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saveError, setSaveError] = useState("");
   const [tab, setTab] = useState<"nodes" | "runs">("nodes");
   const [running, setRunning] = useState(false);
   const [runInput, setRunInput] = useState("{}");
@@ -82,6 +80,8 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
     updatedNodes: WorkflowNode[],
     updatedEdges: Array<{ fromNodeId: string; toNodeId: string; conditionExpr?: string; conditionLabel?: string; edgeType?: string; sortOrder?: number; sourceHandle?: string; targetHandle?: string }>,
   ) {
+    setSaveError("");
+
     // Step 1: Save nodes — returns inserted nodes in order with new UUIDs
     const nodesRes = await fetch(`/api/workflows/${workflowId}/nodes`, {
       method: "PUT",
@@ -99,7 +99,9 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
     });
 
     if (!nodesRes.ok) {
-      console.error("Failed to save nodes:", await nodesRes.text());
+      const errorText = await nodesRes.text();
+      console.error("Failed to save nodes:", errorText);
+      setSaveError("Failed to save workflow nodes. Please try again.");
       return; // abort — don't save edges with stale IDs
     }
 
@@ -132,7 +134,9 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
     });
 
     if (!edgesRes.ok) {
-      console.error("Failed to save edges:", await edgesRes.text());
+      const errorText = await edgesRes.text();
+      console.error("Failed to save edges:", errorText);
+      setSaveError("Failed to save workflow edges. Please try again.");
       return;
     }
 
@@ -164,6 +168,8 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
         <div className="flex-1" />
         <Badge variant={STATUS_VARIANT[workflow.status] || "secondary"}>{workflow.status}</Badge>
       </div>
+
+      <FormError message={saveError} />
 
       <div className="flex items-start justify-between mb-4">
         <div>

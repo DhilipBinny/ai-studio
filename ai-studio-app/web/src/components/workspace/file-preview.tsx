@@ -7,6 +7,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Markdown } from "@/components/markdown";
+import { formatSize } from "@/lib/utils";
 
 interface FileData {
   name: string;
@@ -16,13 +17,6 @@ interface FileData {
   content: string | null;
   truncated: boolean;
   binary: boolean;
-}
-
-function formatSize(bytes: number): string {
-  if (bytes === 0) return "0 B";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".js", ".jsx", ".py", ".sh", ".sql", ".css", ".html", ".yaml", ".yml", ".xml", ".csv", ".env", ".toml"]);

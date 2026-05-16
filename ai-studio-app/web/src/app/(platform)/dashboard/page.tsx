@@ -12,6 +12,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
+import { formatRelativeTime, formatNumber, formatCost } from "@/lib/utils";
+import { STATUS_VARIANT, CHANNEL_LABEL } from "@/lib/constants";
 
 interface TopAgent {
   agentId: string;
@@ -50,41 +52,6 @@ interface Stats {
   recentSessions: RecentSession[];
 }
 
-const STATUS_VARIANT: Record<string, "info" | "success" | "error" | "warning" | "secondary"> = {
-  pending: "secondary", running: "info", waiting: "info", completed: "success", failed: "error", cancelled: "warning", timeout: "error",
-};
-
-const CHANNEL_LABEL: Record<string, string> = {
-  studio: "Studio", api: "API", embedded: "Embedded", workflow: "Workflow",
-};
-
-function formatNumber(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
-
-function formatCost(usd: number): string {
-  if (usd === 0) return "$0.00";
-  if (usd < 0.01) return `$${usd.toFixed(4)}`;
-  if (usd < 1) return `$${usd.toFixed(3)}`;
-  if (usd >= 1000) return `$${(usd / 1000).toFixed(1)}K`;
-  return `$${usd.toFixed(2)}`;
-}
-
-function formatTime(ts: string): string {
-  const d = new Date(ts);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
@@ -176,7 +143,7 @@ export default function DashboardPage() {
                         {s.costUsd > 0 && <span className="font-mono">{formatCost(s.costUsd)}</span>}
                       </div>
                     </div>
-                    <span className="text-[11px] text-muted-foreground shrink-0">{formatTime(s.createdAt)}</span>
+                    <span className="text-[11px] text-muted-foreground shrink-0">{formatRelativeTime(s.createdAt)}</span>
                   </div>
                 ))}
               </div>

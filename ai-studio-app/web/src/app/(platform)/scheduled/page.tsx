@@ -1,6 +1,7 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
 import { formatRelativeTime } from "@/lib/utils";
+import { FormError } from "@/components/form-error";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Play, Trash2, Loader2, Clock, Pause } from "lucide-react";
@@ -90,6 +91,7 @@ export default function ScheduledJobsPage() {
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div className={`h-2 w-2 rounded-full shrink-0 ${j.enabled ? "bg-green-500" : "bg-gray-300"}`} />
+                    <span className="sr-only">{j.enabled ? "Enabled" : "Disabled"}</span>
                     <div>
                       <div className="font-medium text-sm">{j.name}</div>
                       <div className="text-[11px] text-muted-foreground font-mono truncate max-w-48">{j.prompt.slice(0, 60)}</div>
@@ -175,7 +177,7 @@ function CreateCronJobForm({ agents, workflows, onCreated }: { agents: Array<{ i
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <div className="rounded-lg border border-border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
+      <FormError message={error} />
       <div className="space-y-2"><Label>Name <span className="text-destructive">*</span></Label><Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required placeholder="Daily Summary" /></div>
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-2">

@@ -112,7 +112,7 @@ export default function AuditLogPage() {
                           </div>
                           <div className="col-span-2">
                             <span className="font-medium text-muted-foreground">Details:</span>
-                            <pre className="mt-1 rounded-md bg-background border border-border border-border p-2 font-mono text-xs overflow-auto max-h-32">
+                            <pre className="mt-1 rounded-md bg-background border border-border p-2 font-mono text-xs overflow-auto max-h-32">
                               {JSON.stringify(e.details, null, 2)}
                             </pre>
                           </div>

@@ -92,7 +92,7 @@ export default function LoginPage() {
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white/90 backdrop-blur-sm p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.1)]">
+        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-sm p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.1)]">
           {error && (
             <div className="mb-5 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
               {error}
@@ -111,7 +111,7 @@ export default function LoginPage() {
                   placeholder={BRAND.emailPlaceholder}
                   autoComplete="username"
                   autoFocus
-                  className={`h-11 px-4 text-sm focus-visible:ring-brand/30 ${fieldErrors.email ? "border-destructive focus-visible:ring-destructive/30" : "border-slate-300"}`}
+                  className={`h-11 px-4 text-sm focus-visible:ring-brand/30 ${fieldErrors.email ? "border-destructive focus-visible:ring-destructive/30" : "border-input"}`}
                 />
                 {fieldErrors.email && (
                   <p className="text-xs text-destructive">{fieldErrors.email}</p>
@@ -125,7 +125,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setFieldErrors((p) => ({ ...p, password: undefined })); }}
                   autoComplete="current-password"
-                  className={`h-11 px-4 text-sm focus-visible:ring-brand/30 ${fieldErrors.password ? "border-destructive focus-visible:ring-destructive/30" : "border-slate-300"}`}
+                  className={`h-11 px-4 text-sm focus-visible:ring-brand/30 ${fieldErrors.password ? "border-destructive focus-visible:ring-destructive/30" : "border-input"}`}
                 />
                 {fieldErrors.password && (
                   <p className="text-xs text-destructive">{fieldErrors.password}</p>
@@ -159,7 +159,7 @@ export default function LoginPage() {
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                   required
-                  className="h-11 border-slate-300 text-center text-2xl tracking-[0.5em] font-mono focus-visible:ring-brand/30"
+                  className="h-11 border-input text-center text-2xl tracking-[0.5em] font-mono focus-visible:ring-brand/30"
                   placeholder="000000"
                   autoFocus
                 />

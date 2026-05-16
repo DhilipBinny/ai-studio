@@ -1,9 +1,10 @@
 "use client";
 import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
+import { FormError } from "@/components/form-error";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Wrench, Pencil, Loader2, Filter } from "lucide-react";
+import { Plus, Wrench, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -162,7 +163,7 @@ function CreateToolForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
+      <FormError message={error} />
       <div className="space-y-2">
         <Label>Machine Name <span className="text-destructive">*</span></Label>
         <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required pattern="[a-z][a-z0-9_]*" placeholder="web_search" />
@@ -244,7 +245,7 @@ function EditToolForm({ tool, onSaved }: { tool: Tool; onSaved: () => void }) {
 
   return (
     <form onSubmit={handleSave} className="space-y-4">
-      {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
+      <FormError message={error} />
 
       <div className="space-y-1">
         <p className="text-sm font-mono text-muted-foreground">{tool.name}</p>

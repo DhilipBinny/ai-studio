@@ -49,7 +49,7 @@ export default function ForgotPasswordPage() {
           </h1>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white/90 backdrop-blur-sm p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.1)]">
+        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-sm p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.1)]">
           {submitted ? (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-50">
@@ -84,7 +84,7 @@ export default function ForgotPasswordPage() {
                     placeholder={BRAND.emailPlaceholder}
                     required
                     autoFocus
-                    className="h-11 border-slate-300 px-4 text-sm focus-visible:ring-brand/30"
+                    className="h-11 border-input px-4 text-sm focus-visible:ring-brand/30"
                   />
                 </div>
                 <Button type="submit" className="h-11 w-full text-sm font-medium" disabled={submitting}>

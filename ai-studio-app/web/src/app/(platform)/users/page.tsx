@@ -2,6 +2,7 @@
 import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 import { formatRelativeTime } from "@/lib/utils";
+import { FormError } from "@/components/form-error";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Users, Search, Pencil, Loader2 } from "lucide-react";
@@ -158,7 +159,7 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
+      <FormError message={error} />
       <div className="space-y-2"><Label>Name</Label><Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required /></div>
       <div className="space-y-2"><Label>Email</Label><Input type="email" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} required /></div>
       <PasswordInput
@@ -251,7 +252,7 @@ function EditUserForm({ user, onSaved }: { user: User; onSaved: () => void }) {
 
   return (
     <form onSubmit={handleSave} className="space-y-4">
-      {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
+      <FormError message={error} />
       {message && <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">{message}</div>}
 
       <div className="space-y-1">

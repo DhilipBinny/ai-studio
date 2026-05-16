@@ -2,9 +2,11 @@
 import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 import { formatRelativeTime } from "@/lib/utils";
+import { STATUS_VARIANT } from "@/lib/constants";
+import { FormError } from "@/components/form-error";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, Plug, Pencil, Loader2, Trash2, TestTube, Check, Wrench } from "lucide-react";
+import { Plus, Plug, Pencil, Loader2, TestTube, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CopyButton } from "@/components/ui/copy-button";
@@ -28,9 +30,6 @@ interface Connector {
   lastTestedAt: string | null; lastError: string | null; createdAt: string;
 }
 
-const STATUS_VARIANT: Record<string, "success" | "warning" | "error" | "secondary"> = {
-  active: "success", inactive: "warning", error: "error", testing: "secondary",
-};
 
 export default function ConnectorsPage() {
   const [connectorsList, setConnectorsList] = useState<Connector[]>([]);
@@ -165,7 +164,7 @@ function CreateConnectorForm({ onCreated }: { onCreated: () => void }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
-      {error && <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>}
+      <FormError message={error} />
       <div className="space-y-2">
         <Label>Name <span className="text-destructive">*</span></Label>
         <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required placeholder="GitHub" />

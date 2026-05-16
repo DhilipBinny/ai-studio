@@ -16,32 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import type { SessionDetail, SessionToolCall } from "@ais-app/types";
 import { MessageRow } from "./message-row";
-
-const STATUS_VARIANT: Record<string, "info" | "success" | "error" | "warning" | "secondary"> = {
-  pending: "secondary", running: "info", waiting: "info", waiting_approval: "warning", completed: "success", failed: "error", cancelled: "warning", timeout: "error",
-};
-
-const CHANNEL_LABEL: Record<string, string> = {
-  studio: "Studio", api: "API", embedded: "Embedded", workflow: "Workflow", connector: "Connector",
-};
-
-function formatCost(usd: number): string {
-  if (usd === 0) return "$0.00";
-  if (usd < 0.01) return `$${usd.toFixed(4)}`;
-  if (usd < 1) return `$${usd.toFixed(3)}`;
-  if (usd >= 1000) return `$${(usd / 1000).toFixed(1)}K`;
-  return `$${usd.toFixed(2)}`;
-}
-
-function formatDuration(startedAt: string | null, completedAt: string | null): string {
-  if (!startedAt) return "—";
-  const start = new Date(startedAt).getTime();
-  const end = completedAt ? new Date(completedAt).getTime() : Date.now();
-  const ms = end - start;
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${Math.floor(ms / 60000)}m ${Math.floor((ms % 60000) / 1000)}s`;
-}
+import { formatCost, formatDuration } from "@/lib/utils";
+import { STATUS_VARIANT, CHANNEL_LABEL } from "@/lib/constants";
 
 export function SessionDetailView({ sessionId, onBack }: { sessionId: string; onBack: () => void }) {
   const [session, setSession] = useState<SessionDetail | null>(null);

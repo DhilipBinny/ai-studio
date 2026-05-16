@@ -57,7 +57,7 @@ function ResetPasswordForm() {
     return (
       <div className="relative flex min-h-svh flex-col items-center justify-center p-6">
         <AuthBackground />
-        <div className="relative z-10 rounded-xl border border-slate-200 bg-white/90 backdrop-blur-sm p-8 shadow-md text-center max-w-sm">
+        <div className="relative z-10 rounded-xl border border-border bg-card/90 backdrop-blur-sm p-8 shadow-md text-center max-w-sm">
           <p className="text-sm text-destructive">Invalid reset link. No token provided.</p>
           <a href="/login" className="mt-4 inline-block text-xs text-brand hover:underline">Back to login</a>
         </div>
@@ -76,7 +76,7 @@ function ResetPasswordForm() {
           </h1>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white/90 backdrop-blur-sm p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.1)]">
+        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-sm p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.1)]">
           {submitted ? (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-50">

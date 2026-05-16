@@ -5,7 +5,7 @@ import { Folder, File, FileCode, FileText, ChevronRight, FolderOpen } from "luci
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { EmptyState } from "@/components/empty-state";
 import { TableSkeleton } from "@/components/table-skeleton";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatRelativeTime, formatSize } from "@/lib/utils";
 import { FilePreview } from "./file-preview";
 
 interface FileEntry {
@@ -26,12 +26,6 @@ function FileIcon({ name, type }: { name: string; type: string }) {
   return <File className="h-4 w-4 text-muted-foreground" />;
 }
 
-function formatSize(bytes: number): string {
-  if (bytes === 0) return "—";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 export function FileBrowser({
   scope, id, className,
