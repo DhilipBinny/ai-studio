@@ -66,7 +66,7 @@ export const execTools: ToolRegistration[] = [
         type: "object",
         properties: {
           command: { type: "string", description: "Shell command to execute" },
-          timeout: { type: "number", description: "Timeout in seconds (default: 30, max: 120)" },
+          timeout: { type: "number", description: "Timeout in seconds (default: 30, max: 300)" },
         },
         required: ["command"],
       },
@@ -140,7 +140,7 @@ export const execTools: ToolRegistration[] = [
           },
           timeout: {
             type: "number",
-            description: "Timeout in seconds per command (default 30, max 120)",
+            description: "Timeout in seconds per command (default 30, max 300)",
           },
         },
         required: ["commands"],
