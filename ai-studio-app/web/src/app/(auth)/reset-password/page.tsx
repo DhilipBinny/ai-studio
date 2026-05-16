@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/password-input";
 import { Loader2, CheckCircle } from "lucide-react";
 import { BRAND } from "@/lib/branding";
+import { AuthBackground } from "../auth-background";
 
 export default function ResetPasswordPage() {
   const searchParams = useSearchParams();
@@ -41,8 +42,9 @@ export default function ResetPasswordPage() {
 
   if (!token) {
     return (
-      <div className="flex min-h-svh flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6">
-        <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-md text-center max-w-sm">
+      <div className="relative flex min-h-svh flex-col items-center justify-center p-6">
+        <AuthBackground />
+        <div className="relative z-10 rounded-xl border border-slate-200 bg-white/90 backdrop-blur-sm p-8 shadow-md text-center max-w-sm">
           <p className="text-sm text-destructive">Invalid reset link. No token provided.</p>
           <a href="/login" className="mt-4 inline-block text-xs text-brand hover:underline">Back to login</a>
         </div>
@@ -51,8 +53,9 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 md:p-10">
-      <div className="w-full max-w-[420px] space-y-8">
+    <div className="relative flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
+      <AuthBackground />
+      <div className="relative z-10 w-full max-w-[420px] space-y-8">
         <div className="flex flex-col items-center space-y-3 text-center">
           <img src={BRAND.logo} alt={BRAND.logoAlt} className="h-14 w-auto" />
           <h1 className="text-2xl font-semibold tracking-tight text-brand">
@@ -60,7 +63,7 @@ export default function ResetPasswordPage() {
           </h1>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.1)]">
+        <div className="rounded-xl border border-slate-200 bg-white/90 backdrop-blur-sm p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.1)]">
           {submitted ? (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-50">
