@@ -413,8 +413,8 @@ export async function getWorkflowRunDetail(
     .select({
       id: workflowRunSteps.id,
       nodeId: workflowRunSteps.workflowNodeId,
-      nodeName: workflowNodes.name,
-      nodeType: workflowNodes.nodeType,
+      nodeName: sql<string>`COALESCE(${workflowNodes.name}, ${workflowRunSteps.nodeName}, 'Unknown')`.as("node_name"),
+      nodeType: sql<string>`COALESCE(${workflowNodes.nodeType}::text, ${workflowRunSteps.nodeType}, 'unknown')`.as("node_type"),
       status: workflowRunSteps.status,
       input: workflowRunSteps.input,
       output: workflowRunSteps.output,
@@ -425,7 +425,7 @@ export async function getWorkflowRunDetail(
       completedAt: workflowRunSteps.completedAt,
     })
     .from(workflowRunSteps)
-    .innerJoin(
+    .leftJoin(
       workflowNodes,
       eq(workflowRunSteps.workflowNodeId, workflowNodes.id),
     )

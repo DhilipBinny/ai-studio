@@ -30,6 +30,7 @@ export function createStepRecorder(): StepRecorder {
 
     const [step] = await db.insert(workflowRunSteps).values({
       tenantId, workflowRunId: runId, workflowNodeId: node.id,
+      nodeName: node.name, nodeType: node.nodeType,
       status: "running", input: state, startedAt: new Date(), lastHeartbeatAt: new Date(),
     }).returning({ id: workflowRunSteps.id });
 

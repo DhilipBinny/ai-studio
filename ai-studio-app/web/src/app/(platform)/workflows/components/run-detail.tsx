@@ -1,28 +1,19 @@
 "use client";
 import { useState, useEffect } from "react";
 import {
-  ArrowLeft, Loader2, CheckCircle2, XCircle, Clock, Zap,
+  Loader2, CheckCircle2, XCircle, Clock, Zap,
   ChevronDown, ChevronRight, FolderOpen,
 } from "lucide-react";
 import { FileBrowser } from "@/components/workspace/file-browser";
 import { EventFeed, HistoricalEventFeed } from "@/components/activity/event-feed";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { formatRelativeTime } from "@/lib/utils";
+import { STATUS_VARIANT } from "@/lib/constants";
+import { NODE_COLOR_MAP } from "@/components/workflow/canvas-types";
 import type { WorkflowRun, RunStep } from "@ais-app/types";
-
-const STATUS_VARIANT: Record<string, "success" | "warning" | "secondary" | "error" | "info"> = {
-  draft: "warning", active: "success", disabled: "secondary", archived: "error",
-  pending: "secondary", running: "info", waiting: "warning", completed: "success", failed: "error", cancelled: "secondary",
-};
-
-const STEP_NODE_COLORS: Record<string, string> = {
-  input: "#3b82f6", output: "#10b981", condition: "#f59e0b", switch: "#ea580c",
-  loop: "#6366f1", iteration: "#7c3aed", delay: "#94a3b8", sub_workflow: "#0284c7",
-  agent: "#9333ea", llm: "#c026d3", knowledge_search: "#db2777",
-  tool: "#0d9488", http_request: "#0891b2", code: "#475569",
-  transform: "#0e7490", aggregate: "#059669", human_review: "#dc2626",
-};
 
 export function RunDetail({ workflowId, runId, onBack }: { workflowId: string; runId: string; onBack: () => void }) {
   const [run, setRun] = useState<WorkflowRun & { steps: RunStep[] } | null>(null);
@@ -38,7 +29,17 @@ export function RunDetail({ workflowId, runId, onBack }: { workflowId: string; r
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1" /> Runs</Button>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="#" onClick={(e) => { e.preventDefault(); onBack(); }}>Runs</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Run Detail</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
         <div className="flex-1" />
         <Badge variant={STATUS_VARIANT[run.status] || "secondary"}>{run.status}</Badge>
       </div>
@@ -115,7 +116,7 @@ function RunFilesSection({ runId }: { runId: string }) {
 
 function StepRow({ step, index }: { step: RunStep; index: number }) {
   const [expanded, setExpanded] = useState(false);
-  const color = STEP_NODE_COLORS[step.nodeType] || "#6b7280";
+  const color = NODE_COLOR_MAP[step.nodeType] || "#6b7280";
   const statusIcon = step.status === "completed" ? <CheckCircle2 className="h-4 w-4 text-green-600" /> :
     step.status === "failed" ? <XCircle className="h-4 w-4 text-red-600" /> :
     step.status === "waiting_human" ? <Clock className="h-4 w-4 text-amber-600" /> :
