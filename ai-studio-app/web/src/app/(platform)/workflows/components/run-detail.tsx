@@ -1,12 +1,17 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, CheckCircle2, XCircle, Clock, Zap,
-  ChevronDown, ChevronRight, FolderOpen,
+  ChevronDown, ChevronRight, FolderOpen, AlertCircle,
 } from "lucide-react";
 import { FileBrowser } from "@/components/workspace/file-browser";
 import { EventFeed, HistoricalEventFeed } from "@/components/activity/event-feed";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
@@ -19,9 +24,14 @@ export function RunDetail({ workflowId, runId, onBack }: { workflowId: string; r
   const [run, setRun] = useState<WorkflowRun & { steps: RunStep[] } | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetch(`/api/workflows/${workflowId}/runs/${runId}`).then((r) => r.ok ? r.json() : null).then((d) => { setRun(d); setLoading(false); });
+  const loadRun = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch(`/api/workflows/${workflowId}/runs/${runId}`);
+    if (res.ok) setRun(await res.json());
+    setLoading(false);
   }, [workflowId, runId]);
+
+  useEffect(() => { loadRun(); }, [loadRun]);
 
   if (loading) return <div className="flex items-center justify-center h-32"><Loader2 className="h-5 w-5 animate-spin" /></div>;
   if (!run) return <div className="text-destructive">Run not found</div>;
@@ -65,6 +75,10 @@ export function RunDetail({ workflowId, runId, onBack }: { workflowId: string; r
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{run.errorMessage}</div>
       )}
 
+      {run.status === "waiting" && (
+        <HumanReviewPanel workflowId={workflowId} runId={runId} steps={run.steps} onResumed={loadRun} />
+      )}
+
       {(run.status === "running" || run.status === "waiting") ? (
         <EventFeed traceId={runId} enabled height={400} />
       ) : (
@@ -96,6 +110,162 @@ export function RunDetail({ workflowId, runId, onBack }: { workflowId: string; r
   );
 }
 
+// ---------------------------------------------------------------------------
+// Human Review Approval Panel
+// ---------------------------------------------------------------------------
+
+interface ReviewConfig {
+  prompt?: string;
+  reviewType?: string;
+  choices?: string[];
+  formFields?: Array<{ key: string; label: string; type: string; options?: string[]; required?: boolean }>;
+}
+
+function HumanReviewPanel({ workflowId, runId, steps, onResumed }: {
+  workflowId: string; runId: string; steps: RunStep[]; onResumed: () => void;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const waitingStep = [...steps].reverse().find((s) => s.status === "waiting_human");
+  if (!waitingStep?.output) return null;
+
+  const { prompt, reviewType, choices, formFields } = waitingStep.output as ReviewConfig;
+
+  async function submitDecision(decision: Record<string, unknown>) {
+    setSubmitting(true);
+    setError("");
+    const res = await fetch(`/api/workflows/${workflowId}/runs/${runId}/resume`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ decision }),
+    });
+    if (res.ok) {
+      onResumed();
+    } else {
+      const d = await res.json().catch(() => null);
+      setError(d?.error || "Failed to submit decision");
+    }
+    setSubmitting(false);
+  }
+
+  return (
+    <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 space-y-3">
+      <div className="flex items-start gap-2">
+        <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Human Review Required</p>
+          <p className="text-xs text-amber-700/80 dark:text-amber-300/80 mt-0.5">
+            This workflow is paused and waiting for your input.
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-md border border-amber-200 dark:border-amber-800 bg-card p-4 space-y-4">
+        {prompt && <p className="text-sm text-foreground whitespace-pre-wrap">{prompt}</p>}
+        {error && <p className="text-xs text-destructive">{error}</p>}
+
+        {(!reviewType || reviewType === "approve_deny") && (
+          <ApproveDenyForm submitting={submitting} onSubmit={submitDecision} />
+        )}
+        {reviewType === "choice" && (
+          <ChoiceForm choices={choices || []} submitting={submitting} onSubmit={submitDecision} />
+        )}
+        {reviewType === "form" && (
+          <CustomFormReview formFields={formFields || []} submitting={submitting} onSubmit={submitDecision} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ApproveDenyForm({ submitting, onSubmit }: { submitting: boolean; onSubmit: (d: Record<string, unknown>) => void }) {
+  const [comment, setComment] = useState("");
+  return (
+    <div className="space-y-3">
+      <div>
+        <Label htmlFor="review-comment" className="text-xs text-muted-foreground">Comment (optional)</Label>
+        <Textarea id="review-comment" placeholder="Add a reason for your decision..." value={comment} onChange={(e) => setComment(e.target.value)} className="mt-1" rows={2} />
+      </div>
+      <div className="flex gap-2">
+        <Button size="sm" variant="destructive" disabled={submitting} onClick={() => onSubmit({ approved: false, comment: comment || undefined })}>
+          {submitting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+          Deny
+        </Button>
+        <Button size="sm" disabled={submitting} className="bg-green-600 hover:bg-green-700 text-white" onClick={() => onSubmit({ approved: true, comment: comment || undefined })}>
+          {submitting ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <CheckCircle2 className="h-3 w-3 mr-1" />}
+          Approve
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ChoiceForm({ choices, submitting, onSubmit }: { choices: string[]; submitting: boolean; onSubmit: (d: Record<string, unknown>) => void }) {
+  const [selected, setSelected] = useState("");
+  const [comment, setComment] = useState("");
+  return (
+    <div className="space-y-3">
+      <div className="space-y-2">
+        {choices.map((choice) => (
+          <label key={choice} className="flex items-center gap-2 cursor-pointer">
+            <input type="radio" name="review-choice" value={choice} checked={selected === choice} onChange={() => setSelected(choice)} className="h-4 w-4 accent-primary" />
+            <span className="text-sm">{choice}</span>
+          </label>
+        ))}
+      </div>
+      <div>
+        <Label htmlFor="choice-comment" className="text-xs text-muted-foreground">Comment (optional)</Label>
+        <Textarea id="choice-comment" placeholder="Add a comment..." value={comment} onChange={(e) => setComment(e.target.value)} className="mt-1" rows={2} />
+      </div>
+      <Button size="sm" disabled={submitting || !selected} onClick={() => onSubmit({ choice: selected, comment: comment || undefined })}>
+        {submitting && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+        Submit
+      </Button>
+    </div>
+  );
+}
+
+function CustomFormReview({ formFields, submitting, onSubmit }: {
+  formFields: Array<{ key: string; label: string; type: string; options?: string[]; required?: boolean }>;
+  submitting: boolean; onSubmit: (d: Record<string, unknown>) => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  function setValue(key: string, value: string) { setValues((prev) => ({ ...prev, [key]: value })); }
+
+  const allRequiredFilled = formFields.filter((f) => f.required).every((f) => values[f.key]?.trim());
+
+  return (
+    <div className="space-y-3">
+      {formFields.map((field) => (
+        <div key={field.key}>
+          <Label htmlFor={`form-${field.key}`} className="text-xs">
+            {field.label}{field.required && <span className="text-destructive ml-0.5">*</span>}
+          </Label>
+          {field.type === "textarea" ? (
+            <Textarea id={`form-${field.key}`} value={values[field.key] || ""} onChange={(e) => setValue(field.key, e.target.value)} className="mt-1" rows={3} />
+          ) : field.type === "select" && field.options ? (
+            <Select id={`form-${field.key}`} value={values[field.key] || ""} onChange={(e) => setValue(field.key, e.target.value)} className="mt-1">
+              <option value="">Select...</option>
+              {field.options.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+            </Select>
+          ) : (
+            <Input id={`form-${field.key}`} type={field.type === "number" ? "number" : "text"} value={values[field.key] || ""} onChange={(e) => setValue(field.key, e.target.value)} className="mt-1" />
+          )}
+        </div>
+      ))}
+      <Button size="sm" disabled={submitting || !allRequiredFilled} onClick={() => onSubmit(values)}>
+        {submitting && <Loader2 className="h-3 w-3 animate-spin mr-1" />}
+        Submit
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Run Files Section
+// ---------------------------------------------------------------------------
+
 function RunFilesSection({ runId }: { runId: string }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -113,6 +283,10 @@ function RunFilesSection({ runId }: { runId: string }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Step Row
+// ---------------------------------------------------------------------------
 
 function StepRow({ step, index }: { step: RunStep; index: number }) {
   const [expanded, setExpanded] = useState(false);
