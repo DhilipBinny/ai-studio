@@ -1,6 +1,7 @@
 "use client";
 
-import { AlertTriangle, Trash2, ShieldOff, type LucideIcon } from "lucide-react";
+import { AlertTriangle, type LucideIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -43,8 +44,8 @@ export function ConfirmDialog({
     <Dialog open={open} onOpenChange={onOpenChange} size="sm">
       <DialogContent onClose={() => onOpenChange(false)}>
         <div className="flex items-start gap-4">
-          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${iconBg}`}>
-            <Icon className={`h-5 w-5 ${iconColor}`} />
+          <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full", iconBg)}>
+            <Icon className={cn("h-5 w-5", iconColor)} />
           </div>
           <DialogHeader className="border-b-0 pb-0 pr-0">
             <DialogTitle>{title}</DialogTitle>

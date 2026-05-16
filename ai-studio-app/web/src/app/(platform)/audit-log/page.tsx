@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 import { RequirePermission } from "@/components/require-permission";
 import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 import { formatDateTime } from "@/lib/utils";
@@ -74,9 +75,8 @@ export default function AuditLogPage() {
             {loading ? <TableSkeleton columns={5} rows={10} /> : entries.map((e) => {
               const isExpanded = expandedId === e.id;
               return (
-                <>
+                <React.Fragment key={e.id}>
                   <TableRow
-                    key={e.id}
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => setExpandedId(isExpanded ? null : e.id)}
                   >
@@ -128,7 +128,7 @@ export default function AuditLogPage() {
                       </TableCell>
                     </TableRow>
                   )}
-                </>
+                </React.Fragment>
               );
             })}
           </TableBody>

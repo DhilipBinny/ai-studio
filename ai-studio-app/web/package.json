@@ -33,6 +33,7 @@
     "@dagrejs/dagre": "^3.0.0",
     "@huggingface/transformers": "^3.4.0",
     "@radix-ui/react-dialog": "^1.1.15",
+    "@radix-ui/react-tabs": "^1.1.13",
     "@xyflow/react": "^12.10.2",
     "@zxcvbn-ts/core": "^3.0.4",
     "@zxcvbn-ts/language-common": "^3.0.4",

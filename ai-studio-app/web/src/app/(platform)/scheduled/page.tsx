@@ -5,6 +5,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Play, Trash2, Loader2, Clock, Pause } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,8 @@ export default function ScheduledJobsPage() {
   const [agents, setAgents] = useState<Array<{ id: string; name: string }>>([]);
   const [wfs, setWfs] = useState<Array<{ id: string; name: string }>>([]);
   const [running, setRunning] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<CronJob | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -49,9 +52,13 @@ export default function ScheduledJobsPage() {
     await fetchJobs();
   }
 
-  async function handleDelete(id: string) {
-    await fetch(`/api/cron-jobs/${id}`, { method: "DELETE" });
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    await fetch(`/api/cron-jobs/${deleteTarget.id}`, { method: "DELETE" });
     await fetchJobs();
+    setDeleting(false);
+    setDeleteTarget(null);
   }
 
   async function handleRunNow(id: string) {
@@ -116,7 +123,7 @@ export default function ScheduledJobsPage() {
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => handleToggle(j.id, j.enabled)} aria-label={j.enabled ? "Pause" : "Resume"}>
                       {j.enabled ? <Pause className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => handleDelete(j.id)} aria-label="Delete job">
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive" onClick={() => setDeleteTarget(j)} aria-label="Delete job">
                       <Trash2 className="h-3 w-3" />
                     </Button>
                   </div>
@@ -133,6 +140,16 @@ export default function ScheduledJobsPage() {
           <CreateCronJobForm agents={agents} workflows={wfs} onCreated={() => { setShowCreate(false); fetchJobs(); }} />
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        onConfirm={handleDelete}
+        title="Delete scheduled job"
+        description={`Are you sure you want to delete "${deleteTarget?.name || ""}"? The job will stop running immediately.`}
+        confirmLabel="Delete"
+        loading={deleting}
+      />
     </></RequirePermission>
   );
 }

@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Loader2, Copy, Key, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -418,6 +419,8 @@ function ProfilesTab() {
   );
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchProfiles = useCallback(async () => {
     setLoading(true);
@@ -481,9 +484,10 @@ function ProfilesTab() {
     setSaving(false);
   }
 
-  async function handleDelete(profileId: string, profileName: string) {
-    if (!confirm(`Delete profile "${profileName}"? Users with this profile will lose their permissions.`)) return;
-    const res = await fetch(`/api/profiles/${profileId}`, { method: "DELETE" });
+  async function handleDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const res = await fetch(`/api/profiles/${deleteTarget.id}`, { method: "DELETE" });
     if (res.ok) {
       setMessage({ text: "Profile deleted", ok: true });
       fetchProfiles();
@@ -491,6 +495,8 @@ function ProfilesTab() {
       const d = await res.json();
       setMessage({ text: d.error || "Failed to delete", ok: false });
     }
+    setDeleting(false);
+    setDeleteTarget(null);
   }
 
   return (
@@ -593,7 +599,7 @@ function ProfilesTab() {
                         <div className="flex gap-1 justify-center">
                           <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => startEdit(p)}>Edit</Button>
                           {!p.isSystem && (
-                            <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] text-muted-foreground" onClick={() => handleDelete(p.id, p.name)}>Delete</Button>
+                            <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px] text-muted-foreground" onClick={() => setDeleteTarget({ id: p.id, name: p.name })}>Delete</Button>
                           )}
                         </div>
                       )}
@@ -605,6 +611,15 @@ function ProfilesTab() {
           </Table>
         </div>
       </Card>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        onConfirm={handleDelete}
+        title="Delete profile"
+        description={`Delete "${deleteTarget?.name || ""}"? Users with this profile will lose their permissions.`}
+        confirmLabel="Delete"
+        loading={deleting}
+      />
     </div>
   );
 }
