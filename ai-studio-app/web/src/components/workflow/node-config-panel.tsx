@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { X, Settings2, Play } from "lucide-react";
+import { X, Settings2, Play, Plus, Trash2 } from "lucide-react";
 import { NODE_COLOR_MAP, NODE_LABEL_MAP, NODE_ICON_MAP } from "./canvas-types";
 
 import type { AgentSummary, ProviderModel } from "@ais-app/types";
@@ -145,6 +145,42 @@ export function NodeConfigPanel({
                 <div className="space-y-1">
                   <Label className="text-[11px]">Value to evaluate</Label>
                   <Input value={(config.value as string) || ""} onChange={(e) => updateConfig("value", e.target.value)} className="h-8 text-xs font-mono" placeholder="{{classifier.category}}" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-[11px]">Cases</Label>
+                  {((config.cases as string[]) || []).map((c, i) => (
+                    <div key={i} className="flex items-center gap-1">
+                      <Input
+                        value={c}
+                        onChange={(e) => {
+                          const updated = [...((config.cases as string[]) || [])];
+                          updated[i] = e.target.value;
+                          updateConfig("cases", updated);
+                        }}
+                        className="h-7 text-xs flex-1"
+                        placeholder={`Case ${i + 1}`}
+                      />
+                      <button
+                        onClick={() => {
+                          const updated = ((config.cases as string[]) || []).filter((_, idx) => idx !== i);
+                          updateConfig("cases", updated);
+                        }}
+                        className="text-muted-foreground hover:text-destructive p-0.5"
+                        title="Remove case"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => {
+                      const updated = [...((config.cases as string[]) || []), ""];
+                      updateConfig("cases", updated);
+                    }}
+                    className="flex items-center gap-1 text-[11px] text-primary hover:text-primary/80 font-medium"
+                  >
+                    <Plus className="h-3 w-3" /> Add Case
+                  </button>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px]">Default case</Label>

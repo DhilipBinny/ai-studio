@@ -94,6 +94,12 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
         })),
       }),
     });
+
+    if (!nodesRes.ok) {
+      console.error("Failed to save nodes:", await nodesRes.text());
+      return; // abort — don't save edges with stale IDs
+    }
+
     const nodesBody = await nodesRes.json();
     const newNodes: WorkflowNode[] = nodesBody.data || [];
 
@@ -116,11 +122,16 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
     }));
 
     // Step 4: Save remapped edges
-    await fetch(`/api/workflows/${workflowId}/edges`, {
+    const edgesRes = await fetch(`/api/workflows/${workflowId}/edges`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ edges: remappedEdges }),
     });
+
+    if (!edgesRes.ok) {
+      console.error("Failed to save edges:", await edgesRes.text());
+      return;
+    }
 
     // Step 5: Single fetchDetail at the end to sync canvas with server state
     await fetchDetail();

@@ -35,7 +35,7 @@ import { NODE_REGISTRY, NODE_COLOR_MAP, NODE_LABEL_MAP, EDGE_STYLES, DEFAULT_EDG
 import { CustomNode, type DetailLevel, type RunCostData } from "./canvas-node";
 import { NodePalette } from "./node-palette";
 import { NodeConfigPanel } from "./node-config-panel";
-import { useUndoRedo } from "./use-undo-redo";
+import { useUndoRedo, type CanvasState } from "./use-undo-redo";
 
 type Agent = AgentSummary;
 
@@ -497,10 +497,20 @@ function CanvasInner({
     markDirty();
   }, [setEdges, markDirty, pushCurrentState]);
 
+  // Capture pre-drag state so undo restores the position before the drag
+  const preDragStateRef = useRef<CanvasState | null>(null);
+
+  const onNodeDragStart = useCallback(() => {
+    preDragStateRef.current = { nodes: [...nodesRef.current], edges: [...edgesRef.current] };
+  }, []);
+
   const onNodeDragStop = useCallback(() => {
-    pushCurrentState();
+    if (preDragStateRef.current) {
+      pushState(preDragStateRef.current); // push PRE-drag state so undo restores it
+      preDragStateRef.current = null;
+    }
     markDirty();
-  }, [markDirty, pushCurrentState]);
+  }, [markDirty, pushState]);
 
   const onNodeClick = useCallback((_: unknown, node: Node) => {
     setSelectedNodeId(node.id);
@@ -515,26 +525,29 @@ function CanvasInner({
   // Ghost node suggestion — shown when a connection ends on empty canvas
   // -----------------------------------------------------------------------
 
-  const onConnectEnd = useCallback((_event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
+  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent, connectionState: FinalConnectionState) => {
     // Only show ghost if the connection was NOT completed (no target node)
-    if (connectionState.isValid) return;
+    if (connectionState.isValid) { setGhostSuggestion(null); return; }
 
     const fromNode = nodesRef.current.find((n) => n.id === connectionState.fromHandle?.nodeId);
-    if (!fromNode) return;
+    if (!fromNode) { setGhostSuggestion(null); return; }
 
     const fromNodeType = (fromNode.data as Record<string, unknown>).nodeType as string;
     const suggestedType = suggestNextNode(fromNodeType);
 
-    // Use the pointer position as the ghost location (convert to flow coords)
-    if (connectionState.to) {
-      setGhostSuggestion({
-        position: { x: connectionState.to.x + 60, y: connectionState.to.y },
-        suggestedType,
-        sourceNodeId: fromNode.id,
-        sourceHandle: connectionState.fromHandle?.id || "source",
-      });
-    }
-  }, []);
+    // Use event clientX/clientY and convert to flow coordinates
+    const clientX = "clientX" in event ? event.clientX : (event as TouchEvent).touches?.[0]?.clientX;
+    const clientY = "clientY" in event ? event.clientY : (event as TouchEvent).touches?.[0]?.clientY;
+    if (!clientX || !clientY) return;
+
+    const position = screenToFlowPosition({ x: clientX, y: clientY });
+    setGhostSuggestion({
+      position: { x: position.x + 60, y: position.y },
+      suggestedType,
+      sourceNodeId: fromNode.id,
+      sourceHandle: connectionState.fromHandle?.id || "source",
+    });
+  }, [screenToFlowPosition]);
 
   // Add a node at a specific position (used by ghost suggestion click)
   const addNodeAt = useCallback((nodeType: string, position: { x: number; y: number }, connectFrom?: { nodeId: string; sourceHandle: string }) => {
@@ -818,7 +831,7 @@ function CanvasInner({
         return;
       }
 
-      if ((e.target as HTMLElement).tagName === "INPUT" || (e.target as HTMLElement).tagName === "TEXTAREA") return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
 
       const match = shortcuts.find(
         (s) => s.key === e.key && s.ctrl === (e.ctrlKey || e.metaKey) && s.shift === e.shiftKey
@@ -848,17 +861,13 @@ function CanvasInner({
   }, []);
 
   // -----------------------------------------------------------------------
-  // Nodes/Edges delete handlers (push undo before React Flow removes them)
+  // Before-delete handler: captures state BEFORE React Flow removes items
   // -----------------------------------------------------------------------
 
-  const onNodesDelete = useCallback(() => {
-    pushCurrentState();
+  const onBeforeDelete = useCallback(async () => {
+    pushCurrentState(); // capture state before deletion
     markDirty();
-  }, [pushCurrentState, markDirty]);
-
-  const onEdgesDelete = useCallback(() => {
-    pushCurrentState();
-    markDirty();
+    return true; // allow deletion to proceed
   }, [pushCurrentState, markDirty]);
 
   // -----------------------------------------------------------------------
@@ -972,11 +981,11 @@ function CanvasInner({
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             onConnectEnd={onConnectEnd}
+            onNodeDragStart={onNodeDragStart}
             onNodeDragStop={onNodeDragStop}
             onNodeClick={onNodeClick}
             onPaneClick={onPaneClick}
-            onNodesDelete={onNodesDelete}
-            onEdgesDelete={onEdgesDelete}
+            onBeforeDelete={onBeforeDelete}
             nodeTypes={nodeTypes}
             fitView
             fitViewOptions={{ padding: 0.2 }}
@@ -1076,8 +1085,8 @@ export function WorkflowCanvas({
   runSteps?: RunStep[];
   onSave: (nodes: WorkflowNode[], edges: Array<{ fromNodeId: string; toNodeId: string; conditionExpr?: string; conditionLabel?: string; edgeType?: string; sortOrder?: number; sourceHandle?: string; targetHandle?: string }>) => Promise<void>;
 }) {
-  const initialNodes = toFlowNodes(wfNodes, agents);
-  const initialEdges = toFlowEdges(wfEdges, wfNodes);
+  const initialNodes = useMemo(() => toFlowNodes(wfNodes, agents), [wfNodes, agents]);
+  const initialEdges = useMemo(() => toFlowEdges(wfEdges, wfNodes), [wfEdges, wfNodes]);
 
   return (
     <ReactFlowProvider>

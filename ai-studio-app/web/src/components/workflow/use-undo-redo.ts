@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { Node, Edge } from "@xyflow/react";
 
 // ---------------------------------------------------------------------------
 // Undo/Redo hook for canvas state management
+// Uses refs to avoid stale closure issues with rapid operations
 // ---------------------------------------------------------------------------
 
 export interface CanvasState {
@@ -15,40 +16,41 @@ export interface CanvasState {
 const MAX_HISTORY = 50;
 
 export function useUndoRedo(initialState: CanvasState) {
-  const [history, setHistory] = useState<CanvasState[]>([initialState]);
-  const [pointer, setPointer] = useState(0);
+  const historyRef = useRef<CanvasState[]>([initialState]);
+  const pointerRef = useRef(0);
+  const [, forceUpdate] = useState(0);
 
   const pushState = useCallback((state: CanvasState) => {
-    setHistory((prev) => {
-      const truncated = prev.slice(0, pointer + 1); // Discard redo states
-      const next = [...truncated, state];
-      if (next.length > MAX_HISTORY) next.shift();
-      return next;
-    });
-    setPointer((p) => Math.min(p + 1, MAX_HISTORY - 1));
-  }, [pointer]);
-
-  const undo = useCallback((): CanvasState | null => {
-    if (pointer <= 0) return null;
-    const prevState = history[pointer - 1];
-    setPointer((p) => p - 1);
-    return prevState ?? null;
-  }, [pointer, history]);
-
-  const redo = useCallback((): CanvasState | null => {
-    if (pointer >= history.length - 1) return null;
-    const nextState = history[pointer + 1];
-    setPointer((p) => p + 1);
-    return nextState ?? null;
-  }, [pointer, history]);
-
-  const resetHistory = useCallback((state: CanvasState) => {
-    setHistory([state]);
-    setPointer(0);
+    const truncated = historyRef.current.slice(0, pointerRef.current + 1);
+    truncated.push(state);
+    if (truncated.length > MAX_HISTORY) truncated.shift();
+    historyRef.current = truncated;
+    pointerRef.current = truncated.length - 1;
+    forceUpdate((n) => n + 1);
   }, []);
 
-  const canUndo = pointer > 0;
-  const canRedo = pointer < history.length - 1;
+  const undo = useCallback((): CanvasState | null => {
+    if (pointerRef.current <= 0) return null;
+    pointerRef.current -= 1;
+    forceUpdate((n) => n + 1);
+    return historyRef.current[pointerRef.current] ?? null;
+  }, []);
+
+  const redo = useCallback((): CanvasState | null => {
+    if (pointerRef.current >= historyRef.current.length - 1) return null;
+    pointerRef.current += 1;
+    forceUpdate((n) => n + 1);
+    return historyRef.current[pointerRef.current] ?? null;
+  }, []);
+
+  const resetHistory = useCallback((state: CanvasState) => {
+    historyRef.current = [state];
+    pointerRef.current = 0;
+    forceUpdate((n) => n + 1);
+  }, []);
+
+  const canUndo = pointerRef.current > 0;
+  const canRedo = pointerRef.current < historyRef.current.length - 1;
 
   return { pushState, undo, redo, canUndo, canRedo, resetHistory };
 }
