@@ -8,12 +8,12 @@ import { X } from "lucide-react";
 type DialogSize = "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" | "full";
 
 const sizeClasses: Record<DialogSize, string> = {
-  sm: "max-w-sm",
-  md: "max-w-md",
-  lg: "max-w-lg",
-  xl: "max-w-xl",
-  "2xl": "max-w-2xl",
-  "3xl": "max-w-3xl",
+  sm: "max-w-md",
+  md: "max-w-xl",
+  lg: "max-w-2xl",
+  xl: "max-w-3xl",
+  "2xl": "max-w-5xl",
+  "3xl": "max-w-6xl",
   full: "max-w-[90vw]",
 };
 
