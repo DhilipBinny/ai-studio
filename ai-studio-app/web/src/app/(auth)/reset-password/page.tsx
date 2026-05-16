@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/password-input";
@@ -9,6 +9,19 @@ import { BRAND } from "@/lib/branding";
 import { AuthBackground } from "../auth-background";
 
 export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={
+      <div className="relative flex min-h-svh items-center justify-center">
+        <AuthBackground />
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground relative z-10" />
+      </div>
+    }>
+      <ResetPasswordForm />
+    </Suspense>
+  );
+}
+
+function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
   const [password, setPassword] = useState("");

@@ -1,22 +1,40 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Check, X, Loader2, Eye, EyeOff } from "lucide-react";
-import { zxcvbn, zxcvbnOptions } from "@zxcvbn-ts/core";
-import * as zxcvbnCommonPackage from "@zxcvbn-ts/language-common";
-import * as zxcvbnEnPackage from "@zxcvbn-ts/language-en";
 import { PASSWORD_CONFIG, HIBP_API_URL } from "@/lib/client-config";
 
-zxcvbnOptions.setOptions({
-  translations: zxcvbnEnPackage.translations,
-  graphs: zxcvbnCommonPackage.adjacencyGraphs,
-  dictionary: {
-    ...zxcvbnCommonPackage.dictionary,
-    ...zxcvbnEnPackage.dictionary,
-  },
-});
+type ZxcvbnFn = (password: string, userInputs?: (string | number)[]) => { score: number; feedback: { warning: string | null; suggestions: string[] } };
+
+let zxcvbnFn: ZxcvbnFn | null = null;
+let zxcvbnLoading = false;
+const zxcvbnWaiters: Array<() => void> = [];
+
+async function loadZxcvbn(): Promise<ZxcvbnFn> {
+  if (zxcvbnFn) return zxcvbnFn;
+  if (zxcvbnLoading) {
+    return new Promise((resolve) => {
+      zxcvbnWaiters.push(() => resolve(zxcvbnFn!));
+    });
+  }
+  zxcvbnLoading = true;
+  const [{ zxcvbn, zxcvbnOptions }, common, en] = await Promise.all([
+    import("@zxcvbn-ts/core"),
+    import("@zxcvbn-ts/language-common"),
+    import("@zxcvbn-ts/language-en"),
+  ]);
+  zxcvbnOptions.setOptions({
+    translations: en.translations,
+    graphs: common.adjacencyGraphs,
+    dictionary: { ...common.dictionary, ...en.dictionary },
+  });
+  zxcvbnFn = zxcvbn;
+  zxcvbnWaiters.forEach((fn) => fn());
+  zxcvbnWaiters.length = 0;
+  return zxcvbn;
+}
 
 const MIN_LENGTH = PASSWORD_CONFIG.minLength;
 const MIN_STRENGTH = PASSWORD_CONFIG.minStrength;
@@ -37,13 +55,33 @@ export function PasswordInput({ value, onChange, label = "Password", userInputs 
   const [touched, setTouched] = useState(false);
   const [breachStatus, setBreachStatus] = useState<"idle" | "checking" | "safe" | "breached">("idle");
   const [breachCount, setBreachCount] = useState(0);
+  const [score, setScore] = useState(0);
+  const [warning, setWarning] = useState("");
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [zxcvbnReady, setZxcvbnReady] = useState(false);
+  const analyzeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  const result = value.length > 0 ? zxcvbn(value, userInputs) : null;
-  const score = result?.score ?? 0;
+  useEffect(() => {
+    if (value.length === 0) {
+      setScore(0);
+      setWarning("");
+      setSuggestions([]);
+      return;
+    }
+    clearTimeout(analyzeTimer.current);
+    analyzeTimer.current = setTimeout(async () => {
+      const fn = await loadZxcvbn();
+      if (!zxcvbnReady) setZxcvbnReady(true);
+      const result = fn(value, userInputs);
+      setScore(result.score);
+      setWarning(result.feedback.warning || "");
+      setSuggestions(result.feedback.suggestions);
+    }, 150);
+    return () => clearTimeout(analyzeTimer.current);
+  }, [value, userInputs, zxcvbnReady]);
+
   const meetsLength = value.length >= MIN_LENGTH;
   const meetsStrength = score >= MIN_STRENGTH;
-  const warning = result?.feedback.warning || null;
-  const suggestions = result?.feedback.suggestions || [];
 
   const checkBreach = useCallback(async (pw: string) => {
     if (pw.length < MIN_LENGTH) return;
@@ -111,7 +149,6 @@ export function PasswordInput({ value, onChange, label = "Password", userInputs 
 
       {value.length > 0 && (
         <div id="password-feedback" className="space-y-2" aria-live="polite">
-          {/* Strength meter */}
           <div className="flex gap-1">
             {[0, 1, 2, 3].map((i) => (
               <div
@@ -126,7 +163,6 @@ export function PasswordInput({ value, onChange, label = "Password", userInputs 
             {STRENGTH_LABELS[score]}
           </p>
 
-          {/* Requirements checklist */}
           <div className="space-y-1">
             <Requirement met={meetsLength} text={`At least ${MIN_LENGTH} characters`} />
             {meetsLength && <Requirement met={meetsStrength} text="Good or Strong strength" />}
@@ -143,7 +179,6 @@ export function PasswordInput({ value, onChange, label = "Password", userInputs 
             )}
           </div>
 
-          {/* zxcvbn feedback */}
           {warning && (
             <p className="text-xs text-amber-600">{warning}</p>
           )}
