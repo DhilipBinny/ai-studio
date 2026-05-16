@@ -6,6 +6,7 @@ import {
   Bot, Wrench, MessageSquare, AlertTriangle,
   Database, Plug, DollarSign,
 } from "lucide-react";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -198,7 +199,13 @@ function StatCard({ icon: Icon, label, value, variant }: { icon: React.Component
           <span className="text-xs text-muted-foreground">{label}</span>
         </div>
         {value !== undefined ? (
-          <p className={`text-2xl font-semibold tracking-tight ${colorClass}`}>{value}</p>
+          <p className={`text-2xl font-semibold tracking-tight ${colorClass}`}>
+            {typeof value === "number" ? (
+              <AnimatedCounter value={value} />
+            ) : (
+              value
+            )}
+          </p>
         ) : (
           <Skeleton className="mt-1 h-8 w-16" />
         )}
@@ -216,7 +223,9 @@ function MiniStat({ label, value, icon: Icon }: { label: string; value?: number;
       <div>
         <p className="text-xs text-muted-foreground">{label}</p>
         {value !== undefined ? (
-          <p className="text-sm font-semibold">{value}</p>
+          <p className="text-sm font-semibold">
+            <AnimatedCounter value={value} />
+          </p>
         ) : (
           <Skeleton className="h-4 w-8" />
         )}
