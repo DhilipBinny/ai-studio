@@ -99,14 +99,14 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
+    <div className="flex flex-col h-[calc(100vh-12rem)]">
+      <div className="flex items-center gap-3 mb-4">
         <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-1" /> Workflows</Button>
         <div className="flex-1" />
         <Badge variant={STATUS_VARIANT[workflow.status] || "secondary"}>{workflow.status}</Badge>
       </div>
 
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between mb-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight">{workflow.name}</h1>
           {workflow.description && <p className="text-sm text-muted-foreground mt-0.5">{workflow.description}</p>}
@@ -118,7 +118,7 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
         </div>
       </div>
 
-      <div className="flex gap-1 border-b">
+      <div className="flex gap-1 border-b mb-4">
         <button onClick={() => setTab("nodes")} className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px ${tab === "nodes" ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
           Nodes ({nodes.length})
         </button>
@@ -128,16 +128,18 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
       </div>
 
       {tab === "nodes" && (
-        <WorkflowCanvas
-          nodes={nodes}
-          edges={edges}
-          agents={agents}
-          models={models}
-          onSave={async (updatedNodes, updatedEdges) => {
-            await handleSaveNodes(updatedNodes as WorkflowNode[]);
-            await handleSaveEdges(updatedEdges);
-          }}
-        />
+        <div className="flex-1 min-h-0">
+          <WorkflowCanvas
+            nodes={nodes}
+            edges={edges}
+            agents={agents}
+            models={models}
+            onSave={async (updatedNodes, updatedEdges) => {
+              await handleSaveNodes(updatedNodes as WorkflowNode[]);
+              await handleSaveEdges(updatedEdges);
+            }}
+          />
+        </div>
       )}
 
       {tab === "runs" && (

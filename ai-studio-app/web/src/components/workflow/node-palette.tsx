@@ -1,13 +1,26 @@
 "use client";
 
+import { useRef } from "react";
 import { NODE_REGISTRY, CATEGORY_LABELS } from "./canvas-types";
 
 // ---------------------------------------------------------------------------
-// Node Palette (left sidebar)
+// Node Palette (left sidebar) — click-to-add + drag-and-drop
 // ---------------------------------------------------------------------------
 
 export function NodePalette({ onAdd }: { onAdd: (type: string) => void }) {
   const categories = Object.entries(CATEGORY_LABELS);
+  const dragPreviewRef = useRef<HTMLDivElement>(null);
+
+  function handleDragStart(event: React.DragEvent, nodeType: string, label: string, color: string) {
+    event.dataTransfer.setData("application/reactflow-nodetype", nodeType);
+    event.dataTransfer.effectAllowed = "move";
+    if (dragPreviewRef.current) {
+      dragPreviewRef.current.textContent = label;
+      dragPreviewRef.current.style.backgroundColor = `${color}20`;
+      dragPreviewRef.current.style.borderColor = color;
+      event.dataTransfer.setDragImage(dragPreviewRef.current, 40, 20);
+    }
+  }
 
   return (
     <div className="w-56 shrink-0 border-r border-border bg-muted/10 overflow-y-auto">
@@ -26,8 +39,10 @@ export function NodePalette({ onAdd }: { onAdd: (type: string) => void }) {
                 return (
                   <button
                     key={item.type}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, item.type, item.label, item.color)}
                     onClick={() => onAdd(item.type)}
-                    className="flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 hover:bg-muted/60 transition-colors cursor-pointer text-left group"
+                    className="flex items-center gap-2.5 w-full rounded-lg px-2.5 py-2 hover:bg-muted/60 transition-colors cursor-grab active:cursor-grabbing text-left group"
                   >
                     <div
                       className="shrink-0 flex items-center justify-center w-7 h-7 rounded-lg transition-transform group-hover:scale-105"
@@ -46,6 +61,13 @@ export function NodePalette({ onAdd }: { onAdd: (type: string) => void }) {
           </div>
         );
       })}
+
+      {/* Hidden drag preview element */}
+      <div
+        ref={dragPreviewRef}
+        className="fixed -left-[9999px] top-0 rounded-lg border px-3 py-1.5 text-xs font-medium bg-card shadow-sm"
+        style={{ pointerEvents: "none" }}
+      />
     </div>
   );
 }
