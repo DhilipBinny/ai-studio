@@ -21,7 +21,7 @@ export const PUT = withRBAC("WORKFLOWS", 20, async (request, auth, params) => {
   }
 
   try {
-    const result = await updateWorkflowNodes(auth.tenantId, id, parsed.data);
+    const result = await updateWorkflowNodes(auth.tenantId, id, parsed.data, auth.userId);
     return NextResponse.json(result);
   } catch (e) {
     if (e instanceof WorkflowNotFoundError) {

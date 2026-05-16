@@ -164,12 +164,12 @@ export async function getSessionDetail(tenantId: string, sessionId: string) {
     db
       .select()
       .from(agentSessionMessages)
-      .where(eq(agentSessionMessages.agentSessionId, sessionId))
+      .where(and(eq(agentSessionMessages.agentSessionId, sessionId), eq(agentSessionMessages.tenantId, tenantId)))
       .orderBy(asc(agentSessionMessages.createdAt)),
     db
       .select()
       .from(agentSessionToolCalls)
-      .where(eq(agentSessionToolCalls.agentSessionId, sessionId))
+      .where(and(eq(agentSessionToolCalls.agentSessionId, sessionId), eq(agentSessionToolCalls.tenantId, tenantId)))
       .orderBy(asc(agentSessionToolCalls.createdAt)),
     db
       .select({ value: systemConfig.value })

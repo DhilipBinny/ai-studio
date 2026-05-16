@@ -54,7 +54,7 @@ export async function checkAndCompact(
       createdAt: agentSessionMessages.createdAt,
     })
     .from(agentSessionMessages)
-    .where(eq(agentSessionMessages.agentSessionId, sessionId))
+    .where(and(eq(agentSessionMessages.agentSessionId, sessionId), eq(agentSessionMessages.tenantId, tenantId)))
     .orderBy(asc(agentSessionMessages.createdAt));
 
   let totalTokens = 0;
@@ -101,6 +101,7 @@ ${conversationLines.join("\n")}
         .where(
           and(
             eq(agentSessionMessages.agentSessionId, sessionId),
+            eq(agentSessionMessages.tenantId, tenantId),
             lt(agentSessionMessages.id, oldestRecentId),
           ),
         );

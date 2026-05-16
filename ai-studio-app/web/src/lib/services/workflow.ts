@@ -222,6 +222,7 @@ export async function updateWorkflowNodes(
   tenantId: string,
   workflowId: string,
   nodes: NodeInput[],
+  userId: string,
 ) {
   const db = getDb();
 
@@ -258,11 +259,10 @@ export async function updateWorkflowNodes(
         ),
       );
 
-    const results = [];
-    for (const node of nodes) {
-      const [n] = await tx
-        .insert(workflowNodes)
-        .values({
+    const results = await tx
+      .insert(workflowNodes)
+      .values(
+        nodes.map((node) => ({
           tenantId,
           workflowId,
           nodeType:
@@ -278,11 +278,19 @@ export async function updateWorkflowNodes(
           },
           positionX: node.positionX,
           positionY: node.positionY,
-        })
-        .returning();
-      results.push(n);
-    }
+        })),
+      )
+      .returning();
     return results;
+  });
+
+  await createAuditEntry({
+    tenantId,
+    userId,
+    action: "workflow.update_nodes",
+    resourceType: "workflow",
+    resourceId: workflowId,
+    details: { nodeCount: inserted.length },
   });
 
   return { data: inserted };

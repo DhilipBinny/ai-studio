@@ -4,6 +4,12 @@ import { agentSessions, agentSessionMessages } from "@ais-app/database";
 import { runSession } from "@ais-app/agent-runtime";
 import { eq, and, asc } from "drizzle-orm";
 import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
+import { z } from "zod";
+
+const sendMessageSchema = z.object({
+  message: z.string().min(1).max(100000),
+  metadata: z.record(z.unknown()).optional(),
+});
 
 export const POST = withRBAC("AGENTS", 10, async (request, auth, params) => {
   const agentId = params?.id;
@@ -25,10 +31,13 @@ export const POST = withRBAC("AGENTS", 10, async (request, auth, params) => {
 
   const body = await parseJsonBody(request);
   if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
-  const message = body.message;
-  if (!message || typeof message !== "string" || message.trim().length === 0) {
-    return errorResponse("Message is required", "VALIDATION_ERROR", 400);
+
+  const parsed = sendMessageSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse(parsed.error.errors[0].message, "VALIDATION_ERROR", 400);
   }
+
+  const { message } = parsed.data;
 
   const result = await runSession({
     agentId,

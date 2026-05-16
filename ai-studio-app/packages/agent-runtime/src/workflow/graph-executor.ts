@@ -1,10 +1,10 @@
 import { getDb } from "@ais-app/database";
 import { workflowRuns, workflowRunSteps } from "@ais-app/database";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import type { WorkflowState, GraphNode, GraphEdge, ExecutionGraph } from "./types";
 import { normalizeKey } from "./expression-engine";
 import { getNextNodes, executeLoopNode, executeIterationNode, resolveAggregate } from "./node-handlers";
-import { createStepRecorder } from "./step-recorder";
+import { createStepRecorder, type StepRecorder } from "./step-recorder";
 
 // ---------------------------------------------------------------------------
 // Main Executor
@@ -12,6 +12,189 @@ import { createStepRecorder } from "./step-recorder";
 
 const MAX_STEPS = 200;
 const MAX_PARALLEL = 10;
+
+// ---------------------------------------------------------------------------
+// Extracted: Execute a batch of nodes in parallel
+// ---------------------------------------------------------------------------
+
+async function executeParallelBatch(
+  toExecute: GraphNode[],
+  state: WorkflowState,
+  tenantId: string,
+  runId: string,
+  userId: string | null,
+  allEdges: GraphEdge[],
+  graph: ExecutionGraph,
+  recordStep: StepRecorder,
+  completed: Set<string>,
+  processed: Set<string>,
+  nodeOutputs: Map<string, Record<string, unknown>>,
+  remaining: GraphNode[],
+  stepsCompletedRef: { value: number },
+): Promise<{ paused: boolean }> {
+  const db = getDb();
+
+  const results = await Promise.allSettled(
+    toExecute.map(async (node) => {
+      if (node.nodeType === "loop") {
+        return { node, output: await executeLoopNode(node, { ...state }, tenantId, runId, userId, allEdges, graph.nodes, recordStep), paused: false, useErrorBranch: false };
+      }
+      if (node.nodeType === "iteration") {
+        return { node, output: await executeIterationNode(node, { ...state }, tenantId, runId, userId, allEdges, graph.nodes, recordStep), paused: false, useErrorBranch: false };
+      }
+      const stepResult = await recordStep(node, state, tenantId, runId, userId);
+      stepsCompletedRef.value++;
+      return { node, output: stepResult.output, paused: stepResult.paused, useErrorBranch: stepResult.useErrorBranch || false };
+    })
+  );
+
+  for (const r of results) {
+    if (r.status === "fulfilled") {
+      const { node, output, paused, useErrorBranch } = r.value;
+      const key = normalizeKey(node.name);
+      state[key] = output;
+      nodeOutputs.set(node.id, output);
+      completed.add(node.id);
+      processed.add(node.id);
+
+      if (paused) {
+        await db.update(workflowRuns).set({ status: "waiting", output: state }).where(and(eq(workflowRuns.id, runId), eq(workflowRuns.tenantId, tenantId)));
+        return { paused: true };
+      }
+    } else {
+      const failedNode = toExecute.find((_, i) => results[i] === r);
+      if (failedNode) {
+        completed.add(failedNode.id);
+        processed.add(failedNode.id);
+        state[normalizeKey(failedNode.name)] = { _error: true, message: (r.reason as Error).message };
+        if (failedNode.errorPolicy.onError === "error_branch") {
+          const errorNext = getNextNodes(failedNode, graph, state, true);
+          remaining.push(...errorNext);
+        }
+      }
+    }
+  }
+
+  return { paused: false };
+}
+
+// ---------------------------------------------------------------------------
+// Extracted: Execute a single node sequentially
+// ---------------------------------------------------------------------------
+
+async function executeSequentialNode(
+  node: GraphNode,
+  state: WorkflowState,
+  tenantId: string,
+  runId: string,
+  userId: string | null,
+  allEdges: GraphEdge[],
+  graph: ExecutionGraph,
+  recordStep: StepRecorder,
+  completed: Set<string>,
+  processed: Set<string>,
+  nodeOutputs: Map<string, Record<string, unknown>>,
+  remaining: GraphNode[],
+  stepsCompletedRef: { value: number },
+): Promise<{ paused: boolean }> {
+  const db = getDb();
+
+  if (node.nodeType === "loop") {
+    const output = await executeLoopNode(node, state, tenantId, runId, userId, allEdges, graph.nodes, recordStep);
+    state[normalizeKey(node.name)] = output;
+    nodeOutputs.set(node.id, output);
+    completed.add(node.id);
+    processed.add(node.id);
+    stepsCompletedRef.value++;
+  } else if (node.nodeType === "iteration") {
+    const output = await executeIterationNode(node, state, tenantId, runId, userId, allEdges, graph.nodes, recordStep);
+    state[normalizeKey(node.name)] = output;
+    nodeOutputs.set(node.id, output);
+    completed.add(node.id);
+    processed.add(node.id);
+    stepsCompletedRef.value++;
+  } else if (node.nodeType === "aggregate") {
+    const predIds = graph.reverseAdj.get(node.id) || [];
+    const predOutputs = new Map<string, Record<string, unknown>>();
+    for (const pid of predIds) {
+      const pOutput = nodeOutputs.get(pid);
+      if (pOutput) predOutputs.set(pid, pOutput);
+    }
+    const aggregated = resolveAggregate(node, predOutputs);
+    state[normalizeKey(node.name)] = aggregated;
+    nodeOutputs.set(node.id, aggregated);
+    completed.add(node.id);
+    processed.add(node.id);
+
+    const [step] = await db.insert(workflowRunSteps).values({
+      tenantId, workflowRunId: runId, workflowNodeId: node.id,
+      status: "completed", input: state, output: aggregated,
+      startedAt: new Date(), completedAt: new Date(), durationMs: 0, lastHeartbeatAt: new Date(),
+    }).returning({ id: workflowRunSteps.id });
+    stepsCompletedRef.value++;
+  } else {
+    const stepResult = await recordStep(node, state, tenantId, runId, userId);
+    state[normalizeKey(node.name)] = stepResult.output;
+    nodeOutputs.set(node.id, stepResult.output);
+    completed.add(node.id);
+    processed.add(node.id);
+    stepsCompletedRef.value++;
+
+    if (stepResult.paused) {
+      await db.update(workflowRuns).set({ status: "waiting", output: state }).where(and(eq(workflowRuns.id, runId), eq(workflowRuns.tenantId, tenantId)));
+      return { paused: true };
+    }
+
+    if (stepResult.useErrorBranch) {
+      const errorNext = getNextNodes(node, graph, state, true);
+      remaining.push(...errorNext);
+    }
+  }
+
+  return { paused: false };
+}
+
+// ---------------------------------------------------------------------------
+// Extracted: Collect the next ready nodes after execution
+// ---------------------------------------------------------------------------
+
+function collectReadyNodes(
+  toExecute: GraphNode[],
+  graph: ExecutionGraph,
+  allEdges: GraphEdge[],
+  state: WorkflowState,
+  completed: Set<string>,
+  processed: Set<string>,
+  remaining: GraphNode[],
+): GraphNode[] {
+  const ready = [...remaining];
+  for (const doneNode of toExecute) {
+    if (!completed.has(doneNode.id)) continue;
+    const useErrBranch = (state[normalizeKey(doneNode.name)] as Record<string, unknown>)?._error === true
+      && doneNode.errorPolicy.onError === "error_branch";
+    const nextNodes = getNextNodes(doneNode, graph, state, useErrBranch);
+    for (const next of nextNodes) {
+      if (processed.has(next.id) || completed.has(next.id) || ready.some((r) => r.id === next.id)) continue;
+
+      const preds = graph.reverseAdj.get(next.id) || [];
+      const normalPreds = preds.filter((pid) => {
+        const edges = allEdges.filter((e) => e.fromNodeId === pid && e.toNodeId === next.id);
+        return edges.some((e) => e.edgeType === "normal" || e.edgeType === "loop_done" || e.edgeType === "error");
+      });
+
+      if (next.nodeType === "aggregate") {
+        if (normalPreds.every((p) => completed.has(p))) ready.push(next);
+      } else {
+        ready.push(next);
+      }
+    }
+  }
+  return ready;
+}
+
+// ---------------------------------------------------------------------------
+// Main Executor (orchestrator)
+// ---------------------------------------------------------------------------
 
 export async function executeGraph(
   graph: ExecutionGraph,
@@ -29,7 +212,7 @@ export async function executeGraph(
   const processed = new Set<string>();
   const pendingInDegree = new Map(graph.inDegree);
   const nodeOutputs = new Map<string, Record<string, unknown>>();
-  let stepsCompleted = 0;
+  const stepsCompletedRef = { value: 0 };
 
   if (resumeFromNodeIds && resumeFromNodeIds.length > 0) {
     for (const [nodeId, node] of graph.nodes) {
@@ -51,7 +234,7 @@ export async function executeGraph(
     if (startNode) ready.push(startNode);
   }
 
-  while (ready.length > 0 && stepsCompleted < MAX_STEPS) {
+  while (ready.length > 0 && stepsCompletedRef.value < MAX_STEPS) {
     if (timeoutAt && Date.now() > timeoutAt.getTime()) {
       throw new Error("Workflow execution timed out (wall-clock limit exceeded)");
     }
@@ -85,128 +268,24 @@ export async function executeGraph(
     const remaining = ready.filter((n) => !toExecute.some((t) => t.id === n.id));
 
     if (toExecute.length > 1) {
-      const results = await Promise.allSettled(
-        toExecute.map(async (node) => {
-          if (node.nodeType === "loop") {
-            return { node, output: await executeLoopNode(node, { ...state }, tenantId, runId, userId, allEdges, graph.nodes, recordStep), paused: false, useErrorBranch: false };
-          }
-          if (node.nodeType === "iteration") {
-            return { node, output: await executeIterationNode(node, { ...state }, tenantId, runId, userId, allEdges, graph.nodes, recordStep), paused: false, useErrorBranch: false };
-          }
-          const stepResult = await recordStep(node, state, tenantId, runId, userId);
-          stepsCompleted++;
-          return { node, output: stepResult.output, paused: stepResult.paused, useErrorBranch: stepResult.useErrorBranch || false };
-        })
+      const result = await executeParallelBatch(
+        toExecute, state, tenantId, runId, userId, allEdges, graph,
+        recordStep, completed, processed, nodeOutputs, remaining, stepsCompletedRef,
       );
-
-      for (const r of results) {
-        if (r.status === "fulfilled") {
-          const { node, output, paused, useErrorBranch } = r.value;
-          const key = normalizeKey(node.name);
-          state[key] = output;
-          nodeOutputs.set(node.id, output);
-          completed.add(node.id);
-          processed.add(node.id);
-
-          if (paused) {
-            await db.update(workflowRuns).set({ status: "waiting", output: state }).where(eq(workflowRuns.id, runId));
-            return { stepsCompleted, paused: true };
-          }
-        } else {
-          const failedNode = toExecute.find((_, i) => results[i] === r);
-          if (failedNode) {
-            completed.add(failedNode.id);
-            processed.add(failedNode.id);
-            state[normalizeKey(failedNode.name)] = { _error: true, message: (r.reason as Error).message };
-            if (failedNode.errorPolicy.onError === "error_branch") {
-              const errorNext = getNextNodes(failedNode, graph, state, true);
-              remaining.push(...errorNext);
-            }
-          }
-        }
-      }
+      if (result.paused) return { stepsCompleted: stepsCompletedRef.value, paused: true };
     } else if (toExecute.length === 1) {
-      const node = toExecute[0];
-
-      if (node.nodeType === "loop") {
-        const output = await executeLoopNode(node, state, tenantId, runId, userId, allEdges, graph.nodes, recordStep);
-        state[normalizeKey(node.name)] = output;
-        nodeOutputs.set(node.id, output);
-        completed.add(node.id);
-        processed.add(node.id);
-        stepsCompleted++;
-      } else if (node.nodeType === "iteration") {
-        const output = await executeIterationNode(node, state, tenantId, runId, userId, allEdges, graph.nodes, recordStep);
-        state[normalizeKey(node.name)] = output;
-        nodeOutputs.set(node.id, output);
-        completed.add(node.id);
-        processed.add(node.id);
-        stepsCompleted++;
-      } else if (node.nodeType === "aggregate") {
-        const predIds = graph.reverseAdj.get(node.id) || [];
-        const predOutputs = new Map<string, Record<string, unknown>>();
-        for (const pid of predIds) {
-          const pOutput = nodeOutputs.get(pid);
-          if (pOutput) predOutputs.set(pid, pOutput);
-        }
-        const aggregated = resolveAggregate(node, predOutputs);
-        state[normalizeKey(node.name)] = aggregated;
-        nodeOutputs.set(node.id, aggregated);
-        completed.add(node.id);
-        processed.add(node.id);
-
-        const [step] = await db.insert(workflowRunSteps).values({
-          tenantId, workflowRunId: runId, workflowNodeId: node.id,
-          status: "completed", input: state, output: aggregated,
-          startedAt: new Date(), completedAt: new Date(), durationMs: 0, lastHeartbeatAt: new Date(),
-        }).returning({ id: workflowRunSteps.id });
-        stepsCompleted++;
-      } else {
-        const stepResult = await recordStep(node, state, tenantId, runId, userId);
-        state[normalizeKey(node.name)] = stepResult.output;
-        nodeOutputs.set(node.id, stepResult.output);
-        completed.add(node.id);
-        processed.add(node.id);
-        stepsCompleted++;
-
-        if (stepResult.paused) {
-          await db.update(workflowRuns).set({ status: "waiting", output: state }).where(eq(workflowRuns.id, runId));
-          return { stepsCompleted, paused: true };
-        }
-
-        if (stepResult.useErrorBranch) {
-          const errorNext = getNextNodes(node, graph, state, true);
-          remaining.push(...errorNext);
-        }
-      }
+      const result = await executeSequentialNode(
+        toExecute[0], state, tenantId, runId, userId, allEdges, graph,
+        recordStep, completed, processed, nodeOutputs, remaining, stepsCompletedRef,
+      );
+      if (result.paused) return { stepsCompleted: stepsCompletedRef.value, paused: true };
     }
 
-    await db.update(workflowRuns).set({ output: state }).where(eq(workflowRuns.id, runId));
+    await db.update(workflowRuns).set({ output: state }).where(and(eq(workflowRuns.id, runId), eq(workflowRuns.tenantId, tenantId)));
 
     if (toExecute.some((n) => n.nodeType === "output")) break;
 
-    ready = [...remaining];
-    for (const doneNode of toExecute) {
-      if (!completed.has(doneNode.id)) continue;
-      const useErrBranch = (state[normalizeKey(doneNode.name)] as Record<string, unknown>)?._error === true
-        && doneNode.errorPolicy.onError === "error_branch";
-      const nextNodes = getNextNodes(doneNode, graph, state, useErrBranch);
-      for (const next of nextNodes) {
-        if (processed.has(next.id) || completed.has(next.id) || ready.some((r) => r.id === next.id)) continue;
-
-        const preds = graph.reverseAdj.get(next.id) || [];
-        const normalPreds = preds.filter((pid) => {
-          const edges = allEdges.filter((e) => e.fromNodeId === pid && e.toNodeId === next.id);
-          return edges.some((e) => e.edgeType === "normal" || e.edgeType === "loop_done" || e.edgeType === "error");
-        });
-
-        if (next.nodeType === "aggregate") {
-          if (normalPreds.every((p) => completed.has(p))) ready.push(next);
-        } else {
-          ready.push(next);
-        }
-      }
-    }
+    ready = collectReadyNodes(toExecute, graph, allEdges, state, completed, processed, remaining);
   }
 
   const hasOutput = Array.from(completed).some((id) => graph.nodes.get(id)?.nodeType === "output");
@@ -221,5 +300,5 @@ export async function executeGraph(
     }
   }
 
-  return { stepsCompleted, paused: false };
+  return { stepsCompleted: stepsCompletedRef.value, paused: false };
 }

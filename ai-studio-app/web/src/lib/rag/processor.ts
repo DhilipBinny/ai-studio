@@ -10,10 +10,11 @@ import type { ChunkConfig } from "@ais/rag-engine";
 import { createLLMCaller } from "./llm-caller";
 import { decryptSecret, isEncrypted } from "@ais-app/auth";
 
-export async function processDocument(
-  documentId: string,
-  tenantId: string,
-): Promise<{ chunkCount: number }> {
+// ---------------------------------------------------------------------------
+// processDocument helper: Load KB config from DB
+// ---------------------------------------------------------------------------
+
+async function loadKnowledgeBaseConfig(documentId: string, tenantId: string) {
   const db = getDb();
 
   const [doc] = await db
@@ -52,31 +53,18 @@ export async function processDocument(
   const kb = kbRows[0];
   if (!kb) throw new Error("Knowledge base not found");
 
-  const docInfo: DocumentInfo = {
-    id: doc.id,
-    fileName: doc.fileName,
-    fileType: doc.fileType,
-    storagePath: doc.storagePath,
-    knowledgeBaseId: doc.knowledgeBaseId,
-  };
+  return { doc, kb };
+}
 
-  const enrichmentMode = (kb.contextualEnrichment || "static") as "none" | "static" | "llm";
+// ---------------------------------------------------------------------------
+// processDocument helper: Create processing dependencies (embedder, LLM callers)
+// ---------------------------------------------------------------------------
 
-  const kbConfig: KBConfig = {
-    chunkConfig: (kb.chunkConfig || {}) as ChunkConfig,
-    embeddingSource: kb.embeddingSource,
-    embeddingModel: kb.embeddingModel,
-    embeddingDimension: kb.embeddingDimension,
-    rerankSource: kb.rerankSource,
-    rerankModel: kb.rerankModel,
-    contextualEnrichment: enrichmentMode,
-    contextualModel: kb.contextualModel,
-    queryExpansion: (kb.queryExpansion || "none") as "none" | "hyde",
-    queryExpansionModel: kb.queryExpansionModel,
-    graphExtraction: kb.graphExtraction ?? false,
-    graphExtractionModel: kb.graphExtractionModel,
-  };
-
+async function createProcessingDependencies(
+  kb: Awaited<ReturnType<typeof loadKnowledgeBaseConfig>>["kb"],
+  kbConfig: KBConfig,
+  tenantId: string,
+) {
   const embeddingConfig = buildEmbeddingConfig({
     embeddingSource: kb.embeddingSource,
     embeddingModel: kb.embeddingModel,
@@ -94,11 +82,14 @@ export async function processDocument(
   const extractor = createTextExtractor();
   const embedder = createEmbedder(embeddingConfig);
 
+  const enrichmentMode = kbConfig.contextualEnrichment;
+
   // Create LLM callers for contextual enrichment and/or graph extraction
   const needsLLM = enrichmentMode === "llm" || kbConfig.graphExtraction;
   let llmCaller: LLMCaller | undefined;
   let graphLLMCaller: LLMCaller | undefined;
   if (needsLLM) {
+    const db = getDb();
     // Find an active provider for LLM calls (prefer Anthropic/OpenAI)
     const [llmProvider] = await db
       .select({
@@ -139,6 +130,47 @@ export async function processDocument(
     }
   }
 
+  return { store, extractor, embedder, llmCaller, graphLLMCaller };
+}
+
+// ---------------------------------------------------------------------------
+// Main: processDocument
+// ---------------------------------------------------------------------------
+
+export async function processDocument(
+  documentId: string,
+  tenantId: string,
+): Promise<{ chunkCount: number }> {
+  const db = getDb();
+  const { doc, kb } = await loadKnowledgeBaseConfig(documentId, tenantId);
+
+  const docInfo: DocumentInfo = {
+    id: doc.id,
+    fileName: doc.fileName,
+    fileType: doc.fileType,
+    storagePath: doc.storagePath,
+    knowledgeBaseId: doc.knowledgeBaseId,
+  };
+
+  const enrichmentMode = (kb.contextualEnrichment || "static") as "none" | "static" | "llm";
+
+  const kbConfig: KBConfig = {
+    chunkConfig: (kb.chunkConfig || {}) as ChunkConfig,
+    embeddingSource: kb.embeddingSource,
+    embeddingModel: kb.embeddingModel,
+    embeddingDimension: kb.embeddingDimension,
+    rerankSource: kb.rerankSource,
+    rerankModel: kb.rerankModel,
+    contextualEnrichment: enrichmentMode,
+    contextualModel: kb.contextualModel,
+    queryExpansion: (kb.queryExpansion || "none") as "none" | "hyde",
+    queryExpansionModel: kb.queryExpansionModel,
+    graphExtraction: kb.graphExtraction ?? false,
+    graphExtractionModel: kb.graphExtractionModel,
+  };
+
+  const { store, extractor, embedder, llmCaller, graphLLMCaller } = await createProcessingDependencies(kb, kbConfig, tenantId);
+
   try {
     const result = await ragProcessDocument(
       docInfo, kbConfig, store, extractor, embedder,
@@ -163,20 +195,11 @@ export async function processDocument(
   }
 }
 
-/**
- * Persist graph entities and relationships extracted from document chunks.
- * Deduplicates entities by name+type within the knowledge base (upsert pattern):
- * - If entity with same name+type exists: increment mention_count, update description if richer
- * - If new: insert entity, generate embedding for name+description
- */
-async function persistGraphExtractions(
-  db: ReturnType<typeof getDb>,
-  tenantId: string,
-  knowledgeBaseId: string,
-  extractions: GraphExtractionOutput[],
-  embedder: { embed(texts: string[], inputType?: "query" | "document"): Promise<number[][]> },
-): Promise<void> {
-  // Build a map of all entities to deduplicate across chunks
+// ---------------------------------------------------------------------------
+// persistGraphExtractions helper: Deduplicate entities
+// ---------------------------------------------------------------------------
+
+function deduplicateEntities(extractions: GraphExtractionOutput[]) {
   const entityKey = (name: string, type: string) => `${name.toLowerCase()}::${type.toLowerCase()}`;
   const entityMap = new Map<string, {
     name: string;
@@ -186,7 +209,6 @@ async function persistGraphExtractions(
     mentionCount: number;
   }>();
 
-  // Collect all relationships with their source entity names
   const pendingRelationships: Array<{
     sourceEntity: string;
     targetEntity: string;
@@ -227,12 +249,22 @@ async function persistGraphExtractions(
     }
   }
 
-  if (entityMap.size === 0) return;
+  return { entityMap, pendingRelationships, entityKey };
+}
 
-  // Generate embeddings for entity name+description
+// ---------------------------------------------------------------------------
+// persistGraphExtractions helper: Upsert entities to DB
+// ---------------------------------------------------------------------------
+
+async function upsertEntities(
+  db: ReturnType<typeof getDb>,
+  entityMap: Map<string, { name: string; entityType: string; description: string; sourceChunkId: number; mentionCount: number }>,
+  entityKey: (name: string, type: string) => string,
+  entityEmbeddings: number[][],
+  tenantId: string,
+  knowledgeBaseId: string,
+): Promise<Map<string, string>> {
   const entities = [...entityMap.values()];
-  const entityTexts = entities.map((e) => `${e.name}: ${e.description}`);
-  const entityEmbeddings = await embedder.embed(entityTexts, "document");
 
   // Check for existing entities in this KB (for upsert)
   const existingEntities = await db
@@ -256,44 +288,87 @@ async function persistGraphExtractions(
   // Insert or update entities, collecting name -> ID mapping
   const entityIdMap = new Map<string, string>();
 
+  // Separate entities into those needing update vs insert
+  const entitiesToUpdate: Array<{ id: string; mentionCount: number; description?: string; embedding?: number[] }> = [];
+  const entitiesToInsert: Array<{
+    tenantId: string;
+    knowledgeBaseId: string;
+    sourceChunkId: number;
+    name: string;
+    entityType: string;
+    description: string;
+    embedding: number[];
+    mentionCount: number;
+  }> = [];
+  const insertKeys: string[] = [];
+
   for (let i = 0; i < entities.length; i++) {
     const entity = entities[i];
     const key = entityKey(entity.name, entity.entityType);
     const existing = existingEntityMap.get(key);
 
     if (existing) {
-      // Update: increment mention count, update description/embedding if richer
-      const updates: Record<string, unknown> = {
+      const update: { id: string; mentionCount: number; description?: string; embedding?: number[] } = {
+        id: existing.id,
         mentionCount: existing.mentionCount + entity.mentionCount,
       };
       if (entity.description.length > (existing.description?.length ?? 0)) {
-        updates.description = entity.description;
-        updates.embedding = entityEmbeddings[i];
+        update.description = entity.description;
+        update.embedding = entityEmbeddings[i];
       }
-      await db
-        .update(graphEntities)
-        .set(updates)
-        .where(eq(graphEntities.id, existing.id));
+      entitiesToUpdate.push(update);
       entityIdMap.set(key, existing.id);
     } else {
-      // Insert new entity
-      const [inserted] = await db
-        .insert(graphEntities)
-        .values({
-          tenantId,
-          knowledgeBaseId,
-          sourceChunkId: entity.sourceChunkId,
-          name: entity.name,
-          entityType: entity.entityType,
-          description: entity.description,
-          embedding: entityEmbeddings[i],
-          mentionCount: entity.mentionCount,
-        })
-        .returning({ id: graphEntities.id });
-      entityIdMap.set(key, inserted.id);
+      entitiesToInsert.push({
+        tenantId,
+        knowledgeBaseId,
+        sourceChunkId: entity.sourceChunkId,
+        name: entity.name,
+        entityType: entity.entityType,
+        description: entity.description,
+        embedding: entityEmbeddings[i],
+        mentionCount: entity.mentionCount,
+      });
+      insertKeys.push(key);
     }
   }
 
+  // Batch update existing entities
+  for (const update of entitiesToUpdate) {
+    const sets: Record<string, unknown> = { mentionCount: update.mentionCount };
+    if (update.description !== undefined) {
+      sets.description = update.description;
+      sets.embedding = update.embedding;
+    }
+    await db.update(graphEntities).set(sets).where(eq(graphEntities.id, update.id));
+  }
+
+  // Batch insert new entities
+  if (entitiesToInsert.length > 0) {
+    const insertedRows = await db
+      .insert(graphEntities)
+      .values(entitiesToInsert)
+      .returning({ id: graphEntities.id });
+    for (let i = 0; i < insertedRows.length; i++) {
+      entityIdMap.set(insertKeys[i], insertedRows[i].id);
+    }
+  }
+
+  return entityIdMap;
+}
+
+// ---------------------------------------------------------------------------
+// persistGraphExtractions helper: Insert relationships to DB
+// ---------------------------------------------------------------------------
+
+async function insertRelationships(
+  db: ReturnType<typeof getDb>,
+  pendingRelationships: Array<{ sourceEntity: string; targetEntity: string; relationshipType: string; description: string; sourceChunkId: number }>,
+  entityMap: Map<string, unknown>,
+  entityIdMap: Map<string, string>,
+  tenantId: string,
+  knowledgeBaseId: string,
+): Promise<void> {
   // Build a reverse lookup Map keyed by lowercase entity name for O(1) relationship resolution
   const nameToKey = new Map<string, string>();
   for (const key of entityMap.keys()) {
@@ -301,9 +376,19 @@ async function persistGraphExtractions(
     nameToKey.set(name, key);
   }
 
-  // Insert relationships (only if both source and target entities exist)
+  // Batch insert relationships (only if both source and target entities exist)
+  const allRelationships: Array<{
+    tenantId: string;
+    knowledgeBaseId: string;
+    sourceEntityId: string;
+    targetEntityId: string;
+    relationshipType: string;
+    description: string;
+    weight: number;
+    sourceChunkId: number;
+  }> = [];
+
   for (const rel of pendingRelationships) {
-    // Find entity IDs by name (case-insensitive O(1) lookup)
     const sourceKey = nameToKey.get(rel.sourceEntity.toLowerCase());
     const targetKey = nameToKey.get(rel.targetEntity.toLowerCase());
 
@@ -311,7 +396,7 @@ async function persistGraphExtractions(
     const targetId = targetKey ? entityIdMap.get(targetKey) : undefined;
 
     if (sourceId && targetId) {
-      await db.insert(graphRelationships).values({
+      allRelationships.push({
         tenantId,
         knowledgeBaseId,
         sourceEntityId: sourceId,
@@ -323,4 +408,39 @@ async function persistGraphExtractions(
       });
     }
   }
+
+  if (allRelationships.length > 0) {
+    await db.insert(graphRelationships).values(allRelationships);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// persistGraphExtractions (orchestrator)
+// ---------------------------------------------------------------------------
+
+/**
+ * Persist graph entities and relationships extracted from document chunks.
+ * Deduplicates entities by name+type within the knowledge base (upsert pattern):
+ * - If entity with same name+type exists: increment mention_count, update description if richer
+ * - If new: insert entity, generate embedding for name+description
+ */
+async function persistGraphExtractions(
+  db: ReturnType<typeof getDb>,
+  tenantId: string,
+  knowledgeBaseId: string,
+  extractions: GraphExtractionOutput[],
+  embedder: { embed(texts: string[], inputType?: "query" | "document"): Promise<number[][]> },
+): Promise<void> {
+  const { entityMap, pendingRelationships, entityKey } = deduplicateEntities(extractions);
+
+  if (entityMap.size === 0) return;
+
+  // Generate embeddings for entity name+description
+  const entities = [...entityMap.values()];
+  const entityTexts = entities.map((e) => `${e.name}: ${e.description}`);
+  const entityEmbeddings = await embedder.embed(entityTexts, "document");
+
+  const entityIdMap = await upsertEntities(db, entityMap, entityKey, entityEmbeddings, tenantId, knowledgeBaseId);
+
+  await insertRelationships(db, pendingRelationships, entityMap, entityIdMap, tenantId, knowledgeBaseId);
 }

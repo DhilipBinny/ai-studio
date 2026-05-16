@@ -6,6 +6,12 @@ import { runSession } from "@ais-app/agent-runtime";
 import { authenticateApiKey, errorJson } from "@/lib/api-key-auth";
 import { parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
+import { z } from "zod";
+
+const createSessionSchema = z.object({
+  message: z.string().min(1).max(100000),
+  metadata: z.record(z.unknown()).optional(),
+});
 
 export async function POST(request: NextRequest, context: { params: Promise<{ slug: string }> }) {
   const auth = await authenticateApiKey(request);
@@ -29,10 +35,13 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sl
 
   const body = await parseJsonBody(request);
   if (!body) return errorJson("Invalid JSON body", "INVALID_JSON", 400);
-  const message = body.message;
-  if (!message || typeof message !== "string" || message.trim().length === 0) {
-    return errorJson("Message is required", "VALIDATION_ERROR", 400);
+
+  const parsed = createSessionSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorJson(parsed.error.errors[0].message, "VALIDATION_ERROR", 400);
   }
+
+  const { message, metadata } = parsed.data;
 
   const result = await runSession({
     agentId: agent.id,
@@ -40,7 +49,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ sl
     userId: auth.keyId,
     message: message.trim(),
     channel: "api",
-    metadata: { apiKeyName: auth.keyName, ...(body.metadata || {}) },
+    metadata: { apiKeyName: auth.keyName, ...(metadata || {}) },
   });
 
   if (result.error) {

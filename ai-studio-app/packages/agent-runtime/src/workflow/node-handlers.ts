@@ -38,7 +38,210 @@ export type StepRecorder = (
 ) => Promise<NodeResult & { attempt: number }>;
 
 // ---------------------------------------------------------------------------
-// Node Executors
+// Individual Node Type Executors
+// ---------------------------------------------------------------------------
+
+async function executeAgentNode(
+  node: GraphNode,
+  state: WorkflowState,
+  tenantId: string,
+  runId: string,
+  userId: string | null,
+  nodeSpanId?: string,
+): Promise<NodeResult> {
+  const config = node.config;
+  if (!config.agentId) throw new Error(`Agent node "${node.name}" has no agentId`);
+  const message = config.message ? resolveTemplate(config.message, state) : "Process the input.";
+  const result = await runSession({
+    agentId: config.agentId, tenantId, userId: userId || "", message,
+    channel: "workflow", sessionId: config.sessionId ? resolveTemplate(config.sessionId, state) : undefined,
+    metadata: { workflowRunId: runId, nodeName: node.name, parentSpanId: nodeSpanId },
+  });
+  return {
+    output: { response: result.response, sessionId: result.sessionId, status: result.status, usage: result.usage, error: result.error || null },
+    paused: false,
+  };
+}
+
+async function executeLLMNode(
+  node: GraphNode,
+  state: WorkflowState,
+  tenantId: string,
+  runId: string,
+): Promise<NodeResult> {
+  const config = node.config;
+  if (!config.providerModelId) throw new Error(`LLM node "${node.name}" has no providerModelId`);
+  const db = getDb();
+  const [modelRow] = await db.select({
+    modelId: providerModels.modelId, providerType: providers.providerType,
+    apiKeyRef: providers.apiKeyRef, baseUrl: providers.baseUrl, providerConfig: providers.config,
+    displayName: providerModels.displayName,
+    costPerInputToken: providerModels.costPerInputToken, costPerOutputToken: providerModels.costPerOutputToken,
+  }).from(providerModels).innerJoin(providers, eq(providerModels.providerId, providers.id))
+    .where(and(eq(providerModels.id, config.providerModelId), eq(providerModels.tenantId, tenantId), eq(providerModels.isActive, true), eq(providers.isActive, true))).limit(1);
+
+  if (!modelRow) throw new Error(`Model not found or inactive for LLM node "${node.name}"`);
+
+  const providerConfig: ProviderConfig = {
+    providerType: modelRow.providerType, apiKeyRef: modelRow.apiKeyRef, baseUrl: modelRow.baseUrl,
+    config: (modelRow.providerConfig as Record<string, unknown>) || {}, modelId: modelRow.modelId, displayName: modelRow.displayName,
+  };
+
+  const systemPrompt = config.systemPrompt ? resolveTemplate(config.systemPrompt, state) : "";
+  const userMessage = config.userMessage ? resolveTemplate(config.userMessage, state) : "";
+  const messages = [{ role: "user" as const, content: userMessage }];
+
+  const response = await callLLM(providerConfig, systemPrompt, messages, {
+    temperature: config.temperature, maxTokens: config.maxTokens,
+  });
+
+  const pricing = getModelPricing(modelRow.providerType, modelRow.modelId, modelRow.costPerInputToken, modelRow.costPerOutputToken);
+  const costUsd = calculateCost(pricing, response.inputTokens, response.outputTokens);
+
+  let parsedResponse: unknown = response.text;
+  if (config.responseFormat === "json") {
+    try { parsedResponse = JSON.parse(response.text); } catch { /* keep as string */ }
+  }
+
+  return {
+    output: { response: parsedResponse, inputTokens: response.inputTokens, outputTokens: response.outputTokens, costUsd },
+    paused: false,
+  };
+}
+
+async function executeHttpRequestNode(
+  node: GraphNode,
+  state: WorkflowState,
+  tenantId: string,
+): Promise<NodeResult> {
+  const config = node.config;
+  if (!config.url) throw new Error(`HTTP node "${node.name}" has no URL`);
+  const url = resolveTemplate(config.url, state);
+
+  try {
+    const parsed = new URL(url);
+    if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only HTTP(S) allowed");
+    const host = parsed.hostname;
+    if (host === "localhost" || host === "0.0.0.0" || host === "::1"
+      || host.endsWith(".internal") || host.endsWith(".local")
+      || isPrivateIP(host)) {
+      throw new Error("SSRF blocked: private/internal addresses not allowed");
+    }
+    // DNS rebinding check: resolve hostname and validate the resolved IP
+    try {
+      const { address } = await dns.promises.lookup(host);
+      if (isPrivateIP(address)) {
+        throw new Error("SSRF blocked: hostname resolves to private address");
+      }
+    } catch (dnsErr) {
+      if ((dnsErr as Error).message.includes("SSRF")) throw dnsErr;
+      throw new Error(`DNS resolution failed for ${host}: ${(dnsErr as Error).message}`);
+    }
+  } catch (e) {
+    if ((e as Error).message.includes("SSRF") || (e as Error).message.includes("Only HTTP") || (e as Error).message.includes("DNS resolution"))
+      throw e;
+    throw new Error(`Invalid URL: ${url}`);
+  }
+  const resolvedHeaders: Record<string, string> = {};
+  for (const [k, v] of Object.entries(config.headers || {})) {
+    resolvedHeaders[k] = resolveTemplate(v, state);
+  }
+  const bodyStr = config.body ? resolveTemplate(config.body, state) : undefined;
+  const timeoutMs = config.timeoutMs || 30_000;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const resp = await fetch(url, {
+      method: config.method || "GET",
+      headers: resolvedHeaders,
+      body: config.method !== "GET" ? bodyStr : undefined,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    let responseBody: unknown;
+    if (config.responseType === "json") {
+      try { responseBody = await resp.json(); } catch { responseBody = await resp.text(); }
+    } else {
+      responseBody = await resp.text();
+    }
+
+    return { output: { status: resp.status, body: responseBody }, paused: false };
+  } catch (e) {
+    clearTimeout(timer);
+    throw new Error(`HTTP request failed: ${(e as Error).message}`);
+  }
+}
+
+async function executeCodeNode(
+  node: GraphNode,
+  state: WorkflowState,
+): Promise<NodeResult> {
+  const config = node.config;
+  if (!config.code) throw new Error(`Code node "${node.name}" has no code`);
+  const { runInNewContext } = await import("node:vm");
+  const frozenState = JSON.parse(JSON.stringify(state));
+  const sandbox = Object.create(null) as Record<string, unknown>;
+  sandbox.state = frozenState;
+  sandbox.result = Object.create(null) as Record<string, unknown>;
+  sandbox.console = Object.create(null) as Record<string, unknown>;
+  sandbox.console = { log: () => {}, warn: () => {}, error: () => {} };
+  Object.setPrototypeOf(sandbox.console, null);
+
+  const safeJSON = Object.create(null) as Record<string, unknown>;
+  safeJSON.parse = function (s: string) { return JSON.parse(s); };
+  safeJSON.stringify = function (v: unknown) { return JSON.stringify(v); };
+  Object.setPrototypeOf(safeJSON.parse, null);
+  Object.setPrototypeOf(safeJSON.stringify, null);
+  sandbox.JSON = safeJSON;
+
+  const safeMath = Object.create(null) as Record<string, unknown>;
+  for (const key of ["abs", "ceil", "floor", "round", "max", "min", "pow", "sqrt", "random", "log", "log2", "log10", "sign", "trunc", "PI", "E"] as const) {
+    safeMath[key] = typeof Math[key] === "function" ? (...args: number[]) => (Math[key] as (...a: number[]) => number)(...args) : Math[key];
+  }
+  sandbox.Math = safeMath;
+
+  sandbox.parseInt = (s: string, r?: number) => parseInt(s, r);
+  sandbox.parseFloat = (s: string) => parseFloat(s);
+  sandbox.isNaN = (v: unknown) => isNaN(v as number);
+  sandbox.isFinite = (v: unknown) => isFinite(v as number);
+  Object.setPrototypeOf(sandbox.parseInt, null);
+  Object.setPrototypeOf(sandbox.parseFloat, null);
+  Object.setPrototypeOf(sandbox.isNaN, null);
+  Object.setPrototypeOf(sandbox.isFinite, null);
+
+  const wrappedCode = `"use strict"; (function(state) { ${config.code} })(state)`;
+  try {
+    const returned = runInNewContext(wrappedCode, sandbox, { timeout: 5000, microtaskMode: "afterEvaluate" });
+    const output = (returned && typeof returned === "object" && !Array.isArray(returned))
+      ? JSON.parse(JSON.stringify(returned)) as Record<string, unknown>
+      : JSON.parse(JSON.stringify(sandbox.result)) as Record<string, unknown>;
+    return { output, paused: false };
+  } catch (e) {
+    throw new Error(`Code execution failed: ${(e as Error).message}`);
+  }
+}
+
+async function executeKnowledgeSearchNode(
+  node: GraphNode,
+  state: WorkflowState,
+  tenantId: string,
+): Promise<NodeResult> {
+  const config = node.config;
+  if (!config.knowledgeBaseId) throw new Error(`Knowledge search node "${node.name}" has no knowledgeBaseId`);
+  const query = config.query ? resolveTemplate(config.query, state) : "";
+  if (!query) throw new Error(`Knowledge search node "${node.name}" resolved to empty query`);
+  const { searchKnowledge } = await import("../knowledge-search");
+  const results = await searchKnowledge(tenantId, config.knowledgeBaseId, query, {
+    topK: config.topK || 5,
+    similarityThreshold: config.scoreThreshold || 0.3,
+  });
+  return { output: { results, query, count: results.length }, paused: false };
+}
+
+// ---------------------------------------------------------------------------
+// Main Node Executor (thin switch that delegates)
 // ---------------------------------------------------------------------------
 
 export async function executeNode(
@@ -63,59 +266,11 @@ export async function executeNode(
       return { output: result, paused: false };
     }
 
-    case "agent": {
-      if (!config.agentId) throw new Error(`Agent node "${node.name}" has no agentId`);
-      const message = config.message ? resolveTemplate(config.message, state) : "Process the input.";
-      const result = await runSession({
-        agentId: config.agentId, tenantId, userId: userId || "", message,
-        channel: "workflow", sessionId: config.sessionId ? resolveTemplate(config.sessionId, state) : undefined,
-        metadata: { workflowRunId: runId, nodeName: node.name, parentSpanId: nodeSpanId },
-      });
-      return {
-        output: { response: result.response, sessionId: result.sessionId, status: result.status, usage: result.usage, error: result.error || null },
-        paused: false,
-      };
-    }
+    case "agent":
+      return executeAgentNode(node, state, tenantId, runId, userId, nodeSpanId);
 
-    case "llm": {
-      if (!config.providerModelId) throw new Error(`LLM node "${node.name}" has no providerModelId`);
-      const db = getDb();
-      const [modelRow] = await db.select({
-        modelId: providerModels.modelId, providerType: providers.providerType,
-        apiKeyRef: providers.apiKeyRef, baseUrl: providers.baseUrl, providerConfig: providers.config,
-        displayName: providerModels.displayName,
-        costPerInputToken: providerModels.costPerInputToken, costPerOutputToken: providerModels.costPerOutputToken,
-      }).from(providerModels).innerJoin(providers, eq(providerModels.providerId, providers.id))
-        .where(and(eq(providerModels.id, config.providerModelId), eq(providerModels.isActive, true), eq(providers.isActive, true))).limit(1);
-
-      if (!modelRow) throw new Error(`Model not found or inactive for LLM node "${node.name}"`);
-
-      const providerConfig: ProviderConfig = {
-        providerType: modelRow.providerType, apiKeyRef: modelRow.apiKeyRef, baseUrl: modelRow.baseUrl,
-        config: (modelRow.providerConfig as Record<string, unknown>) || {}, modelId: modelRow.modelId, displayName: modelRow.displayName,
-      };
-
-      const systemPrompt = config.systemPrompt ? resolveTemplate(config.systemPrompt, state) : "";
-      const userMessage = config.userMessage ? resolveTemplate(config.userMessage, state) : "";
-      const messages = [{ role: "user" as const, content: userMessage }];
-
-      const response = await callLLM(providerConfig, systemPrompt, messages, {
-        temperature: config.temperature, maxTokens: config.maxTokens,
-      });
-
-      const pricing = getModelPricing(modelRow.providerType, modelRow.modelId, modelRow.costPerInputToken, modelRow.costPerOutputToken);
-      const costUsd = calculateCost(pricing, response.inputTokens, response.outputTokens);
-
-      let parsedResponse: unknown = response.text;
-      if (config.responseFormat === "json") {
-        try { parsedResponse = JSON.parse(response.text); } catch { /* keep as string */ }
-      }
-
-      return {
-        output: { response: parsedResponse, inputTokens: response.inputTokens, outputTokens: response.outputTokens, costUsd },
-        paused: false,
-      };
-    }
+    case "llm":
+      return executeLLMNode(node, state, tenantId, runId);
 
     case "tool": {
       if (!config.toolName) throw new Error(`Tool node "${node.name}" has no toolName`);
@@ -177,122 +332,14 @@ export async function executeNode(
         paused: true,
       };
 
-    case "http_request": {
-      if (!config.url) throw new Error(`HTTP node "${node.name}" has no URL`);
-      const url = resolveTemplate(config.url, state);
+    case "http_request":
+      return executeHttpRequestNode(node, state, tenantId);
 
-      try {
-        const parsed = new URL(url);
-        if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("Only HTTP(S) allowed");
-        const host = parsed.hostname;
-        if (host === "localhost" || host === "0.0.0.0" || host === "::1"
-          || host.endsWith(".internal") || host.endsWith(".local")
-          || isPrivateIP(host)) {
-          throw new Error("SSRF blocked: private/internal addresses not allowed");
-        }
-        // DNS rebinding check: resolve hostname and validate the resolved IP
-        try {
-          const { address } = await dns.promises.lookup(host);
-          if (isPrivateIP(address)) {
-            throw new Error("SSRF blocked: hostname resolves to private address");
-          }
-        } catch (dnsErr) {
-          if ((dnsErr as Error).message.includes("SSRF")) throw dnsErr;
-          throw new Error(`DNS resolution failed for ${host}: ${(dnsErr as Error).message}`);
-        }
-      } catch (e) {
-        if ((e as Error).message.includes("SSRF") || (e as Error).message.includes("Only HTTP") || (e as Error).message.includes("DNS resolution"))
-          throw e;
-        throw new Error(`Invalid URL: ${url}`);
-      }
-      const resolvedHeaders: Record<string, string> = {};
-      for (const [k, v] of Object.entries(config.headers || {})) {
-        resolvedHeaders[k] = resolveTemplate(v, state);
-      }
-      const bodyStr = config.body ? resolveTemplate(config.body, state) : undefined;
-      const timeoutMs = config.timeoutMs || 30_000;
+    case "code":
+      return executeCodeNode(node, state);
 
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
-      try {
-        const resp = await fetch(url, {
-          method: config.method || "GET",
-          headers: resolvedHeaders,
-          body: config.method !== "GET" ? bodyStr : undefined,
-          signal: controller.signal,
-        });
-        clearTimeout(timer);
-
-        let responseBody: unknown;
-        if (config.responseType === "json") {
-          try { responseBody = await resp.json(); } catch { responseBody = await resp.text(); }
-        } else {
-          responseBody = await resp.text();
-        }
-
-        return { output: { status: resp.status, body: responseBody }, paused: false };
-      } catch (e) {
-        clearTimeout(timer);
-        throw new Error(`HTTP request failed: ${(e as Error).message}`);
-      }
-    }
-
-    case "code": {
-      if (!config.code) throw new Error(`Code node "${node.name}" has no code`);
-      const { runInNewContext } = await import("node:vm");
-      const frozenState = JSON.parse(JSON.stringify(state));
-      const sandbox = Object.create(null) as Record<string, unknown>;
-      sandbox.state = frozenState;
-      sandbox.result = Object.create(null) as Record<string, unknown>;
-      sandbox.console = Object.create(null) as Record<string, unknown>;
-      sandbox.console = { log: () => {}, warn: () => {}, error: () => {} };
-      Object.setPrototypeOf(sandbox.console, null);
-
-      const safeJSON = Object.create(null) as Record<string, unknown>;
-      safeJSON.parse = function (s: string) { return JSON.parse(s); };
-      safeJSON.stringify = function (v: unknown) { return JSON.stringify(v); };
-      Object.setPrototypeOf(safeJSON.parse, null);
-      Object.setPrototypeOf(safeJSON.stringify, null);
-      sandbox.JSON = safeJSON;
-
-      const safeMath = Object.create(null) as Record<string, unknown>;
-      for (const key of ["abs", "ceil", "floor", "round", "max", "min", "pow", "sqrt", "random", "log", "log2", "log10", "sign", "trunc", "PI", "E"] as const) {
-        safeMath[key] = typeof Math[key] === "function" ? (...args: number[]) => (Math[key] as (...a: number[]) => number)(...args) : Math[key];
-      }
-      sandbox.Math = safeMath;
-
-      sandbox.parseInt = (s: string, r?: number) => parseInt(s, r);
-      sandbox.parseFloat = (s: string) => parseFloat(s);
-      sandbox.isNaN = (v: unknown) => isNaN(v as number);
-      sandbox.isFinite = (v: unknown) => isFinite(v as number);
-      Object.setPrototypeOf(sandbox.parseInt, null);
-      Object.setPrototypeOf(sandbox.parseFloat, null);
-      Object.setPrototypeOf(sandbox.isNaN, null);
-      Object.setPrototypeOf(sandbox.isFinite, null);
-
-      const wrappedCode = `"use strict"; (function(state) { ${config.code} })(state)`;
-      try {
-        const returned = runInNewContext(wrappedCode, sandbox, { timeout: 5000, microtaskMode: "afterEvaluate" });
-        const output = (returned && typeof returned === "object" && !Array.isArray(returned))
-          ? JSON.parse(JSON.stringify(returned)) as Record<string, unknown>
-          : JSON.parse(JSON.stringify(sandbox.result)) as Record<string, unknown>;
-        return { output, paused: false };
-      } catch (e) {
-        throw new Error(`Code execution failed: ${(e as Error).message}`);
-      }
-    }
-
-    case "knowledge_search": {
-      if (!config.knowledgeBaseId) throw new Error(`Knowledge search node "${node.name}" has no knowledgeBaseId`);
-      const query = config.query ? resolveTemplate(config.query, state) : "";
-      if (!query) throw new Error(`Knowledge search node "${node.name}" resolved to empty query`);
-      const { searchKnowledge } = await import("../knowledge-search");
-      const results = await searchKnowledge(tenantId, config.knowledgeBaseId, query, {
-        topK: config.topK || 5,
-        similarityThreshold: config.scoreThreshold || 0.3,
-      });
-      return { output: { results, query, count: results.length }, paused: false };
-    }
+    case "knowledge_search":
+      return executeKnowledgeSearchNode(node, state, tenantId);
 
     case "aggregate":
       return { output: {}, paused: false };
@@ -317,8 +364,49 @@ export async function executeNode(
 }
 
 // ---------------------------------------------------------------------------
-// Edge Resolution
+// Edge Resolution — helper functions
 // ---------------------------------------------------------------------------
+
+function resolveSwitchEdges(
+  currentNode: GraphNode,
+  normalEdges: GraphEdge[],
+  graph: ExecutionGraph,
+  state: WorkflowState,
+): GraphNode[] {
+  const switchOutput = state[normalizeKey(currentNode.name)] as Record<string, unknown> | undefined;
+  const matched = (switchOutput?.matched as string) || "";
+  for (const edge of normalEdges) {
+    if (edge.conditionLabel === matched) {
+      const target = graph.nodes.get(edge.toNodeId);
+      return target ? [target] : [];
+    }
+  }
+  const defaultEdge = normalEdges.find((e) => e.conditionLabel === "default" || !e.conditionExpr);
+  if (defaultEdge) {
+    const target = graph.nodes.get(defaultEdge.toNodeId);
+    return target ? [target] : [];
+  }
+  return [];
+}
+
+function resolveConditionalEdges(
+  normalEdges: GraphEdge[],
+  graph: ExecutionGraph,
+  state: WorkflowState,
+): GraphNode[] {
+  for (const edge of normalEdges) {
+    if (edge.conditionExpr && evaluateCondition(edge.conditionExpr, state)) {
+      const target = graph.nodes.get(edge.toNodeId);
+      return target ? [target] : [];
+    }
+  }
+  const defaultEdge = normalEdges.find((e) => !e.conditionExpr);
+  if (defaultEdge) {
+    const target = graph.nodes.get(defaultEdge.toNodeId);
+    return target ? [target] : [];
+  }
+  return [];
+}
 
 export function getNextNodes(
   currentNode: GraphNode,
@@ -342,36 +430,12 @@ export function getNextNodes(
   const normalEdges = outEdges.filter((e) => e.edgeType === "normal" || e.edgeType === "loop_done");
 
   if (currentNode.nodeType === "switch") {
-    const switchOutput = state[normalizeKey(currentNode.name)] as Record<string, unknown> | undefined;
-    const matched = (switchOutput?.matched as string) || "";
-    for (const edge of normalEdges) {
-      if (edge.conditionLabel === matched) {
-        const target = graph.nodes.get(edge.toNodeId);
-        return target ? [target] : [];
-      }
-    }
-    const defaultEdge = normalEdges.find((e) => e.conditionLabel === "default" || !e.conditionExpr);
-    if (defaultEdge) {
-      const target = graph.nodes.get(defaultEdge.toNodeId);
-      return target ? [target] : [];
-    }
-    return [];
+    return resolveSwitchEdges(currentNode, normalEdges, graph, state);
   }
 
   const hasConditions = normalEdges.some((e) => e.conditionExpr);
   if (hasConditions) {
-    for (const edge of normalEdges) {
-      if (edge.conditionExpr && evaluateCondition(edge.conditionExpr, state)) {
-        const target = graph.nodes.get(edge.toNodeId);
-        return target ? [target] : [];
-      }
-    }
-    const defaultEdge = normalEdges.find((e) => !e.conditionExpr);
-    if (defaultEdge) {
-      const target = graph.nodes.get(defaultEdge.toNodeId);
-      return target ? [target] : [];
-    }
-    return [];
+    return resolveConditionalEdges(normalEdges, graph, state);
   }
 
   return normalEdges.map((e) => graph.nodes.get(e.toNodeId)).filter((n): n is GraphNode => !!n);
@@ -440,28 +504,21 @@ export async function executeLoopNode(
   return { iterations: counter, lastResult: lastResult || {} };
 }
 
-export async function executeIterationNode(
-  node: GraphNode,
+// ---------------------------------------------------------------------------
+// Iteration Node — processIterationItems helper
+// ---------------------------------------------------------------------------
+
+async function processIterationItems(
+  items: unknown[],
+  config: NodeConfig,
   state: WorkflowState,
+  bodyNodeIds: Set<string>,
+  allNodes: Map<string, GraphNode>,
+  recordStep: StepRecorder,
   tenantId: string,
   runId: string,
   userId: string | null,
-  allEdges: GraphEdge[],
-  allNodes: Map<string, GraphNode>,
-  recordStep: StepRecorder,
-): Promise<Record<string, unknown>> {
-  const config = node.config;
-  if (!config.arrayPath) throw new Error(`Iteration node "${node.name}" has no arrayPath`);
-
-  const resolved = resolveTemplate(config.arrayPath, state);
-  let items: unknown[];
-  try { items = JSON.parse(resolved); } catch { throw new Error(`Iteration node "${node.name}": arrayPath resolved to invalid JSON: ${resolved.slice(0, 100)}`); }
-  if (!Array.isArray(items)) throw new Error(`Iteration node "${node.name}": arrayPath did not resolve to an array`);
-
-  const maxItems = config.maxItems || 1000;
-  items = items.slice(0, maxItems);
-
-  const bodyNodeIds = getLoopBodyNodes(node, allEdges, allNodes);
+): Promise<Array<Record<string, unknown>>> {
   const results: Array<Record<string, unknown>> = [];
   const batchSize = config.batchSize || 5;
 
@@ -493,6 +550,36 @@ export async function executeIterationNode(
       results.push(await processItem(items[i], i));
     }
   }
+
+  return results;
+}
+
+export async function executeIterationNode(
+  node: GraphNode,
+  state: WorkflowState,
+  tenantId: string,
+  runId: string,
+  userId: string | null,
+  allEdges: GraphEdge[],
+  allNodes: Map<string, GraphNode>,
+  recordStep: StepRecorder,
+): Promise<Record<string, unknown>> {
+  const config = node.config;
+  if (!config.arrayPath) throw new Error(`Iteration node "${node.name}" has no arrayPath`);
+
+  const resolved = resolveTemplate(config.arrayPath, state);
+  let items: unknown[];
+  try { items = JSON.parse(resolved); } catch { throw new Error(`Iteration node "${node.name}": arrayPath resolved to invalid JSON: ${resolved.slice(0, 100)}`); }
+  if (!Array.isArray(items)) throw new Error(`Iteration node "${node.name}": arrayPath did not resolve to an array`);
+
+  const maxItems = config.maxItems || 1000;
+  items = items.slice(0, maxItems);
+
+  const bodyNodeIds = getLoopBodyNodes(node, allEdges, allNodes);
+
+  const results = await processIterationItems(
+    items, config, state, bodyNodeIds, allNodes, recordStep, tenantId, runId, userId,
+  );
 
   delete (state as Record<string, unknown>)._iteration;
   return { results, count: results.length };

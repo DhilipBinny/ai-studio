@@ -12,7 +12,7 @@ export class DrizzleDocumentStore implements DocumentStore {
 
   async deleteChunks(documentId: string): Promise<void> {
     const db = getDb();
-    await db.delete(documentChunks).where(eq(documentChunks.documentId, documentId));
+    await db.delete(documentChunks).where(and(eq(documentChunks.documentId, documentId), eq(documentChunks.tenantId, this.tenantId)));
   }
 
   async insertChunks(_tenantId: string, chunks: ChunkRecord[]): Promise<number[]> {
@@ -52,7 +52,7 @@ export class DrizzleDocumentStore implements DocumentStore {
     if (status === "error") {
       updates.errorMessage = "Processing failed";
     }
-    await db.update(documents).set(updates).where(eq(documents.id, documentId));
+    await db.update(documents).set(updates).where(and(eq(documents.id, documentId), eq(documents.tenantId, this.tenantId)));
   }
 
   async updateKBChunkCount(knowledgeBaseId: string): Promise<void> {
@@ -65,6 +65,6 @@ export class DrizzleDocumentStore implements DocumentStore {
     await db
       .update(knowledgeBases)
       .set({ chunkCount: totalChunks, updatedAt: new Date() })
-      .where(eq(knowledgeBases.id, knowledgeBaseId));
+      .where(and(eq(knowledgeBases.id, knowledgeBaseId), eq(knowledgeBases.tenantId, this.tenantId)));
   }
 }

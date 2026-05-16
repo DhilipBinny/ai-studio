@@ -264,86 +264,14 @@ function mergeRunEdges(flowEdges: Edge[], steps: RunStep[]): Edge[] {
 }
 
 // ---------------------------------------------------------------------------
-// Canvas Inner (uses useReactFlow — must be inside ReactFlowProvider)
+// Custom Hook: useCanvasSearch — search state, filter, navigate
 // ---------------------------------------------------------------------------
 
-function CanvasInner({
-  initialNodes,
-  initialEdges,
-  wfNodes,
-  agents,
-  models,
-  runSteps = [],
-  onSave,
-}: {
-  initialNodes: Node[];
-  initialEdges: Edge[];
-  wfNodes: WorkflowNode[];
-  agents: Agent[];
-  models: ProviderModel[];
-  runSteps?: RunStep[];
-  onSave: (nodes: WorkflowNode[], edges: Array<{ fromNodeId: string; toNodeId: string; conditionExpr?: string; conditionLabel?: string; edgeType?: string; sortOrder?: number; sourceHandle?: string; targetHandle?: string }>) => Promise<void>;
-}) {
-  const { screenToFlowPosition, fitView, setCenter } = useReactFlow();
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-  const [saving, setSaving] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-
-  // Semantic zoom — track detail level (only updates on threshold cross)
-  const viewport = useViewport();
-  const detailLevelRef = useRef<DetailLevel>("full");
-  const [detailLevel, setDetailLevel] = useState<DetailLevel>("full");
-
-  useEffect(() => {
-    const next = computeDetailLevel(viewport.zoom);
-    if (next !== detailLevelRef.current) {
-      detailLevelRef.current = next;
-      setDetailLevel(next);
-    }
-  }, [viewport.zoom]);
-
-  // Cost overlay toggle
-  const [showCostOverlay, setShowCostOverlay] = useState(false);
-
-  // Ghost node suggestion (ephemeral — dismissed on any action)
-  const [ghostSuggestion, setGhostSuggestion] = useState<GhostSuggestion | null>(null);
-
-  // Search state
+function useCanvasSearch(nodes: Node[], setCenter: (x: number, y: number, opts: { duration: number; zoom: number }) => void) {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchIndex, setSearchIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Undo/Redo
-  const { pushState, undo, redo, canUndo, canRedo, resetHistory } = useUndoRedo({
-    nodes: initialNodes,
-    edges: initialEdges,
-  });
-
-  // Copy/Paste clipboard (ref to avoid re-renders in keyboard handler)
-  const clipboardRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
-
-  // Refs to current state for keyboard handler closure
-  const nodesRef = useRef(nodes);
-  const edgesRef = useRef(edges);
-  const hasChangesRef = useRef(hasChanges);
-  nodesRef.current = nodes;
-  edgesRef.current = edges;
-  hasChangesRef.current = hasChanges;
-
-  // Sync when parent props change (e.g. after save + re-fetch)
-  useEffect(() => {
-    setNodes(initialNodes);
-    setEdges(initialEdges);
-    setHasChanges(false);
-    resetHistory({ nodes: initialNodes, edges: initialEdges });
-  }, [initialNodes, initialEdges, setNodes, setEdges, resetHistory]);
-
-  // -----------------------------------------------------------------------
-  // Search logic
-  // -----------------------------------------------------------------------
 
   const searchResults = useMemo(() => {
     if (!searchQuery.trim()) return [];
@@ -364,49 +292,6 @@ function CanvasInner({
       setSearchIndex(0);
     }
   }, [searchResults, searchIndex]);
-
-  // Apply search highlight/dim + semantic zoom + cost overlay to nodes
-  const displayNodes = useMemo(() => {
-    // Merge run status first
-    let result = mergeRunStatus(nodes, runSteps);
-
-    // Inject detailLevel and showCostOverlay into every node's data
-    result = result.map((n) => ({
-      ...n,
-      data: {
-        ...n.data,
-        detailLevel,
-        showCostOverlay,
-      },
-    }));
-
-    // Apply search styling
-    if (showSearch && searchQuery.trim() && searchMatchIds.size > 0) {
-      result = result.map((n) => ({
-        ...n,
-        className: searchMatchIds.has(n.id) ? "ring-2 ring-primary" : "opacity-30",
-      }));
-    } else if (showSearch && searchQuery.trim() && searchMatchIds.size === 0) {
-      // Query entered but no matches — dim everything
-      result = result.map((n) => ({
-        ...n,
-        className: "opacity-30",
-      }));
-    } else {
-      // Clear any leftover className
-      result = result.map((n) => ({
-        ...n,
-        className: undefined,
-      }));
-    }
-
-    return result;
-  }, [nodes, runSteps, showSearch, searchQuery, searchMatchIds, detailLevel, showCostOverlay]);
-
-  // Apply execution animation to edges
-  const displayEdges = useMemo(() => {
-    return mergeRunEdges(edges, runSteps);
-  }, [edges, runSteps]);
 
   const navigateSearchNext = useCallback(() => {
     if (searchResults.length === 0) return;
@@ -454,6 +339,382 @@ function CanvasInner({
     }
   }, [navigateSearchNext, navigateSearchPrev, closeSearch]);
 
+  return {
+    showSearch, searchQuery, setSearchQuery, searchIndex, setSearchIndex,
+    searchInputRef, searchResults, searchMatchIds,
+    navigateSearchNext, navigateSearchPrev, closeSearch, openSearch, handleSearchKeyDown,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Custom Hook: useCopyPaste — clipboard, copy, paste
+// ---------------------------------------------------------------------------
+
+function useCopyPaste(
+  nodesRef: React.RefObject<Node[]>,
+  edgesRef: React.RefObject<Edge[]>,
+  setNodes: React.Dispatch<React.SetStateAction<Node[]>>,
+  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>,
+  pushCurrentState: () => void,
+  markDirty: () => void,
+) {
+  const clipboardRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null);
+
+  const handleCopy = useCallback(() => {
+    const selectedNodes = nodesRef.current.filter((n) => n.selected);
+    if (selectedNodes.length === 0) return;
+    const selectedIds = new Set(selectedNodes.map((n) => n.id));
+    const selectedEdges = edgesRef.current.filter(
+      (e) => selectedIds.has(e.source) && selectedIds.has(e.target)
+    );
+    clipboardRef.current = { nodes: selectedNodes, edges: selectedEdges };
+  }, [nodesRef, edgesRef]);
+
+  const handlePaste = useCallback(() => {
+    if (!clipboardRef.current) return;
+    const { nodes: copiedNodes, edges: copiedEdges } = clipboardRef.current;
+
+    pushCurrentState();
+
+    const idMap = new Map<string, string>();
+    copiedNodes.forEach((n) => {
+      idMap.set(n.id, `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
+    });
+
+    const newNodes = copiedNodes.map((n) => ({
+      ...n,
+      id: idMap.get(n.id) as string,
+      position: { x: n.position.x + 40, y: n.position.y + 40 },
+      selected: true,
+    }));
+
+    const newEdges = copiedEdges.map((e) => ({
+      ...e,
+      id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      source: idMap.get(e.source) || e.source,
+      target: idMap.get(e.target) || e.target,
+    }));
+
+    setNodes((nds) => [
+      ...nds.map((n) => ({ ...n, selected: false })),
+      ...newNodes,
+    ]);
+    setEdges((eds) => [...eds, ...newEdges]);
+    markDirty();
+  }, [setNodes, setEdges, markDirty, pushCurrentState]);
+
+  return { handleCopy, handlePaste };
+}
+
+// ---------------------------------------------------------------------------
+// Custom Hook: useCanvasKeyboard — keyboard event listener
+// ---------------------------------------------------------------------------
+
+function useCanvasKeyboard(handlers: {
+  handleUndo: () => void;
+  handleRedo: () => void;
+  handleCopy: () => void;
+  handlePaste: () => void;
+  handleSelectAll: () => void;
+  handleSave: () => Promise<void>;
+  openSearch: () => void;
+  hasChangesRef: React.RefObject<boolean>;
+}) {
+  const { handleUndo, handleRedo, handleCopy, handlePaste, handleSelectAll, handleSave, openSearch, hasChangesRef } = handlers;
+
+  useEffect(() => {
+    const shortcuts: Array<{
+      key: string;
+      ctrl: boolean;
+      shift: boolean;
+      handler: () => void;
+    }> = [
+      { key: "z", ctrl: true, shift: false, handler: handleUndo },
+      { key: "z", ctrl: true, shift: true, handler: handleRedo },
+      { key: "c", ctrl: true, shift: false, handler: handleCopy },
+      { key: "v", ctrl: true, shift: false, handler: handlePaste },
+      { key: "a", ctrl: true, shift: false, handler: handleSelectAll },
+      { key: "s", ctrl: true, shift: false, handler: () => { if (hasChangesRef.current) handleSave(); } },
+      { key: "f", ctrl: true, shift: false, handler: openSearch },
+    ];
+
+    const listener = (e: KeyboardEvent) => {
+      // Allow Ctrl+F even inside search input
+      if (e.key === "f" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+        e.preventDefault();
+        openSearch();
+        return;
+      }
+
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+
+      const match = shortcuts.find(
+        (s) => s.key === e.key && s.ctrl === (e.ctrlKey || e.metaKey) && s.shift === e.shiftKey
+      );
+      if (match) {
+        e.preventDefault();
+        match.handler();
+      }
+    };
+
+    window.addEventListener("keydown", listener);
+    return () => window.removeEventListener("keydown", listener);
+  }, [handleUndo, handleRedo, handleCopy, handlePaste, handleSelectAll, handleSave, openSearch, hasChangesRef]);
+}
+
+// ---------------------------------------------------------------------------
+// Sub-component: CanvasToolbar
+// ---------------------------------------------------------------------------
+
+function CanvasToolbar({
+  canUndo, canRedo, hasChanges, saving, showCostOverlay,
+  handleUndo, handleRedo, handleAutoLayout, openSearch,
+  setShowCostOverlay, handleSave,
+}: {
+  canUndo: boolean;
+  canRedo: boolean;
+  hasChanges: boolean;
+  saving: boolean;
+  showCostOverlay: boolean;
+  handleUndo: () => void;
+  handleRedo: () => void;
+  handleAutoLayout: () => void;
+  openSearch: () => void;
+  setShowCostOverlay: (fn: (prev: boolean) => boolean) => void;
+  handleSave: () => Promise<void>;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 px-3 py-1.5 border-b bg-muted/20">
+      <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="h-7 w-7 p-0">
+        <Undo2 className="h-3.5 w-3.5" />
+      </Button>
+      <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)" className="h-7 w-7 p-0">
+        <Redo2 className="h-3.5 w-3.5" />
+      </Button>
+      <div className="w-px h-4 bg-border mx-1" />
+      <Button variant="ghost" size="sm" onClick={handleAutoLayout} title="Auto Layout" className="h-7 gap-1 px-2">
+        <LayoutGrid className="h-3.5 w-3.5" />
+        <span className="text-xs">Tidy Up</span>
+      </Button>
+      <div className="w-px h-4 bg-border mx-1" />
+      <Button variant="ghost" size="sm" onClick={openSearch} title="Search (Ctrl+F)" className="h-7 gap-1 px-2">
+        <Search className="h-3.5 w-3.5" />
+        <span className="text-xs">Search</span>
+      </Button>
+      <div className="w-px h-4 bg-border mx-1" />
+      <Button
+        variant={showCostOverlay ? "secondary" : "ghost"}
+        size="sm"
+        onClick={() => setShowCostOverlay((prev) => !prev)}
+        title="Show Costs"
+        className="h-7 gap-1 px-2"
+      >
+        <DollarSign className="h-3.5 w-3.5" />
+        <span className="text-xs">Costs</span>
+      </Button>
+      <div className="flex-1" />
+      {hasChanges && (
+        <Button size="sm" onClick={handleSave} disabled={saving} className="h-7">
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Save className="h-3.5 w-3.5 mr-1" />}
+          Save
+        </Button>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-component: CanvasSearchBar
+// ---------------------------------------------------------------------------
+
+function CanvasSearchBar({
+  searchQuery, setSearchQuery, searchIndex, setSearchIndex,
+  searchInputRef, searchResults, handleSearchKeyDown,
+  navigateSearchPrev, navigateSearchNext, closeSearch,
+}: {
+  searchQuery: string;
+  setSearchQuery: (q: string) => void;
+  searchIndex: number;
+  setSearchIndex: (i: number) => void;
+  searchInputRef: React.RefObject<HTMLInputElement | null>;
+  searchResults: Node[];
+  handleSearchKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  navigateSearchPrev: () => void;
+  navigateSearchNext: () => void;
+  closeSearch: () => void;
+}) {
+  return (
+    <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-1.5 shadow-lg">
+      <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+      <input
+        ref={searchInputRef}
+        value={searchQuery}
+        onChange={(e) => {
+          setSearchQuery(e.target.value);
+          setSearchIndex(0);
+        }}
+        onKeyDown={handleSearchKeyDown}
+        placeholder="Search nodes..."
+        className="bg-transparent border-none text-sm w-48 focus:outline-none"
+        autoFocus
+      />
+      {searchQuery.trim() && (
+        <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
+          {searchResults.length > 0 ? `${searchIndex + 1}/${searchResults.length}` : "0/0"}
+        </span>
+      )}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={navigateSearchPrev}
+        disabled={searchResults.length === 0}
+        className="h-6 w-6 p-0"
+        aria-label="Previous match"
+      >
+        <ChevronUp className="h-3 w-3" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={navigateSearchNext}
+        disabled={searchResults.length === 0}
+        className="h-6 w-6 p-0"
+        aria-label="Next match"
+      >
+        <ChevronDown className="h-3 w-3" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={closeSearch}
+        className="h-6 w-6 p-0"
+        aria-label="Close search"
+      >
+        <X className="h-3 w-3" />
+      </Button>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Canvas Inner (uses useReactFlow — must be inside ReactFlowProvider)
+// ---------------------------------------------------------------------------
+
+function CanvasInner({
+  initialNodes,
+  initialEdges,
+  wfNodes,
+  agents,
+  models,
+  runSteps = [],
+  onSave,
+}: {
+  initialNodes: Node[];
+  initialEdges: Edge[];
+  wfNodes: WorkflowNode[];
+  agents: Agent[];
+  models: ProviderModel[];
+  runSteps?: RunStep[];
+  onSave: (nodes: WorkflowNode[], edges: Array<{ fromNodeId: string; toNodeId: string; conditionExpr?: string; conditionLabel?: string; edgeType?: string; sortOrder?: number; sourceHandle?: string; targetHandle?: string }>) => Promise<void>;
+}) {
+  const { screenToFlowPosition, fitView, setCenter } = useReactFlow();
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [saving, setSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+
+  // Semantic zoom — track detail level (only updates on threshold cross)
+  const viewport = useViewport();
+  const detailLevelRef = useRef<DetailLevel>("full");
+  const [detailLevel, setDetailLevel] = useState<DetailLevel>("full");
+
+  useEffect(() => {
+    const next = computeDetailLevel(viewport.zoom);
+    if (next !== detailLevelRef.current) {
+      detailLevelRef.current = next;
+      setDetailLevel(next);
+    }
+  }, [viewport.zoom]);
+
+  // Cost overlay toggle
+  const [showCostOverlay, setShowCostOverlay] = useState(false);
+
+  // Ghost node suggestion (ephemeral — dismissed on any action)
+  const [ghostSuggestion, setGhostSuggestion] = useState<GhostSuggestion | null>(null);
+
+  // Undo/Redo
+  const { pushState, undo, redo, canUndo, canRedo, resetHistory } = useUndoRedo({
+    nodes: initialNodes,
+    edges: initialEdges,
+  });
+
+  // Refs to current state for keyboard handler closure
+  const nodesRef = useRef(nodes);
+  const edgesRef = useRef(edges);
+  const hasChangesRef = useRef(hasChanges);
+  nodesRef.current = nodes;
+  edgesRef.current = edges;
+  hasChangesRef.current = hasChanges;
+
+  // Search hook
+  const {
+    showSearch, searchQuery, setSearchQuery, searchIndex, setSearchIndex,
+    searchInputRef, searchResults, searchMatchIds,
+    navigateSearchNext, navigateSearchPrev, closeSearch, openSearch, handleSearchKeyDown,
+  } = useCanvasSearch(nodes, setCenter);
+
+  // Sync when parent props change (e.g. after save + re-fetch)
+  useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+    setHasChanges(false);
+    resetHistory({ nodes: initialNodes, edges: initialEdges });
+  }, [initialNodes, initialEdges, setNodes, setEdges, resetHistory]);
+
+  // Apply search highlight/dim + semantic zoom + cost overlay to nodes
+  const displayNodes = useMemo(() => {
+    // Merge run status first
+    let result = mergeRunStatus(nodes, runSteps);
+
+    // Inject detailLevel and showCostOverlay into every node's data
+    result = result.map((n) => ({
+      ...n,
+      data: {
+        ...n.data,
+        detailLevel,
+        showCostOverlay,
+      },
+    }));
+
+    // Apply search styling
+    if (showSearch && searchQuery.trim() && searchMatchIds.size > 0) {
+      result = result.map((n) => ({
+        ...n,
+        className: searchMatchIds.has(n.id) ? "ring-2 ring-primary" : "opacity-30",
+      }));
+    } else if (showSearch && searchQuery.trim() && searchMatchIds.size === 0) {
+      // Query entered but no matches — dim everything
+      result = result.map((n) => ({
+        ...n,
+        className: "opacity-30",
+      }));
+    } else {
+      // Clear any leftover className
+      result = result.map((n) => ({
+        ...n,
+        className: undefined,
+      }));
+    }
+
+    return result;
+  }, [nodes, runSteps, showSearch, searchQuery, searchMatchIds, detailLevel, showCostOverlay]);
+
+  // Apply execution animation to edges
+  const displayEdges = useMemo(() => {
+    return mergeRunEdges(edges, runSteps);
+  }, [edges, runSteps]);
+
   // -----------------------------------------------------------------------
   // Mutation helpers
   // -----------------------------------------------------------------------
@@ -463,6 +724,11 @@ function CanvasInner({
   const pushCurrentState = useCallback(() => {
     pushState({ nodes: nodesRef.current, edges: edgesRef.current });
   }, [pushState]);
+
+  // Copy / Paste hook
+  const { handleCopy, handlePaste } = useCopyPaste(
+    nodesRef, edgesRef, setNodes, setEdges, pushCurrentState, markDirty,
+  );
 
   // -----------------------------------------------------------------------
   // Core handlers
@@ -688,53 +954,6 @@ function CanvasInner({
   }, [redo, setNodes, setEdges]);
 
   // -----------------------------------------------------------------------
-  // Copy / Paste
-  // -----------------------------------------------------------------------
-
-  const handleCopy = useCallback(() => {
-    const selectedNodes = nodesRef.current.filter((n) => n.selected);
-    if (selectedNodes.length === 0) return;
-    const selectedIds = new Set(selectedNodes.map((n) => n.id));
-    const selectedEdges = edgesRef.current.filter(
-      (e) => selectedIds.has(e.source) && selectedIds.has(e.target)
-    );
-    clipboardRef.current = { nodes: selectedNodes, edges: selectedEdges };
-  }, []);
-
-  const handlePaste = useCallback(() => {
-    if (!clipboardRef.current) return;
-    const { nodes: copiedNodes, edges: copiedEdges } = clipboardRef.current;
-
-    pushCurrentState();
-
-    const idMap = new Map<string, string>();
-    copiedNodes.forEach((n) => {
-      idMap.set(n.id, `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
-    });
-
-    const newNodes = copiedNodes.map((n) => ({
-      ...n,
-      id: idMap.get(n.id) as string,
-      position: { x: n.position.x + 40, y: n.position.y + 40 },
-      selected: true,
-    }));
-
-    const newEdges = copiedEdges.map((e) => ({
-      ...e,
-      id: `edge-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      source: idMap.get(e.source) || e.source,
-      target: idMap.get(e.target) || e.target,
-    }));
-
-    setNodes((nds) => [
-      ...nds.map((n) => ({ ...n, selected: false })),
-      ...newNodes,
-    ]);
-    setEdges((eds) => [...eds, ...newEdges]);
-    markDirty();
-  }, [setNodes, setEdges, markDirty, pushCurrentState]);
-
-  // -----------------------------------------------------------------------
   // Select All
   // -----------------------------------------------------------------------
 
@@ -807,44 +1026,10 @@ function CanvasInner({
   // Keyboard shortcuts
   // -----------------------------------------------------------------------
 
-  useEffect(() => {
-    const shortcuts: Array<{
-      key: string;
-      ctrl: boolean;
-      shift: boolean;
-      handler: () => void;
-    }> = [
-      { key: "z", ctrl: true, shift: false, handler: handleUndo },
-      { key: "z", ctrl: true, shift: true, handler: handleRedo },
-      { key: "c", ctrl: true, shift: false, handler: handleCopy },
-      { key: "v", ctrl: true, shift: false, handler: handlePaste },
-      { key: "a", ctrl: true, shift: false, handler: handleSelectAll },
-      { key: "s", ctrl: true, shift: false, handler: () => { if (hasChangesRef.current) handleSave(); } },
-      { key: "f", ctrl: true, shift: false, handler: openSearch },
-    ];
-
-    const listener = (e: KeyboardEvent) => {
-      // Allow Ctrl+F even inside search input
-      if (e.key === "f" && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
-        e.preventDefault();
-        openSearch();
-        return;
-      }
-
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
-
-      const match = shortcuts.find(
-        (s) => s.key === e.key && s.ctrl === (e.ctrlKey || e.metaKey) && s.shift === e.shiftKey
-      );
-      if (match) {
-        e.preventDefault();
-        match.handler();
-      }
-    };
-
-    window.addEventListener("keydown", listener);
-    return () => window.removeEventListener("keydown", listener);
-  }, [handleUndo, handleRedo, handleCopy, handlePaste, handleSelectAll, handleSave, openSearch]);
+  useCanvasKeyboard({
+    handleUndo, handleRedo, handleCopy, handlePaste,
+    handleSelectAll, handleSave, openSearch, hasChangesRef,
+  });
 
   // -----------------------------------------------------------------------
   // Unsaved changes warning
@@ -881,95 +1066,33 @@ function CanvasInner({
       <NodePalette onAdd={handleAddNodeFromPalette} />
 
       <div className="flex-1 flex flex-col relative">
-        {/* Toolbar */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 border-b bg-muted/20">
-          <Button variant="ghost" size="sm" onClick={handleUndo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="h-7 w-7 p-0">
-            <Undo2 className="h-3.5 w-3.5" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleRedo} disabled={!canRedo} title="Redo (Ctrl+Shift+Z)" className="h-7 w-7 p-0">
-            <Redo2 className="h-3.5 w-3.5" />
-          </Button>
-          <div className="w-px h-4 bg-border mx-1" />
-          <Button variant="ghost" size="sm" onClick={handleAutoLayout} title="Auto Layout" className="h-7 gap-1 px-2">
-            <LayoutGrid className="h-3.5 w-3.5" />
-            <span className="text-xs">Tidy Up</span>
-          </Button>
-          <div className="w-px h-4 bg-border mx-1" />
-          <Button variant="ghost" size="sm" onClick={openSearch} title="Search (Ctrl+F)" className="h-7 gap-1 px-2">
-            <Search className="h-3.5 w-3.5" />
-            <span className="text-xs">Search</span>
-          </Button>
-          <div className="w-px h-4 bg-border mx-1" />
-          <Button
-            variant={showCostOverlay ? "secondary" : "ghost"}
-            size="sm"
-            onClick={() => setShowCostOverlay((prev) => !prev)}
-            title="Show Costs"
-            className="h-7 gap-1 px-2"
-          >
-            <DollarSign className="h-3.5 w-3.5" />
-            <span className="text-xs">Costs</span>
-          </Button>
-          <div className="flex-1" />
-          {hasChanges && (
-            <Button size="sm" onClick={handleSave} disabled={saving} className="h-7">
-              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Save className="h-3.5 w-3.5 mr-1" />}
-              Save
-            </Button>
-          )}
-        </div>
+        <CanvasToolbar
+          canUndo={canUndo}
+          canRedo={canRedo}
+          hasChanges={hasChanges}
+          saving={saving}
+          showCostOverlay={showCostOverlay}
+          handleUndo={handleUndo}
+          handleRedo={handleRedo}
+          handleAutoLayout={handleAutoLayout}
+          openSearch={openSearch}
+          setShowCostOverlay={setShowCostOverlay}
+          handleSave={handleSave}
+        />
 
-        {/* Search bar */}
         {showSearch && (
-          <div className="absolute top-12 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-1.5 shadow-lg">
-            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <input
-              ref={searchInputRef}
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setSearchIndex(0);
-              }}
-              onKeyDown={handleSearchKeyDown}
-              placeholder="Search nodes..."
-              className="bg-transparent border-none text-sm w-48 focus:outline-none"
-              autoFocus
-            />
-            {searchQuery.trim() && (
-              <span className="text-xs text-muted-foreground whitespace-nowrap shrink-0">
-                {searchResults.length > 0 ? `${searchIndex + 1}/${searchResults.length}` : "0/0"}
-              </span>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={navigateSearchPrev}
-              disabled={searchResults.length === 0}
-              className="h-6 w-6 p-0"
-              aria-label="Previous match"
-            >
-              <ChevronUp className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={navigateSearchNext}
-              disabled={searchResults.length === 0}
-              className="h-6 w-6 p-0"
-              aria-label="Next match"
-            >
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={closeSearch}
-              className="h-6 w-6 p-0"
-              aria-label="Close search"
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
+          <CanvasSearchBar
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            searchIndex={searchIndex}
+            setSearchIndex={setSearchIndex}
+            searchInputRef={searchInputRef}
+            searchResults={searchResults}
+            handleSearchKeyDown={handleSearchKeyDown}
+            navigateSearchPrev={navigateSearchPrev}
+            navigateSearchNext={navigateSearchNext}
+            closeSearch={closeSearch}
+          />
         )}
 
         {/* Canvas */}

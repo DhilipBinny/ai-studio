@@ -109,7 +109,12 @@ export function withAuth(handler: RouteHandler) {
       return errorResponse("Authentication required", "UNAUTHENTICATED", 401);
     }
     const params = await context.params;
-    return handler(request, auth, params);
+    try {
+      return await handler(request, auth, params);
+    } catch (err) {
+      console.error("Route handler error:", err);
+      return errorResponse("Internal server error", "INTERNAL_ERROR", 500);
+    }
   };
 }
 

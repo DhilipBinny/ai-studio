@@ -310,7 +310,7 @@ export function NodeConfigPanel({
                   <Label className="text-[11px]">Arguments (JSON)</Label>
                   <Textarea
                     value={JSON.stringify(config.arguments || {}, null, 2)}
-                    onChange={(e) => { try { updateConfig("arguments", JSON.parse(e.target.value)); } catch {} }}
+                    onChange={(e) => { try { updateConfig("arguments", JSON.parse(e.target.value)); } catch (_err) { /* invalid intermediate JSON while typing */ } }}
                     rows={3} className="font-mono text-[11px]"
                     placeholder={'{"path": "{{input.filePath}}"}'}
                   />
@@ -340,7 +340,7 @@ export function NodeConfigPanel({
                 <Label className="text-[11px]">Mappings (JSON)</Label>
                 <Textarea
                   value={JSON.stringify(config.mappings || [], null, 2)}
-                  onChange={(e) => { try { updateConfig("mappings", JSON.parse(e.target.value)); } catch {} }}
+                  onChange={(e) => { try { updateConfig("mappings", JSON.parse(e.target.value)); } catch (_err) { /* invalid intermediate JSON while typing */ } }}
                   rows={4} className="font-mono text-[11px]"
                   placeholder={'[{"key":"summary","value":"{{agent.response}}"}]'}
                 />
