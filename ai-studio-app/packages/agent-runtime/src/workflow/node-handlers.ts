@@ -290,8 +290,11 @@ export async function executeNode(
       return { output: { result: result.content, isError: result.is_error || false }, paused: false };
     }
 
-    case "condition":
-      return { output: { evaluated: true }, paused: false };
+    case "condition": {
+      const expr = config.expression ? resolveTemplate(config.expression, state) : "false";
+      const result = evaluateCondition(expr, state);
+      return { output: { result, expression: config.expression }, paused: false };
+    }
 
     case "switch": {
       const val = config.value ? resolveTemplate(config.value, state).trim() : "";
@@ -427,10 +430,26 @@ export function getNextNodes(
     return [];
   }
 
-  const normalEdges = outEdges.filter((e) => e.edgeType === "normal" || e.edgeType === "loop_done");
+  const normalEdges = outEdges.filter((e) =>
+    e.edgeType === "normal" || e.edgeType === "loop_done" ||
+    e.edgeType === "condition_true" || e.edgeType === "condition_false"
+  );
 
   if (currentNode.nodeType === "switch") {
     return resolveSwitchEdges(currentNode, normalEdges, graph, state);
+  }
+
+  // Condition node: route by edgeType based on the node's boolean result
+  if (currentNode.nodeType === "condition") {
+    const nodeKey = normalizeKey(currentNode.name);
+    const condResult = (state[nodeKey] as Record<string, unknown>)?.result;
+    const targetType = condResult ? "condition_true" : "condition_false";
+    const matchedEdge = normalEdges.find((e) => e.edgeType === targetType);
+    if (matchedEdge) {
+      const target = graph.nodes.get(matchedEdge.toNodeId);
+      return target ? [target] : [];
+    }
+    return [];
   }
 
   const hasConditions = normalEdges.some((e) => e.conditionExpr);
