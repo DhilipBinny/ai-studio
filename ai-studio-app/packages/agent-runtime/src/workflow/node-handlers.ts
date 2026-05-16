@@ -52,10 +52,13 @@ async function executeAgentNode(
   const config = node.config;
   if (!config.agentId) throw new Error(`Agent node "${node.name}" has no agentId`);
   const message = config.message ? resolveTemplate(config.message, state) : "Process the input.";
+  const projectId = config.projectId
+    ? resolveTemplate(config.projectId, state)
+    : (state.input as Record<string, unknown>)?.projectId as string | undefined;
   const result = await runSession({
     agentId: config.agentId, tenantId, userId: userId || "", message,
     channel: "workflow", sessionId: config.sessionId ? resolveTemplate(config.sessionId, state) : undefined,
-    metadata: { workflowRunId: runId, nodeName: node.name, parentSpanId: nodeSpanId },
+    metadata: { workflowRunId: runId, nodeName: node.name, parentSpanId: nodeSpanId, projectId },
   });
   return {
     output: { response: result.response, sessionId: result.sessionId, status: result.status, usage: result.usage, error: result.error || null },

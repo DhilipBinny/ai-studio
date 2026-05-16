@@ -60,39 +60,46 @@ export async function executeTool(
   }
 
   if (toolRisk === "dangerous") {
-    const argsHash = JSON.stringify(call.input);
-    const [pendingCall] = await db
-      .select({ id: agentSessionToolCalls.id, approvalStatus: agentSessionToolCalls.approvalStatus, arguments: agentSessionToolCalls.arguments })
-      .from(agentSessionToolCalls)
-      .where(and(
-        eq(agentSessionToolCalls.agentSessionId, sessionId),
-        eq(agentSessionToolCalls.toolName, call.name),
-        eq(agentSessionToolCalls.requiresApproval, true),
-      ))
-      .orderBy(desc(agentSessionToolCalls.createdAt))
-      .limit(1);
+    const [sessionRow] = await db.select({ channel: agentSessions.channel }).from(agentSessions)
+      .where(eq(agentSessions.id, sessionId)).limit(1);
+    const autoApproveChannels = ["sub_agent", "workflow", "cron"];
+    const isAutoApproved = sessionRow && autoApproveChannels.includes(sessionRow.channel || "");
 
-    const argsMatch = pendingCall && JSON.stringify(pendingCall.arguments) === argsHash;
+    if (!isAutoApproved) {
+      const argsHash = JSON.stringify(call.input);
+      const [pendingCall] = await db
+        .select({ id: agentSessionToolCalls.id, approvalStatus: agentSessionToolCalls.approvalStatus, arguments: agentSessionToolCalls.arguments })
+        .from(agentSessionToolCalls)
+        .where(and(
+          eq(agentSessionToolCalls.agentSessionId, sessionId),
+          eq(agentSessionToolCalls.toolName, call.name),
+          eq(agentSessionToolCalls.requiresApproval, true),
+        ))
+        .orderBy(desc(agentSessionToolCalls.createdAt))
+        .limit(1);
 
-    if (!pendingCall || !argsMatch || pendingCall.approvalStatus !== "approved") {
-      await db.insert(agentSessionToolCalls).values({
-        tenantId,
-        agentSessionId: sessionId,
-        toolName: call.name,
-        arguments: call.input,
-        result: "Awaiting human approval",
-        status: "pending",
-        requiresApproval: true,
-        durationMs: 0,
-      });
+      const argsMatch = pendingCall && JSON.stringify(pendingCall.arguments) === argsHash;
 
-      await db.update(agentSessions).set({ status: "waiting_approval" }).where(eq(agentSessions.id, sessionId));
+      if (!pendingCall || !argsMatch || pendingCall.approvalStatus !== "approved") {
+        await db.insert(agentSessionToolCalls).values({
+          tenantId,
+          agentSessionId: sessionId,
+          toolName: call.name,
+          arguments: call.input,
+          result: "Awaiting human approval",
+          status: "pending",
+          requiresApproval: true,
+          durationMs: 0,
+        });
 
-      return {
-        tool_use_id: call.id,
-        content: "This tool requires human approval before execution. The session is paused until an admin approves or denies this tool call. Tell the user their request needs admin approval for the dangerous operation.",
-        is_error: false,
-      };
+        await db.update(agentSessions).set({ status: "waiting_approval" }).where(eq(agentSessions.id, sessionId));
+
+        return {
+          tool_use_id: call.id,
+          content: "This tool requires human approval before execution. The session is paused until an admin approves or denies this tool call. Tell the user their request needs admin approval for the dangerous operation.",
+          is_error: false,
+        };
+      }
     }
   }
 

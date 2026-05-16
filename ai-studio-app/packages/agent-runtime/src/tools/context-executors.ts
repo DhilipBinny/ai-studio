@@ -1,6 +1,100 @@
 import type { ContextAwareExecutorFn, ToolDefinition, SearchSessionState } from "./types";
+import { getDb, agentTasks, agents } from "@ais-app/database";
+import { eq, and } from "drizzle-orm";
 
 export const CONTEXT_EXECUTORS: Record<string, ContextAwareExecutorFn> = {
+  invoke_agent: async (args, ctx) => {
+    const agentId = args.agent_id as string;
+    const message = args.message as string;
+    const projectId = args.project_id as string | undefined;
+    const timeoutMs = Math.min(Number(args.timeout_ms) || 600000, 600000);
+
+    if (!agentId) return "Error: agent_id is required";
+    if (!message) return "Error: message is required";
+
+    const db = getDb();
+
+    const [targetAgent] = await db.select({ id: agents.id }).from(agents)
+      .where(and(eq(agents.id, agentId), eq(agents.tenantId, ctx.tenantId))).limit(1);
+    if (!targetAgent) return "Error: agent not found or belongs to another tenant";
+
+    const { runSession } = await import("../session-runner");
+    const startTime = Date.now();
+
+    const [task] = await db.insert(agentTasks).values({
+      tenantId: ctx.tenantId,
+      projectId: projectId || null,
+      parentSessionId: ctx.sessionId,
+      agentId,
+      status: "running",
+      description: message.slice(0, 200),
+      prompt: message,
+    }).returning();
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    try {
+      const resultPromise = runSession({
+        agentId,
+        tenantId: ctx.tenantId,
+        userId: "",
+        message,
+        channel: "sub_agent",
+        metadata: {
+          parentSessionId: ctx.sessionId,
+          parentTaskId: task.id,
+          projectId: projectId || undefined,
+          isSubAgent: true,
+        },
+      });
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Sub-agent timed out")), timeoutMs);
+      });
+
+      const result = await Promise.race([resultPromise, timeoutPromise]);
+      if (timer) clearTimeout(timer);
+      const durationMs = Date.now() - startTime;
+
+      await db.update(agentTasks).set({
+        childSessionId: result.sessionId,
+        status: result.status === "completed" ? "completed" : "failed",
+        result: result.response?.slice(0, 5000) || null,
+        errorMessage: result.error || null,
+        completedAt: new Date(),
+        durationMs,
+        notified: true,
+      }).where(eq(agentTasks.id, task.id));
+
+      if (result.status !== "completed") {
+        return `Sub-agent failed: ${result.error || "Unknown error"}\nSession: ${result.sessionId}`;
+      }
+
+      return [
+        `Sub-agent completed successfully.`,
+        `Session: ${result.sessionId}`,
+        `Duration: ${(durationMs / 1000).toFixed(1)}s`,
+        `Tokens: ${result.usage.inputTokens + result.usage.outputTokens} ($${result.usage.costUsd.toFixed(4)})`,
+        ``,
+        `Response:`,
+        result.response,
+      ].join("\n");
+    } catch (err: unknown) {
+      if (timer) clearTimeout(timer);
+      const durationMs = Date.now() - startTime;
+      const errorMsg = err instanceof Error ? err.message : "Unknown error";
+
+      await db.update(agentTasks).set({
+        status: "failed",
+        errorMessage: errorMsg,
+        completedAt: new Date(),
+        durationMs,
+        notified: true,
+      }).where(eq(agentTasks.id, task.id));
+
+      return `Sub-agent error: ${errorMsg}`;
+    }
+  },
+
   knowledge_search: async (args, ctx) => {
     const { searchKnowledge } = await import("../knowledge-search");
     const query = args.query as string;
@@ -101,5 +195,20 @@ export const KNOWLEDGE_REFINE_SEARCH_DEFINITION: ToolDefinition = {
       top_k: { type: "number", description: "Number of results (default: 5)" },
     },
     required: ["query", "reason"],
+  },
+};
+
+export const INVOKE_AGENT_DEFINITION: ToolDefinition = {
+  name: "invoke_agent",
+  description: "Spawn a sub-agent session and wait for it to complete. The sub-agent runs independently with its own tools and system prompt, then returns its final response. Use this to delegate specialized tasks to other agents.",
+  input_schema: {
+    type: "object",
+    properties: {
+      agent_id: { type: "string", description: "UUID of the agent to invoke" },
+      message: { type: "string", description: "The task/prompt to send to the sub-agent" },
+      project_id: { type: "string", description: "Optional project ID for shared workspace access" },
+      timeout_ms: { type: "number", description: "Max wait time in ms (default: 600000 = 10 min, max: 600000)" },
+    },
+    required: ["agent_id", "message"],
   },
 };

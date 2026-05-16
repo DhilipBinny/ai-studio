@@ -3,7 +3,7 @@ import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
 import type { ToolRegistration } from "@ais/tool-platform";
 import { textEnvelope } from "@ais/tool-platform";
-import { getTempPath } from "./workspace";
+import { getTempPath, getProjectWorkspacePath } from "./workspace";
 import type { BuiltinToolContext } from "./types";
 import fs from "node:fs";
 
@@ -39,6 +39,10 @@ const BLOCKED_PATTERNS: Array<{ pattern: RegExp; reason: string }> = [
   { pattern: /\bcat\b.*\/(\.ssh\/|\.aws\/|\.env\b|secrets\.json|\.docker\/config)/i, reason: "read credential files" },
   { pattern: /\b(history|\.bash_history|\.zsh_history)\b/i, reason: "read shell history" },
   { pattern: /\bsystemctl\s+(stop|disable|mask)\s+(docker|sshd|network|firewall)/i, reason: "disable critical service" },
+  { pattern: /\bgit\s+push\s+--force\b/i, reason: "git force push" },
+  { pattern: /\bgit\s+reset\s+--hard\b/i, reason: "git hard reset" },
+  { pattern: /\bgit\s+clean\s+-[a-zA-Z]*f/i, reason: "git clean forced" },
+  { pattern: /\bgit\s+branch\s+-D\s+(main|master)\b/i, reason: "delete main branch" },
 ];
 
 function checkCommandSafety(command: string): { blocked: boolean; reason?: string } {
@@ -82,10 +86,13 @@ export const execTools: ToolRegistration[] = [
       }
 
       const ctx = getCtx(context as Record<string, unknown>);
-      const cwd = getTempPath(ctx.workspace);
+      const projectPath = getProjectWorkspacePath(ctx.workspace);
+      const cwd = projectPath || getTempPath(ctx.workspace);
       fs.mkdirSync(cwd, { recursive: true });
 
-      const timeout = Math.min(Math.max(Number(args.timeout) || EXEC_DEFAULT_TIMEOUT_SECONDS, 1), EXEC_MAX_TIMEOUT_SECONDS) * 1000;
+      const agentMaxTimeout = ctx.workspace.execTimeoutMs ? ctx.workspace.execTimeoutMs / 1000 : EXEC_MAX_TIMEOUT_SECONDS;
+      const maxAllowed = Math.min(agentMaxTimeout, EXEC_MAX_TIMEOUT_SECONDS);
+      const timeout = Math.min(Math.max(Number(args.timeout) || EXEC_DEFAULT_TIMEOUT_SECONDS, 1), maxAllowed) * 1000;
 
       const safeEnv: Record<string, string> = {};
       for (const key of SAFE_ENV_KEYS) {
@@ -169,7 +176,8 @@ export const execTools: ToolRegistration[] = [
       }
 
       const ctx = getCtx(context as Record<string, unknown>);
-      const cwd = getTempPath(ctx.workspace);
+      const batchProjectPath = getProjectWorkspacePath(ctx.workspace);
+      const cwd = batchProjectPath || getTempPath(ctx.workspace);
       fs.mkdirSync(cwd, { recursive: true });
 
       const safeEnv: Record<string, string> = {};

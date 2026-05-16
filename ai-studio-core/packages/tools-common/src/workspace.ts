@@ -2,7 +2,15 @@ import fs from "node:fs";
 import path from "node:path";
 import type { WorkspaceConfig } from "./types";
 
+export function getProjectWorkspacePath(config: WorkspaceConfig): string | null {
+  if (!config.projectId) return null;
+  if (config.projectPath) return config.projectPath;
+  return path.resolve(config.dataRoot, "tenants", config.tenantId, "projects", config.projectId);
+}
+
 export function getAgentWorkspacePath(config: WorkspaceConfig): string {
+  const projectPath = getProjectWorkspacePath(config);
+  if (projectPath) return projectPath;
   if (config.workflowRunId) {
     return path.resolve(config.dataRoot, "tenants", config.tenantId, "workspace", "runs", config.workflowRunId);
   }

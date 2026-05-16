@@ -4,6 +4,9 @@ export interface WorkspaceConfig {
   agentId: string;
   sessionId: string;
   workflowRunId?: string;
+  projectId?: string;
+  projectPath?: string;
+  execTimeoutMs?: number;
 }
 
 export interface BuiltinToolContext {

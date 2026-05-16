@@ -160,7 +160,7 @@ async function prepareSession(
         status: "running",
         modelUsed: modelRow.modelId,
         providerUsed: modelRow.providerType,
-        triggeredBy: input.channel === "api" ? null : input.userId,
+        triggeredBy: input.channel === "api" || input.channel === "sub_agent" || !input.userId ? null : input.userId,
         startedAt: new Date(),
         input: input.metadata || {},
       })
@@ -173,8 +173,11 @@ async function prepareSession(
       .where(and(eq(agentSessions.id, sessionId), eq(agentSessions.tenantId, input.tenantId)));
   }
 
-  const workflowRunId = (input.metadata as Record<string, unknown> | undefined)?.workflowRunId as string | undefined;
-  const parentSpanId = (input.metadata as Record<string, unknown> | undefined)?.parentSpanId as string | undefined;
+  const metaRecord = input.metadata as Record<string, unknown> | undefined;
+  const workflowRunId = metaRecord?.workflowRunId as string | undefined;
+  const parentSpanId = metaRecord?.parentSpanId as string | undefined;
+  const projectId = metaRecord?.projectId as string | undefined;
+  const isSubAgent = metaRecord?.isSubAgent as boolean | undefined;
 
   const sanitized = sanitizeInput(input.message);
   const injection = detectPromptInjection(sanitized);
@@ -193,7 +196,10 @@ async function prepareSession(
     content: sanitized,
   });
 
-  const { definitions: toolDefs, mcpConnectorMap, workspaceConfig } = await loadToolDefinitions(input.agentId, input.tenantId, sessionId, workflowRunId);
+  const { definitions: toolDefs, mcpConnectorMap, workspaceConfig: rawWorkspaceConfig } = await loadToolDefinitions(input.agentId, input.tenantId, sessionId, workflowRunId, isSubAgent);
+  const workspaceConfig = rawWorkspaceConfig
+    ? { ...rawWorkspaceConfig, projectId, execTimeoutMs: (agentConfig as unknown as Record<string, unknown>).execTimeoutMs as number | undefined }
+    : null;
   const timezone = (agentModelConfig as Record<string, unknown>)?.timezone as string || "UTC";
   const systemPrompt = buildSystemPrompt(agentConfig, { timezone });
   const loopDetector = createLoopDetector();
@@ -443,18 +449,27 @@ async function finalizeSession(
     .where(eq(agentSessions.id, sessionId))
     .limit(1);
 
-  const nextStatus = currentStatus?.status === "waiting_approval" ? "waiting_approval" : "waiting";
+  const oneShotChannels = ["sub_agent", "workflow", "cron"];
+  const isOneShot = oneShotChannels.includes(input.channel || "");
+  const nextStatus = currentStatus?.status === "waiting_approval"
+    ? "waiting_approval"
+    : isOneShot ? "completed" : "waiting";
+
+  const updates: Record<string, unknown> = {
+    status: nextStatus,
+    totalInputTokens: sql`${agentSessions.totalInputTokens} + ${totals.totalInputTokens}`,
+    totalOutputTokens: sql`${agentSessions.totalOutputTokens} + ${totals.totalOutputTokens}`,
+    totalTurns: sql`${agentSessions.totalTurns} + 1`,
+    totalToolCalls: sql`${agentSessions.totalToolCalls} + ${totals.totalToolCalls}`,
+    totalCostUsd: sql`${agentSessions.totalCostUsd} + ${totals.totalCost.toFixed(6)}::numeric`,
+  };
+  if (isOneShot) {
+    updates.completedAt = new Date();
+  }
 
   await db
     .update(agentSessions)
-    .set({
-      status: nextStatus,
-      totalInputTokens: sql`${agentSessions.totalInputTokens} + ${totals.totalInputTokens}`,
-      totalOutputTokens: sql`${agentSessions.totalOutputTokens} + ${totals.totalOutputTokens}`,
-      totalTurns: sql`${agentSessions.totalTurns} + 1`,
-      totalToolCalls: sql`${agentSessions.totalToolCalls} + ${totals.totalToolCalls}`,
-      totalCostUsd: sql`${agentSessions.totalCostUsd} + ${totals.totalCost.toFixed(6)}::numeric`,
-    })
+    .set(updates)
     .where(eq(agentSessions.id, sessionId));
 
   progressBus.emit({
@@ -471,7 +486,7 @@ async function finalizeSession(
     sessionId,
     response: totals.finalText,
     usage: { inputTokens: totals.totalInputTokens, outputTokens: totals.totalOutputTokens, costUsd: totals.totalCost },
-    status: "waiting",
+    status: isOneShot ? "completed" : "waiting",
   };
 }
 

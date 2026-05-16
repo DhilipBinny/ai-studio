@@ -81,6 +81,8 @@ export interface NodeConfig {
   formFields?: Array<{ key: string; label: string; type: string; options?: string[]; required?: boolean }>;
   timeoutMs?: number;
   assignTo?: string;
+  // project workspace
+  projectId?: string;
 }
 
 export interface GraphNode {

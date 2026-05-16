@@ -9,6 +9,7 @@ export { pdfTools } from "./pdf";
 export {
   resolveTenantPath,
   getAgentWorkspacePath,
+  getProjectWorkspacePath,
   getSharedWorkspacePath,
   getTempPath,
   ensureWorkspace,
