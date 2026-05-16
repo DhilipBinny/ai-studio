@@ -18,6 +18,7 @@ export const GET = withRBAC("SETTINGS", 10, async (request, auth) => {
       scheduleType: cronJobs.scheduleType, scheduleValue: cronJobs.scheduleValue,
       timezone: cronJobs.timezone, prompt: cronJobs.prompt, enabled: cronJobs.enabled,
       agentId: cronJobs.agentId, workflowId: cronJobs.workflowId,
+      workflowInput: cronJobs.workflowInput,
       lastRun: cronJobs.lastRun, lastResult: cronJobs.lastResult, lastError: cronJobs.lastError,
       runCount: cronJobs.runCount, createdAt: cronJobs.createdAt,
     }).from(cronJobs).where(where).orderBy(desc(cronJobs.createdAt)).limit(pagination.pageSize).offset((pagination.page - 1) * pagination.pageSize),
@@ -34,7 +35,7 @@ export const POST = withRBAC("SETTINGS", 20, async (request, auth) => {
   if (!parsed.success) {
     return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
   }
-  const { name, triggerType, agentId, workflowId, scheduleType, scheduleValue, timezone, prompt } = parsed.data;
+  const { name, triggerType, agentId, workflowId, scheduleType, scheduleValue, timezone, prompt, workflowInput } = parsed.data;
 
   if (triggerType === "agent" && !agentId) return errorResponse("Agent required for agent trigger", "VALIDATION_ERROR", 400);
   if (triggerType === "workflow" && !workflowId) return errorResponse("Workflow required for workflow trigger", "VALIDATION_ERROR", 400);
@@ -51,19 +52,20 @@ export const POST = withRBAC("SETTINGS", 20, async (request, auth) => {
     userId: auth.userId,
     name,
     triggerType: triggerType || "agent",
-    agentId: agentId || null,
-    workflowId: workflowId || null,
+    agentId: triggerType === "agent" ? (agentId || null) : null,
+    workflowId: triggerType === "workflow" ? (workflowId || null) : null,
     scheduleType: scheduleType || "cron",
     scheduleValue,
     timezone: timezone || "UTC",
     prompt,
+    workflowInput: workflowInput || {},
     enabled: true,
   }).returning();
 
   await createAuditEntry({
     tenantId: auth.tenantId, userId: auth.userId,
     action: "cron.create", resourceType: "cron_job", resourceId: job.id,
-    details: { name, scheduleValue, triggerType },
+    details: { name, scheduleValue, triggerType, scheduleType },
   });
 
   return NextResponse.json(job, { status: 201 });

@@ -19,6 +19,7 @@ export const cronJobs = pgTable(
     timezone: text("timezone"),
     prompt: text("prompt").notNull(),
     delivery: jsonb("delivery").notNull().default({}),
+    workflowInput: jsonb("workflow_input").notNull().default({}),
     enabled: boolean("enabled").notNull().default(true),
     lastRun: timestamp("last_run", { withTimezone: true }),
     lastResult: text("last_result"),
@@ -31,6 +32,28 @@ export const cronJobs = pgTable(
     index("idx_cron_jobs_tenant").on(table.tenantId),
     index("idx_cron_jobs_user").on(table.userId),
     index("idx_cron_jobs_enabled").on(table.tenantId, table.enabled),
+  ]
+);
+
+export const cronJobRuns = pgTable(
+  "cron_job_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    cronJobId: uuid("cron_job_id").notNull().references(() => cronJobs.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("running"),
+    trigger: text("trigger").notNull().default("scheduled"),
+    resultText: text("result_text"),
+    errorMessage: text("error_message"),
+    durationMs: integer("duration_ms"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("idx_cron_job_runs_job").on(table.cronJobId),
+    index("idx_cron_job_runs_tenant").on(table.tenantId),
+    index("idx_cron_job_runs_created").on(table.cronJobId, table.createdAt),
   ]
 );
 

@@ -1,5 +1,5 @@
 import { getDb } from "@ais-app/database";
-import { cronJobs } from "@ais-app/database";
+import { cronJobs, cronJobRuns } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
 import { runSession } from "./session-runner";
 import { triggerWorkflow } from "./workflow-engine";
@@ -61,9 +61,11 @@ function getTimeInZone(tz: string): Date {
   }
 }
 
-const runningJobs = new Set<string>();
+// ---------------------------------------------------------------------------
+// Job execution with run history recording
+// ---------------------------------------------------------------------------
 
-async function executeJob(job: {
+interface JobPayload {
   id: string;
   tenantId: string;
   userId: string | null;
@@ -73,11 +75,27 @@ async function executeJob(job: {
   prompt: string;
   name: string;
   runCount: number;
-}): Promise<void> {
+  scheduleType: string;
+  workflowInput: Record<string, unknown>;
+  trigger: "scheduled" | "manual";
+}
+
+const runningJobs = new Set<string>();
+
+async function executeJob(job: JobPayload): Promise<void> {
   if (runningJobs.has(job.id)) return;
   runningJobs.add(job.id);
 
   const db = getDb();
+  const startTime = Date.now();
+
+  const [run] = await db.insert(cronJobRuns).values({
+    tenantId: job.tenantId,
+    cronJobId: job.id,
+    status: "running",
+    trigger: job.trigger,
+    startedAt: new Date(),
+  }).returning({ id: cronJobRuns.id });
 
   try {
     let resultText = "";
@@ -94,12 +112,24 @@ async function executeJob(job: {
       resultText = result.response?.slice(0, 500) || "";
       if (result.error) throw new Error(result.error);
     } else if (job.triggerType === "workflow" && job.workflowId) {
-      const result = await triggerWorkflow(job.workflowId, job.tenantId, job.userId, { cronPrompt: job.prompt });
+      const input = Object.keys(job.workflowInput || {}).length > 0
+        ? job.workflowInput
+        : { prompt: job.prompt };
+      const result = await triggerWorkflow(job.workflowId, job.tenantId, job.userId, input);
       resultText = result.status === "completed" ? "Workflow completed" : `Workflow ${result.status}`;
       if (result.error) throw new Error(result.error);
     } else {
       throw new Error(`Invalid trigger: type=${job.triggerType}, agentId=${job.agentId}, workflowId=${job.workflowId}`);
     }
+
+    const durationMs = Date.now() - startTime;
+
+    await db.update(cronJobRuns).set({
+      status: "completed",
+      resultText,
+      durationMs,
+      completedAt: new Date(),
+    }).where(eq(cronJobRuns.id, run.id));
 
     await db.update(cronJobs).set({
       lastRun: new Date(),
@@ -108,10 +138,25 @@ async function executeJob(job: {
       runCount: job.runCount + 1,
       updatedAt: new Date(),
     }).where(eq(cronJobs.id, job.id));
+
+    // Auto-disable "at" (one-time) jobs after execution
+    if (job.scheduleType === "at") {
+      await db.update(cronJobs).set({ enabled: false, updatedAt: new Date() }).where(eq(cronJobs.id, job.id));
+    }
   } catch (e) {
+    const durationMs = Date.now() - startTime;
+    const errorMsg = (e as Error).message;
+
+    await db.update(cronJobRuns).set({
+      status: "failed",
+      errorMessage: errorMsg,
+      durationMs,
+      completedAt: new Date(),
+    }).where(eq(cronJobRuns.id, run.id));
+
     await db.update(cronJobs).set({
       lastRun: new Date(),
-      lastError: (e as Error).message,
+      lastError: errorMsg,
       runCount: job.runCount + 1,
       updatedAt: new Date(),
     }).where(eq(cronJobs.id, job.id));
@@ -119,6 +164,10 @@ async function executeJob(job: {
     runningJobs.delete(job.id);
   }
 }
+
+// ---------------------------------------------------------------------------
+// Tick — check all enabled jobs against their schedule
+// ---------------------------------------------------------------------------
 
 let tickInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -131,17 +180,34 @@ async function tick(): Promise<void> {
     .where(eq(cronJobs.enabled, true));
 
   for (const job of jobs) {
-    if (job.scheduleType !== "cron") continue;
+    let shouldRun = false;
 
-    const tz = job.timezone || "UTC";
-    const now = getTimeInZone(tz);
+    if (job.scheduleType === "cron") {
+      const tz = job.timezone || "UTC";
+      const now = getTimeInZone(tz);
+      shouldRun = cronMatches(job.scheduleValue, now);
+    } else if (job.scheduleType === "every") {
+      const intervalMs = parseInt(job.scheduleValue, 10);
+      if (!isNaN(intervalMs) && intervalMs > 0) {
+        const lastRunTime = job.lastRun ? new Date(job.lastRun).getTime() : 0;
+        shouldRun = Date.now() >= lastRunTime + intervalMs;
+      }
+    } else if (job.scheduleType === "at") {
+      const scheduledTime = new Date(job.scheduleValue).getTime();
+      if (!isNaN(scheduledTime) && Date.now() >= scheduledTime && job.runCount === 0) {
+        shouldRun = true;
+      }
+    }
 
-    if (cronMatches(job.scheduleValue, now)) {
+    if (shouldRun) {
       executeJob({
         id: job.id, tenantId: job.tenantId, userId: job.userId,
         agentId: job.agentId, workflowId: job.workflowId,
         triggerType: job.triggerType, prompt: job.prompt,
         name: job.name, runCount: job.runCount,
+        scheduleType: job.scheduleType,
+        workflowInput: (job.workflowInput || {}) as Record<string, unknown>,
+        trigger: "scheduled",
       }).catch(() => {});
     }
   }
@@ -167,16 +233,14 @@ export async function runJobNow(jobId: string, tenantId: string): Promise<{ succ
 
   try {
     await executeJob({
-      id: job.id,
-      tenantId: job.tenantId,
-      userId: job.userId,
-      agentId: job.agentId,
-      workflowId: job.workflowId,
-      triggerType: job.triggerType,
-      prompt: job.prompt,
-      name: job.name,
-      runCount: job.runCount,
-    } as { id: string; tenantId: string; userId: string | null; agentId: string | null; workflowId: string | null; triggerType: string; prompt: string; name: string; runCount: number });
+      id: job.id, tenantId: job.tenantId, userId: job.userId,
+      agentId: job.agentId, workflowId: job.workflowId,
+      triggerType: job.triggerType, prompt: job.prompt,
+      name: job.name, runCount: job.runCount,
+      scheduleType: job.scheduleType,
+      workflowInput: (job.workflowInput || {}) as Record<string, unknown>,
+      trigger: "manual",
+    });
     return { success: true };
   } catch (e) {
     return { success: false, error: (e as Error).message };

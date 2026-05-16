@@ -26,9 +26,24 @@ export const PATCH = withRBAC("SETTINGS", 20, async (request, auth, params) => {
   const updates: Record<string, unknown> = { updatedAt: new Date() };
   if (parsed.data.name !== undefined) updates.name = parsed.data.name;
   if (parsed.data.enabled !== undefined) updates.enabled = parsed.data.enabled;
+  if (parsed.data.scheduleType !== undefined) updates.scheduleType = parsed.data.scheduleType;
   if (parsed.data.scheduleValue !== undefined) updates.scheduleValue = parsed.data.scheduleValue;
   if (parsed.data.timezone !== undefined) updates.timezone = parsed.data.timezone;
   if (parsed.data.prompt !== undefined) updates.prompt = parsed.data.prompt;
+  if (parsed.data.workflowInput !== undefined) updates.workflowInput = parsed.data.workflowInput;
+  if (parsed.data.triggerType !== undefined) {
+    updates.triggerType = parsed.data.triggerType;
+    if (parsed.data.triggerType === "agent") {
+      updates.agentId = parsed.data.agentId || null;
+      updates.workflowId = null;
+    } else {
+      updates.workflowId = parsed.data.workflowId || null;
+      updates.agentId = null;
+    }
+  } else {
+    if (parsed.data.agentId !== undefined) updates.agentId = parsed.data.agentId;
+    if (parsed.data.workflowId !== undefined) updates.workflowId = parsed.data.workflowId;
+  }
 
   const [updated] = await db.update(cronJobs).set(updates).where(eq(cronJobs.id, id)).returning();
 
