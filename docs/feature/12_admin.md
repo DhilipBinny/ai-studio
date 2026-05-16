@@ -158,6 +158,7 @@ Each profile has an `accessRights` JSONB field mapping module IDs to permission 
 | PROFILES    | No access| View     | Manage   |
 | AUDIT       | No access| View     | Manage   |
 | SETTINGS    | No access| View     | Manage   |
+| DOCS        | No access| View     | Manage   |
 
 **Validation:** `createProfileSchema` / `updateProfileSchema` — each permission level is `z.union([z.literal(0), z.literal(10), z.literal(20)])`.
 
@@ -343,17 +344,18 @@ This creates a hash chain — tampering with any entry breaks the chain from tha
 
 ## 12.5 Scheduled Jobs / Cron
 
-CRUD for scheduled jobs that trigger agent sessions or workflow runs on cron schedules.
+CRUD for scheduled jobs that trigger agent sessions or workflow runs on cron, interval, or one-time schedules.
 
 ### API Endpoints
 
-| Method | Path                     | Auth (Module, Level) | Description            |
-|--------|--------------------------|----------------------|------------------------|
-| GET    | `/api/cron-jobs`         | SETTINGS, 10         | List jobs (paginated)  |
-| POST   | `/api/cron-jobs`         | SETTINGS, 20         | Create job             |
-| PATCH  | `/api/cron-jobs/[id]`    | SETTINGS, 20         | Update job             |
-| DELETE | `/api/cron-jobs/[id]`    | SETTINGS, 20         | Delete job             |
-| POST   | `/api/cron-jobs/[id]`    | SETTINGS, 20         | Run job immediately    |
+| Method | Path                        | Auth (Module, Level) | Description              |
+|--------|-----------------------------|----------------------|--------------------------|
+| GET    | `/api/cron-jobs`            | SETTINGS, 10         | List jobs (paginated)    |
+| POST   | `/api/cron-jobs`            | SETTINGS, 20         | Create job               |
+| PATCH  | `/api/cron-jobs/[id]`       | SETTINGS, 20         | Update job               |
+| DELETE | `/api/cron-jobs/[id]`       | SETTINGS, 20         | Delete job               |
+| POST   | `/api/cron-jobs/[id]`       | SETTINGS, 20         | Run job immediately      |
+| GET    | `/api/cron-jobs/[id]/runs`  | SETTINGS, 10         | Paginated run history    |
 
 ### Create Job Validation
 
@@ -365,12 +367,30 @@ CRUD for scheduled jobs that trigger agent sessions or workflow runs on cron sch
 | `triggerType`   | `"agent"` or `"workflow"`                 |
 | `agentId`       | UUID, required if triggerType=agent       |
 | `workflowId`    | UUID, required if triggerType=workflow    |
-| `scheduleType`  | 1-50 chars (currently "cron")            |
-| `scheduleValue` | 1-255 chars (cron expression)            |
+| `scheduleType`  | `"cron"`, `"every"`, or `"at"`           |
+| `scheduleValue` | 1-255 chars (cron expr / minutes / ISO datetime) |
 | `timezone`      | Max 100 chars, optional                   |
 | `prompt`        | 1-50000 chars                             |
+| `workflowInput` | JSON object, optional (passed to workflow trigger) |
 
-**Cron validation:** Must have exactly 5 fields (minute hour day month weekday).
+**Schedule type validation (Zod refinement):**
+- `cron`: must have exactly 5 fields (minute hour day month weekday).
+- `every`: must be a positive integer (interval in minutes).
+- `at`: must be a valid ISO 8601 datetime string.
+
+### Schedule Types
+
+| Type | scheduleValue | Behavior |
+|------|---------------|----------|
+| `cron` | `"*/5 * * * *"` | Standard 5-field cron expression, evaluated every 60s tick |
+| `every` | `"15"` | Run every N minutes (tracked via `lastRun` + interval comparison) |
+| `at` | `"2026-05-20T14:00:00Z"` | Run once at specified time, then auto-disables (`enabled=false`) |
+
+### Update Job (PATCH)
+
+Supports updating: `name`, `triggerType`, `agentId`, `workflowId`, `scheduleType`, `scheduleValue`, `timezone`, `prompt`, `enabled`, `workflowInput`.
+
+Switching `triggerType` (e.g. agent→workflow) nulls the previous reference field.
 
 ### Cron Scheduler
 
@@ -382,10 +402,16 @@ CRUD for scheduled jobs that trigger agent sessions or workflow runs on cron sch
   - Ranges (`1-5`)
   - Steps (`*/5`, `1-10/2`)
   - Lists (`1,3,5`)
+- **Interval matching (`every`):** Checks if `now - lastRun >= intervalMinutes * 60_000`.
+- **One-time matching (`at`):** Checks if `scheduledTime <= now` and hasn't run yet.
 - **Timezone support:** Converts current time to job's timezone via `Intl.DateTimeFormat`.
 - **Concurrency guard:** `runningJobs` Set prevents double-execution of same job.
 - **Execution:** Calls `runSession()` for agent triggers, `triggerWorkflow()` for workflow triggers.
+- **Workflow input:** If `workflowInput` is set, passed as the `input` parameter to `triggerWorkflow()`.
+- **Run history:** Inserts a `cron_job_runs` record at start (status=running), updates on complete/fail with duration and result.
 - **Result tracking:** Updates `lastRun`, `lastResult`, `lastError`, `runCount` on the job record.
+- **Auto-disable:** "at" jobs are automatically disabled after execution (`enabled=false`).
+- **Trigger field:** Each run records whether it was `"scheduled"` or `"manual"`.
 - **Started by:** `instrumentation.ts` on server boot.
 - **Stopped by:** `stopCronScheduler()` — clears the 60-second interval timer.
 - **Manual trigger:** `runJobNow(jobId, tenantId)` executes immediately.
@@ -401,10 +427,11 @@ CRUD for scheduled jobs that trigger agent sessions or workflow runs on cron sch
 | `workflow_id`    | `uuid` FK       | Target workflow (nullable)         |
 | `trigger_type`   | `text`          | "agent" or "workflow"              |
 | `name`           | `text`          | Job name                           |
-| `schedule_type`  | `text`          | "cron"                             |
-| `schedule_value` | `text`          | Cron expression (5-field)          |
+| `schedule_type`  | `text`          | "cron", "every", or "at"          |
+| `schedule_value` | `text`          | Cron expr / minutes / ISO datetime |
 | `timezone`       | `text`          | IANA timezone                      |
 | `prompt`         | `text`          | Message sent to agent/workflow     |
+| `workflow_input` | `jsonb`         | Input passed to workflow trigger    |
 | `delivery`       | `jsonb`         | Delivery config                    |
 | `enabled`        | `boolean`       | Active flag                        |
 | `last_run`       | `timestamptz`   | Last execution time                |
@@ -415,6 +442,42 @@ CRUD for scheduled jobs that trigger agent sessions or workflow runs on cron sch
 | `updated_at`     | `timestamptz`   |                                    |
 
 **Indexes:** `(tenant_id)`, `(user_id)`, `(tenant_id, enabled)`
+
+### Database Table: cron_job_runs
+
+| Column           | Type           | Notes                              |
+|------------------|----------------|------------------------------------|
+| `id`             | `uuid` PK      |                                    |
+| `tenant_id`      | `uuid` FK       | Cascade delete                     |
+| `cron_job_id`    | `uuid` FK       | Cascade delete                     |
+| `status`         | `text`          | "running", "completed", "failed"   |
+| `trigger`        | `text`          | "scheduled" or "manual"            |
+| `started_at`     | `timestamptz`   |                                    |
+| `completed_at`   | `timestamptz`   |                                    |
+| `duration_ms`    | `integer`       | nullable                           |
+| `result`         | `text`          | Truncated result (500 chars)       |
+| `error`          | `text`          | Error message if failed            |
+| `created_at`     | `timestamptz`   |                                    |
+
+**Indexes:** `(cron_job_id)`, `(tenant_id)`
+
+### Run History API
+
+`GET /api/cron-jobs/[id]/runs` — paginated list of run records for a job. Returns `{ data, total, page, pageSize, totalPages }`. Ordered by `createdAt DESC`.
+
+### UI Page
+
+**Route:** `/(platform)/scheduled`
+
+- **Job list:** table with name, trigger type (agent/workflow badge), schedule (formatted display: cron expression / "Every N min" / "At datetime"), status toggle, last run, actions.
+- **Create/Edit form:** unified `CronJobForm` dialog supporting:
+  - Name, trigger type selector (agent/workflow), target selector
+  - Schedule type picker (Cron / Every / At) with conditional input fields
+  - Prompt textarea
+  - Workflow input JSON editor (shown when triggerType=workflow)
+- **Edit dialog:** opens pre-filled form for existing job.
+- **Run History dialog:** shows paginated table of past runs with status, trigger, started, duration, result/error.
+- **Actions:** Edit, Run Now, History, Delete.
 
 ---
 
@@ -545,6 +608,41 @@ External API access keys for programmatic agent invocation.
 
 ---
 
-## 12.8 Migration Notes
+## 12.8 Documentation Page
+
+Admin-only page serving platform feature documentation from markdown files.
+
+### API Endpoint
+
+| Method | Path         | Auth (Module, Level) | Description                        |
+|--------|--------------|----------------------|------------------------------------|
+| GET    | `/api/docs`  | DOCS, 10             | List files or get single file content |
+
+**Query parameters:**
+- No params: returns file tree `{ files: [{ name, path }] }` from `docs/feature/`.
+- `?file=filename.md`: returns `{ content: "markdown string" }` for the specified file.
+
+### File Location
+
+Docs are stored at `<repo-root>/docs/feature/` (tracked in git). Path resolved via `path.resolve(process.cwd(), "../../docs/feature")`.
+
+Additional local-only directories (`docs/_local_research/`, `docs/_local_design-history/`) are gitignored and not served by the API.
+
+### UI Page
+
+**Route:** `/(platform)/docs`  
+**Sidebar:** BookText icon under Admin section, requires DOCS module access.
+
+- **Left panel:** file list (clickable sidebar nav).
+- **Right panel:** markdown content rendered with proper formatting (headings, code blocks, tables, lists).
+- **Loading state:** skeleton placeholder while content loads.
+
+---
+
+## 12.9 Migration Notes
 
 **Migration 011 (`encrypt_secrets.ts`)** is a TypeScript file, not SQL. The SQL-based migration runner (`migrate.ts`) only processes `.sql` files, so migration 011 must be run manually (e.g., via `tsx` or `ts-node`). It will not be auto-applied during normal migration execution.
+
+**Migration 022 (`step_denormalize.sql`):** Adds `node_name` and `node_type` columns to `workflow_run_steps`, drops FK constraint on `workflow_node_id`, grants DOCS access to admin profiles.
+
+**Migration 023 (`cron_job_runs.sql`):** Creates `cron_job_runs` table for scheduled job execution history, adds `workflow_input` JSONB column to `cron_jobs`.

@@ -266,7 +266,7 @@ The `CustomNode` component shows contextual subtitles per node type:
 |------|----------|-------|-------------|--------------|
 | `input` | flow | #3b82f6 | Entry point -- passes trigger data | (none -- outputs `state.input`) |
 | `output` | flow | #10b981 | Terminal -- formats final result | `mappings[]` (key/value pairs) |
-| `condition` | flow | #f59e0b | If/else branch on expression | `expression` (template string) |
+| `condition` | flow | #f59e0b | If/else branch on expression | `expression` (template string). Evaluates expression and routes via `condition_true`/`condition_false` edge types. |
 | `switch` | flow | #ea580c | Multi-branch routing by value | `value`, `cases[]` (label+condition), `defaultCase` |
 | `loop` | flow | #6366f1 | Repeat until condition met | `mode` (while/for_count), `condition`, `maxCount`, `maxIterations` (safety cap, default 100) |
 | `iteration` | flow | #7c3aed | Process array items | `arrayPath`, `parallel`, `batchSize`, `maxItems` (default 1000), `itemVariable` |
@@ -356,6 +356,8 @@ The `CustomNode` component shows contextual subtitles per node type:
 |------|-------------|-------|-------------|
 | `normal` | #94a3b8 (gray) | solid | Standard flow |
 | `error` | #ef4444 (red) | dashed (6,4) | Error branch (when `onError = "error_branch"`) |
+| `condition_true` | #10b981 (green) | solid | True branch from condition node |
+| `condition_false` | #ef4444 (red) | solid | False branch from condition node |
 | `loop_body` | #6366f1 (indigo) | solid, animated | Loop body entry |
 | `loop_back` | #6366f1 (indigo) | dashed (4,4) | Loop iteration feedback (skipped during graph build) |
 | `loop_done` | #10b981 (green) | solid | Exit from loop after completion |
@@ -507,9 +509,10 @@ Constructs an `ExecutionGraph` with:
 Evaluation order for outgoing edges:
 
 1. **Error branch**: if `useErrorBranch` is true, follows edges with `edgeType === "error"` only.
-2. **Switch node**: matches `conditionLabel` against the switch output's `matched` value.
-3. **Conditional edges**: evaluates `conditionExpr` in order of `sortOrder`; takes first truthy match.
-4. **Default**: follows all `normal` and `loop_done` edges (parallel fan-out).
+2. **Condition node**: checks `state[nodeKey].result` (boolean). Routes to edges with `edgeType === "condition_true"` if true, `edgeType === "condition_false"` if false.
+3. **Switch node**: matches `conditionLabel` against the switch output's `matched` value.
+4. **Conditional edges**: evaluates `conditionExpr` in order of `sortOrder`; takes first truthy match.
+5. **Default**: follows all `normal` and `loop_done` edges (parallel fan-out).
 
 ---
 
@@ -528,7 +531,7 @@ Each node type has a dedicated handler:
 | **agent** | Calls `runSession()` with resolved message template, returns response/sessionId/status/usage |
 | **llm** | Looks up provider model in DB, calls `callLLM()`, calculates token cost, optionally parses JSON response |
 | **tool** | Resolves argument templates, creates workspace, calls `executeTool()` |
-| **condition** | Returns `{ evaluated: true }` (branching happens in edge resolution) |
+| **condition** | Evaluates `expression` via condition engine, returns `{ result: boolean, expression }`. Routing handled by `condition_true`/`condition_false` edge types in `getNextNodes()`. |
 | **switch** | Resolves value template, matches against cases, returns `{ matched, value }` |
 | **transform** | Applies mappings array via template resolution |
 | **delay** | Sleeps for `delayMs` (clamped to 300s max) or dynamic `delayExpression` |
@@ -655,7 +658,9 @@ The `waiting_approval` status is used for tool approval (agent sessions), not wo
 | id | bigserial PK | auto-increment |
 | tenant_id | uuid FK -> tenants | cascade delete |
 | workflow_run_id | uuid FK -> workflow_runs | cascade delete |
-| workflow_node_id | uuid FK -> workflow_nodes | cascade delete |
+| workflow_node_id | uuid | nullable (no FK — decoupled from node lifecycle) |
+| node_name | text | nullable — denormalized from node at insert time |
+| node_type | text | nullable — denormalized from node at insert time |
 | status | run_step_status enum | pending, running, completed, failed, skipped, waiting_human, retrying |
 | input | jsonb | snapshot of workflow state at step start |
 | output | jsonb | nullable -- node output |
@@ -667,6 +672,8 @@ The `waiting_approval` status is used for tool approval (agent sessions), not wo
 | started_at | timestamptz | |
 | completed_at | timestamptz | |
 | created_at | timestamptz | |
+
+**Design note:** `node_name` and `node_type` are denormalized into steps at insert time. The FK constraint on `workflow_node_id` was removed because the canvas save uses a delete-and-replace pattern for nodes — previously, re-saving a workflow would orphan existing step records (INNER JOIN returned 0 rows). Steps now survive node re-saves via LEFT JOIN + COALESCE on the denormalized columns.
 
 **Indexes:** `idx_wf_run_steps_run(workflow_run_id)`, `idx_wf_run_steps_status(workflow_run_id, status)`.
 
@@ -787,7 +794,25 @@ The `RunDetail` component displays:
 6. **Final output**: JSON display of the full workflow state.
 7. **Run files**: expandable section with `FileBrowser` component scoped to the run's workspace directory.
 
-### 13.2 Step Status Colors
+### 13.2 Human Review Approval Panel
+
+When `run.status === "waiting"`, an amber alert card appears between the summary cards and the event feed:
+
+- **Detection:** Finds the last step with `status === "waiting_human"` and extracts `prompt`, `reviewType`, `choices`, `formFields` from its output.
+- **Card styling:** `border-amber-300 bg-amber-50 dark:bg-amber-950/30` with AlertCircle icon and "Human Review Required" heading.
+- **3 form types based on `reviewType`:**
+
+| reviewType | UI Rendered | Decision Payload |
+|---|---|---|
+| `approve_deny` (default) | Approve (green) + Deny (red) buttons, optional comment textarea | `{ approved: boolean, comment? }` |
+| `choice` | Radio buttons for each choice string, optional comment, Submit button (disabled until selection) | `{ choice: string, comment? }` |
+| `form` | Dynamic fields from `formFields` config — Input, Textarea, Select with options. Submit disabled until all required fields filled. | `{ [key]: value, ... }` |
+
+- **Submit:** POSTs to `/api/workflows/{id}/runs/{rid}/resume` with `{ decision }`.
+- **On success:** reloads run detail (panel disappears as status changes from "waiting").
+- **On error:** inline error text shown below the form.
+
+### 13.3 Step Status Colors
 
 | Node Type | Color |
 |-----------|-------|
