@@ -75,19 +75,54 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
     setRunning(false);
   }
 
-  async function handleSaveNodes(updatedNodes: WorkflowNode[]) {
-    await fetch(`/api/workflows/${workflowId}/nodes`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nodes: updatedNodes.map((n) => ({ nodeType: n.nodeType, name: n.name, config: n.config, positionX: n.positionX, positionY: n.positionY })) }),
+  async function handleSave(
+    updatedNodes: WorkflowNode[],
+    updatedEdges: Array<{ fromNodeId: string; toNodeId: string; conditionExpr?: string; conditionLabel?: string; edgeType?: string; sortOrder?: number; sourceHandle?: string; targetHandle?: string }>,
+  ) {
+    // Step 1: Save nodes — returns inserted nodes in order with new UUIDs
+    const nodesRes = await fetch(`/api/workflows/${workflowId}/nodes`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        nodes: updatedNodes.map((n) => ({
+          nodeType: n.nodeType,
+          name: n.name,
+          config: n.config,
+          errorPolicy: n.errorPolicy,
+          positionX: n.positionX,
+          positionY: n.positionY,
+        })),
+      }),
     });
-    await fetchDetail();
-  }
+    const nodesBody = await nodesRes.json();
+    const newNodes: WorkflowNode[] = nodesBody.data || [];
 
-  async function handleSaveEdges(updatedEdges: Array<{ fromNodeId: string; toNodeId: string; conditionExpr?: string; conditionLabel?: string; edgeType?: string }>) {
-    await fetch(`/api/workflows/${workflowId}/edges`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ edges: updatedEdges }),
+    // Step 2: Build ID mapping (old canvas ID → new server UUID)
+    const idMap = new Map<string, string>();
+    updatedNodes.forEach((oldNode, i) => {
+      if (newNodes[i]) {
+        idMap.set(oldNode.id, newNodes[i].id);
+      }
     });
+
+    // Step 3: Remap edge node IDs to use the new server UUIDs
+    const remappedEdges = updatedEdges.map((e) => ({
+      fromNodeId: idMap.get(e.fromNodeId) || e.fromNodeId,
+      toNodeId: idMap.get(e.toNodeId) || e.toNodeId,
+      conditionLabel: e.conditionLabel,
+      conditionExpr: e.conditionExpr,
+      edgeType: e.edgeType,
+      sortOrder: e.sortOrder,
+    }));
+
+    // Step 4: Save remapped edges
+    await fetch(`/api/workflows/${workflowId}/edges`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ edges: remappedEdges }),
+    });
+
+    // Step 5: Single fetchDetail at the end to sync canvas with server state
     await fetchDetail();
   }
 
@@ -134,10 +169,7 @@ export function WorkflowDetail({ workflowId, onBack }: { workflowId: string; onB
             edges={edges}
             agents={agents}
             models={models}
-            onSave={async (updatedNodes, updatedEdges) => {
-              await handleSaveNodes(updatedNodes as WorkflowNode[]);
-              await handleSaveEdges(updatedEdges);
-            }}
+            onSave={handleSave}
           />
         </div>
       )}
