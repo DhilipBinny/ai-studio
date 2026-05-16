@@ -6,6 +6,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Plug, Pencil, Loader2, Trash2, TestTube, Check, Wrench } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -215,7 +216,7 @@ function ConnectorDetail({ connector, onUpdated }: { connector: Connector; onUpd
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; tools?: DiscoveredTool[]; error?: string; latencyMs?: number } | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const discoveredTools = (connector.connectionConfig?.discoveredTools as DiscoveredTool[]) || [];
   const config = connector.connectionConfig || {};
@@ -235,7 +236,7 @@ function ConnectorDetail({ connector, onUpdated }: { connector: Connector; onUpd
     const res = await fetch(`/api/connectors/${connector.id}`, { method: "DELETE" });
     if (res.ok) onUpdated();
     setDeleting(false);
-    setConfirmDelete(false);
+    setShowDeleteDialog(false);
   }
 
   return (
@@ -289,13 +290,16 @@ function ConnectorDetail({ connector, onUpdated }: { connector: Connector; onUpd
       )}
 
       <div className="flex gap-2 pt-2 border-t">
-        {!confirmDelete ? (
-          <Button variant="outline" size="sm" onClick={() => setConfirmDelete(true)}>Delete</Button>
-        ) : (
-          <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
-            {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirm Delete"}
-          </Button>
-        )}
+        <Button variant="outline" size="sm" onClick={() => setShowDeleteDialog(true)}>Delete</Button>
+        <ConfirmDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          onConfirm={handleDelete}
+          title="Delete connector"
+          description={`Are you sure you want to delete "${connector.name}"? All discovered tools will be removed.`}
+          confirmLabel="Delete"
+          loading={deleting}
+        />
       </div>
     </div>
   );

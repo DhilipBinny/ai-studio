@@ -6,6 +6,7 @@ import { formatDate } from "@/lib/utils";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Plus, BookOpen, Upload, Pencil, Trash2, Loader2, ArrowLeft, FileText, CheckCircle, AlertCircle, Clock, RefreshCw, Cpu, Cloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -574,7 +575,7 @@ function EditKBForm({ kb, onSaved }: { kb: KnowledgeBase; onSaved: () => void })
   const [form, setForm] = useState({ name: kb.name, description: kb.description || "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
@@ -604,7 +605,7 @@ function EditKBForm({ kb, onSaved }: { kb: KnowledgeBase; onSaved: () => void })
     if (res.ok) onSaved();
     else { const d = await res.json(); setError(d.error || "Failed to delete"); }
     setDeleting(false);
-    setConfirmDelete(false);
+    setShowDeleteDialog(false);
   }
 
   return (
@@ -629,13 +630,16 @@ function EditKBForm({ kb, onSaved }: { kb: KnowledgeBase; onSaved: () => void })
         <Button type="submit" className="flex-1" disabled={submitting}>
           {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Save Changes"}
         </Button>
-        {!confirmDelete ? (
-          <Button type="button" variant="outline" onClick={() => setConfirmDelete(true)}>Delete</Button>
-        ) : (
-          <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleting}>
-            {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Delete"}
-          </Button>
-        )}
+        <Button type="button" variant="outline" onClick={() => setShowDeleteDialog(true)}>Delete</Button>
+        <ConfirmDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          onConfirm={handleDelete}
+          title="Delete knowledge base"
+          description={`Are you sure you want to delete "${kb.name}"? All documents and chunks will be permanently removed.`}
+          confirmLabel="Delete"
+          loading={deleting}
+        />
       </div>
     </form>
   );

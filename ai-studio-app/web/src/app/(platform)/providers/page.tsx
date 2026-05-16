@@ -4,6 +4,7 @@ import { RequirePermission } from "@/components/require-permission";
 import { useState, useEffect, useCallback } from "react";
 import { Plus, TestTube, Check, Loader2, ExternalLink, Trash2, Key, Globe, ChevronDown, ChevronRight, Star, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -160,7 +161,7 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   async function handleSave() {
@@ -203,7 +204,7 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
       setMessage({ text: "Failed to delete", ok: false });
     }
     setDeleting(false);
-    setConfirmDelete(false);
+    setShowDeleteDialog(false);
   }
 
   async function handleTest() {
@@ -247,18 +248,21 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
             {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <TestTube className="h-3 w-3" />}
             {testing ? "Testing..." : "Test"}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { setShowConfig(!showConfig); setConfirmDelete(false); }}>
+          <Button variant="outline" size="sm" onClick={() => { setShowConfig(!showConfig); setShowDeleteDialog(false); }}>
             {showConfig ? "Cancel" : "Edit"}
           </Button>
-          {!confirmDelete ? (
-            <Button variant="outline" size="sm" onClick={() => setConfirmDelete(true)}>
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          ) : (
-            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
-              {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirm?"}
-            </Button>
-          )}
+          <Button variant="outline" size="sm" onClick={() => setShowDeleteDialog(true)} aria-label="Delete provider">
+            <Trash2 className="h-3 w-3" />
+          </Button>
+          <ConfirmDialog
+            open={showDeleteDialog}
+            onOpenChange={setShowDeleteDialog}
+            onConfirm={handleDelete}
+            title="Delete provider"
+            description={`Are you sure you want to delete "${provider.name}"? Agents using this provider will stop working.`}
+            confirmLabel="Delete"
+            loading={deleting}
+          />
         </div>
       </div>
 

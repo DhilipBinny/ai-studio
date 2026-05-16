@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Plus, Users, Search, Pencil, Loader2 } from "lucide-react";
 import { PasswordInput } from "@/components/password-input";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -191,7 +192,7 @@ function EditUserForm({ user, onSaved }: { user: User; onSaved: () => void }) {
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [showDeactivateDialog, setShowDeactivateDialog] = useState(false);
 
   useEffect(() => {
     fetch("/api/profiles")
@@ -245,7 +246,7 @@ function EditUserForm({ user, onSaved }: { user: User; onSaved: () => void }) {
       setError(d.error || "Failed to deactivate");
     }
     setDeactivating(false);
-    setConfirmDeactivate(false);
+    setShowDeactivateDialog(false);
   }
 
   return (
@@ -286,15 +287,18 @@ function EditUserForm({ user, onSaved }: { user: User; onSaved: () => void }) {
         <Button type="submit" className="flex-1" disabled={submitting}>
           {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Save Changes"}
         </Button>
-        {!confirmDeactivate ? (
-          <Button type="button" variant="outline" onClick={() => setConfirmDeactivate(true)}>
-            Deactivate
-          </Button>
-        ) : (
-          <Button type="button" variant="destructive" onClick={handleDeactivate} disabled={deactivating}>
-            {deactivating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Deactivate"}
-          </Button>
-        )}
+        <Button type="button" variant="outline" onClick={() => setShowDeactivateDialog(true)}>
+          Deactivate
+        </Button>
+        <ConfirmDialog
+          open={showDeactivateDialog}
+          onOpenChange={setShowDeactivateDialog}
+          onConfirm={handleDeactivate}
+          title="Deactivate user"
+          description={`Are you sure you want to deactivate ${user.name}? They will lose access to the platform immediately.`}
+          confirmLabel="Deactivate"
+          loading={deactivating}
+        />
       </div>
     </form>
   );

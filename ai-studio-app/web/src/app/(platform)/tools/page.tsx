@@ -5,6 +5,7 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 import { useState, useEffect, useCallback } from "react";
 import { Plus, Wrench, Pencil, Loader2, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -203,7 +204,7 @@ function EditToolForm({ tool, onSaved }: { tool: Tool; onSaved: () => void }) {
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -238,7 +239,7 @@ function EditToolForm({ tool, onSaved }: { tool: Tool; onSaved: () => void }) {
     if (res.ok) onSaved();
     else { const d = await res.json(); setError(d.error || "Failed to deactivate"); }
     setDeactivating(false);
-    setConfirmDeactivate(false);
+    setShowDeleteDialog(false);
   }
 
   return (
@@ -275,15 +276,18 @@ function EditToolForm({ tool, onSaved }: { tool: Tool; onSaved: () => void }) {
         <Button type="submit" className="flex-1" disabled={submitting}>
           {submitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...</> : "Save Changes"}
         </Button>
-        {!confirmDeactivate ? (
-          <Button type="button" variant="outline" onClick={() => setConfirmDeactivate(true)}>
-            Delete
-          </Button>
-        ) : (
-          <Button type="button" variant="destructive" onClick={handleDeactivate} disabled={deactivating}>
-            {deactivating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Delete"}
-          </Button>
-        )}
+        <Button type="button" variant="outline" onClick={() => setShowDeleteDialog(true)}>
+          Delete
+        </Button>
+        <ConfirmDialog
+          open={showDeleteDialog}
+          onOpenChange={setShowDeleteDialog}
+          onConfirm={handleDeactivate}
+          title="Delete tool"
+          description={`Are you sure you want to delete "${tool.displayName}"? This action cannot be undone.`}
+          confirmLabel="Delete"
+          loading={deactivating}
+        />
       </div>
     </form>
   );
