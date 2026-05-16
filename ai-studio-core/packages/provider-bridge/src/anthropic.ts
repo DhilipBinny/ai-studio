@@ -230,6 +230,15 @@ export class AnthropicProvider implements ProviderInterface {
           if (event.usage) {
             outputTokens = event.usage.output_tokens || 0;
           }
+          if ((event as any).delta?.stop_reason === 'max_tokens') {
+            if (toolCalls.length > 0) {
+              const lastTc = toolCalls[toolCalls.length - 1];
+              try { JSON.parse(lastTc._rawArgs || '{}'); } catch {
+                toolCalls.pop();
+                text = (text || '') + '\n[Output truncated — max_tokens reached. Retry with shorter content or write in parts.]';
+              }
+            }
+          }
         } else if (event.type === 'message_start') {
           if (event.message?.usage) {
             inputTokens = event.message.usage.input_tokens || 0;
