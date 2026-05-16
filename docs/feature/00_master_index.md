@@ -32,6 +32,10 @@ Echol AI Studio is an enterprise agentic AI platform for configuring, deploying,
 | 12 | [Admin](12_admin.md) | Users, profiles, settings, audit log, cron jobs, API keys, dashboard | 26 KB |
 | 13 | [Security](13_security.md) | All security measures consolidated (auth, crypto, SSRF, RLS, injection, RAG tenant isolation) | 25 KB |
 | 14 | [Infrastructure](14_infrastructure.md) | PostgreSQL, Qdrant, Docker, Drizzle, migrations (21), Next.js config, health, dev setup | 28 KB |
+| 15 | [Testing Standards](15_testing_standards.md) | Test architecture, Vitest setup, LLM mocking, coverage targets | — |
+| 16 | [RAG Overhaul Design](16_rag_overhaul_design.md) | RAG v2 architecture, HyDE, contextual retrieval, late chunking | — |
+| 17 | [Canvas Overhaul Design](17_canvas_overhaul_design.md) | Workflow canvas v2 architecture, node improvements | — |
+| 18 | [Multi-Agent Framework](18_multi_agent_framework.md) | Shared project workspace, invoke_agent tool, auto-approve, one-shot sessions | — |
 
 ---
 
