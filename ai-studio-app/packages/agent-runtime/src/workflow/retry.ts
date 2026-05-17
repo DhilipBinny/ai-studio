@@ -39,7 +39,7 @@ export async function executeNodeWithRetry(
     let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const timeoutMs = policy.timeoutMs || 600_000;
+      const timeoutMs = policy.timeoutMs || 1_800_000;
       const result = await Promise.race([
         executeNode(node, state, tenantId, runId, userId, nodeSpanId),
         new Promise<never>((_, reject) => {
