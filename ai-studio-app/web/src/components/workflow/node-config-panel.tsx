@@ -65,10 +65,10 @@ export function NodeConfigPanel({
         </div>
         <div className="flex items-center gap-1">
           <button onClick={() => onDelete(node.id)} className="text-muted-foreground hover:text-destructive p-1" title="Delete node">
-            <X className="h-3.5 w-3.5" />
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground p-1" title="Close panel">
-            <Settings2 className="h-3.5 w-3.5" />
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
