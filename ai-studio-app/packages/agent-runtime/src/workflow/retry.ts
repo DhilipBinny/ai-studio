@@ -39,7 +39,8 @@ export async function executeNodeWithRetry(
     let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const timeoutMs = policy.timeoutMs || 1_800_000;
+      const { getConfigSync } = await import("../config");
+      const timeoutMs = policy.timeoutMs || getConfigSync().WORKFLOW_NODE_TIMEOUT_MS;
       const result = await Promise.race([
         executeNode(node, state, tenantId, runId, userId, nodeSpanId),
         new Promise<never>((_, reject) => {

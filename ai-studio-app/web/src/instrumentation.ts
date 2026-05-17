@@ -35,7 +35,8 @@ export async function register() {
         const { agents } = await import("@ais-app/database");
         const { sql } = await import("drizzle-orm");
         const db = getDb();
-        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const { getConfigSync } = await import("@ais-app/agent-runtime");
+        const cutoff = new Date(Date.now() - getConfigSync().EPHEMERAL_AGENT_TTL_MS);
         await db.delete(agents).where(
           sql`${agents.isActive} = false AND ${agents.metadata}->>'ephemeral' = 'true' AND ${agents.createdAt} < ${cutoff.toISOString()}`
         );

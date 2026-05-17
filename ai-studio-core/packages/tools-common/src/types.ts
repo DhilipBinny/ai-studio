@@ -9,7 +9,16 @@ export interface WorkspaceConfig {
   execTimeoutMs?: number;
 }
 
+export interface RuntimeLimits {
+  execMaxStdout: number;
+  execMaxStderr: number;
+  execMaxTimeoutSeconds: number;
+  execDefaultTimeoutSeconds: number;
+  fileMaxWriteBytes: number;
+}
+
 export interface BuiltinToolContext {
   workspace: WorkspaceConfig;
   braveApiKey?: string;
+  limits?: RuntimeLimits;
 }

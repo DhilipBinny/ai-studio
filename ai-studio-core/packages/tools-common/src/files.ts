@@ -84,8 +84,9 @@ export const fileTools: ToolRegistration[] = [
       const filePath = resolveTenantPath(requestedPath, ctx.workspace);
       const fileContent = (args.content as string) || "";
       const contentSize = Buffer.byteLength(fileContent);
-      if (contentSize > FILE_MAX_WRITE_SIZE) {
-        return { error: `Content too large: ${(contentSize / 1024 / 1024).toFixed(1)}MB exceeds ${FILE_MAX_WRITE_SIZE / 1024 / 1024}MB limit` };
+      const maxWrite = ctx.limits?.fileMaxWriteBytes ?? FILE_MAX_WRITE_SIZE;
+      if (contentSize > maxWrite) {
+        return { error: `Content too large: ${(contentSize / 1024 / 1024).toFixed(1)}MB exceeds ${maxWrite / 1024 / 1024}MB limit` };
       }
 
       fs.mkdirSync(path.dirname(filePath), { recursive: true });

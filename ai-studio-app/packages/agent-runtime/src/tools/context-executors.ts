@@ -16,7 +16,9 @@ export const CONTEXT_EXECUTORS: Record<string, ContextAwareExecutorFn> = {
   invoke_agent: async (args, ctx) => {
     const message = args.message as string;
     const projectId = args.project_id as string | undefined;
-    const timeoutMs = Math.min(Number(args.timeout_ms) || 600000, 600000);
+    const { getConfigSync } = await import("../config");
+    const maxInvokeTimeout = getConfigSync().INVOKE_AGENT_TIMEOUT_MS;
+    const timeoutMs = Math.min(Number(args.timeout_ms) || maxInvokeTimeout, maxInvokeTimeout);
 
     if (!message) return "Error: message is required";
 

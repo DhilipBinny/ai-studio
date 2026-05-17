@@ -133,10 +133,13 @@ export async function executeTool(
           status = "error";
           errorMessage = validation.error;
         } else {
+          const { getConfigSync } = await import("../config");
+          const cfg = getConfigSync();
           const braveApiKey = process.env.BRAVE_API_KEY || undefined;
           const builtinCtx: BuiltinToolContext = {
             workspace: workspaceConfig,
             braveApiKey,
+            limits: { execMaxStdout: cfg.EXEC_MAX_STDOUT_BYTES, execMaxStderr: cfg.EXEC_MAX_STDERR_BYTES, execMaxTimeoutSeconds: cfg.EXEC_MAX_TIMEOUT_SECONDS, execDefaultTimeoutSeconds: cfg.EXEC_DEFAULT_TIMEOUT_SECONDS, fileMaxWriteBytes: cfg.FILE_MAX_WRITE_BYTES },
           };
           const raw = await builtinTool.executor(call.input, builtinCtx as unknown as Record<string, unknown>);
           result = toolResultToString(raw);

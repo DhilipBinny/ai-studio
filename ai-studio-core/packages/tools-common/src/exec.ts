@@ -90,9 +90,13 @@ export const execTools: ToolRegistration[] = [
       const cwd = projectPath || getTempPath(ctx.workspace);
       fs.mkdirSync(cwd, { recursive: true });
 
-      const agentMaxTimeout = ctx.workspace.execTimeoutMs ? ctx.workspace.execTimeoutMs / 1000 : EXEC_MAX_TIMEOUT_SECONDS;
-      const maxAllowed = Math.min(agentMaxTimeout, EXEC_MAX_TIMEOUT_SECONDS);
-      const timeout = Math.min(Math.max(Number(args.timeout) || EXEC_DEFAULT_TIMEOUT_SECONDS, 1), maxAllowed) * 1000;
+      const maxStdout = ctx.limits?.execMaxStdout ?? EXEC_MAX_STDOUT;
+      const maxStderr = ctx.limits?.execMaxStderr ?? EXEC_MAX_STDERR;
+      const maxTimeout = ctx.limits?.execMaxTimeoutSeconds ?? EXEC_MAX_TIMEOUT_SECONDS;
+      const defaultTimeout = ctx.limits?.execDefaultTimeoutSeconds ?? EXEC_DEFAULT_TIMEOUT_SECONDS;
+      const agentMaxTimeout = ctx.workspace.execTimeoutMs ? ctx.workspace.execTimeoutMs / 1000 : maxTimeout;
+      const maxAllowed = Math.min(agentMaxTimeout, maxTimeout);
+      const timeout = Math.min(Math.max(Number(args.timeout) || defaultTimeout, 1), maxAllowed) * 1000;
 
       const safeEnv: Record<string, string> = {};
       for (const key of SAFE_ENV_KEYS) {
@@ -107,15 +111,15 @@ export const execTools: ToolRegistration[] = [
           env: safeEnv as NodeJS.ProcessEnv,
         });
         return textEnvelope(formatExecResult(
-          stdout.slice(0, EXEC_MAX_STDOUT),
-          stderr.slice(0, EXEC_MAX_STDERR),
+          stdout.slice(0, maxStdout),
+          stderr.slice(0, maxStderr),
           0,
         ));
       } catch (e: unknown) {
         const err = e as { stdout?: string; stderr?: string; message?: string; code?: unknown; status?: number };
         return textEnvelope(formatExecResult(
-          (err.stdout || "").slice(0, EXEC_MAX_STDOUT),
-          (err.stderr || err.message || "").slice(0, EXEC_MAX_STDERR),
+          (err.stdout || "").slice(0, maxStdout),
+          (err.stderr || err.message || "").slice(0, maxStderr),
           err.status || (typeof err.code === "number" ? err.code : 1),
         ));
       }
@@ -176,6 +180,8 @@ export const execTools: ToolRegistration[] = [
       }
 
       const ctx = getCtx(context as Record<string, unknown>);
+      const batchMaxStdout = ctx.limits?.execMaxStdout ?? EXEC_MAX_STDOUT;
+      const batchMaxStderr = ctx.limits?.execMaxStderr ?? EXEC_MAX_STDERR;
       const batchProjectPath = getProjectWorkspacePath(ctx.workspace);
       const cwd = batchProjectPath || getTempPath(ctx.workspace);
       fs.mkdirSync(cwd, { recursive: true });
@@ -192,13 +198,13 @@ export const execTools: ToolRegistration[] = [
             const { stdout, stderr } = await execFileAsync("/bin/sh", ["-c", cmd], {
               cwd, timeout, maxBuffer: 1024 * 1024, env: safeEnv as NodeJS.ProcessEnv,
             });
-            return { exitCode: 0, stdout: (stdout || "").slice(0, EXEC_MAX_STDOUT), stderr: (stderr || "").slice(0, EXEC_MAX_STDERR) };
+            return { exitCode: 0, stdout: (stdout || "").slice(0, batchMaxStdout), stderr: (stderr || "").slice(0, batchMaxStderr) };
           } catch (e: unknown) {
             const err = e as { stdout?: string; stderr?: string; code?: number; status?: number; signal?: string };
             return {
               exitCode: err.status ?? (typeof err.code === "number" ? err.code : 1),
-              stdout: (err.stdout || "").slice(0, EXEC_MAX_STDOUT),
-              stderr: (err.stderr || "").slice(0, EXEC_MAX_STDERR),
+              stdout: (err.stdout || "").slice(0, batchMaxStdout),
+              stderr: (err.stderr || "").slice(0, batchMaxStderr),
             };
           }
         }),

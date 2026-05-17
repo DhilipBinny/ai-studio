@@ -11,7 +11,7 @@ import { progressBus, truncatePreview } from "./progress-bus";
 import type { SessionInput, SessionResult, AgentConfig, ProviderConfig } from "./types";
 import type { ToolCall, ToolContext } from "./tool-executor";
 
-const MAX_TOOL_ROUNDS = 100;
+import { getConfigSync } from "./config";
 
 interface ToolCallBlock {
   type: string;
@@ -125,7 +125,7 @@ async function loadAgentAndProvider(input: SessionInput): Promise<LoadedAgentAnd
     providerModelId: agent.providerModelId,
     temperature: agent.temperature || "0.7",
     maxTurns: agent.maxTurns || 25,
-    maxTokensPerTurn: agent.maxTokensPerTurn || 16384,
+    maxTokensPerTurn: agent.maxTokensPerTurn || getConfigSync().DEFAULT_MAX_TOKENS_PER_TURN,
   };
 
   return {
@@ -266,7 +266,7 @@ async function executeToolLoop(
   let finalText = "";
 
   const skipCompaction = ["sub_agent", "workflow", "cron"].includes(input.channel || "");
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+  for (let round = 0; round < getConfigSync().MAX_TOOL_ROUNDS; round++) {
     if (agent.providerModelId && !skipCompaction) {
       await checkAndCompact(sessionId, input.tenantId, agent.providerModelId, providerConfig);
     }

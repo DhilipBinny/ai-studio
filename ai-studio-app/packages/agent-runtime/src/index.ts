@@ -14,6 +14,7 @@ export type { LLMToolCall, LLMCallResult } from "./llm-caller";
 export { triggerWorkflow, resumeWorkflow, recoverStaleWorkflowRuns } from "./workflow-engine";
 export type { WorkflowRunResult } from "./workflow-engine";
 export { startCronScheduler, stopCronScheduler, runJobNow } from "./cron-scheduler";
+export { getConfigSync, getAgentRuntimeConfig, DEFAULTS as AGENT_RUNTIME_DEFAULTS } from "./config";
 export { progressBus, truncatePreview } from "./progress-bus";
 export { startProgressWriter, stopProgressWriter } from "./progress-writer";
 export type { ProgressSpan, EmitSpanOptions, SpanKind, SpanPhase, ProgressBusStats } from "./progress-types";
