@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight } from "lucide-react";
 
 interface PaginationProps {
   page: number;
@@ -20,14 +20,19 @@ export function Pagination({ page, pageSize, total, totalPages, onPageChange }: 
       <p className="text-sm text-muted-foreground">
         {start}&ndash;{end} of {total}
       </p>
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => onPageChange(page - 1)} disabled={page <= 1}>
-          <ChevronLeft className="h-4 w-4" />
-          Previous
+      <div className="flex items-center gap-1">
+        <Button variant="outline" size="sm" onClick={() => onPageChange(1)} disabled={page <= 1} className="h-8 w-8 p-0">
+          <ChevronsLeft className="h-4 w-4" />
         </Button>
-        <Button variant="outline" size="sm" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages}>
-          Next
-          <ChevronRight className="h-4 w-4" />
+        <Button variant="outline" size="sm" onClick={() => onPageChange(page - 1)} disabled={page <= 1} className="h-8 px-3">
+          <ChevronLeft className="h-4 w-4" /> Prev
+        </Button>
+        <span className="px-2 text-sm text-muted-foreground">{page} / {totalPages}</span>
+        <Button variant="outline" size="sm" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages} className="h-8 px-3">
+          Next <ChevronRight className="h-4 w-4" />
+        </Button>
+        <Button variant="outline" size="sm" onClick={() => onPageChange(totalPages)} disabled={page >= totalPages} className="h-8 w-8 p-0">
+          <ChevronsRight className="h-4 w-4" />
         </Button>
       </div>
     </div>

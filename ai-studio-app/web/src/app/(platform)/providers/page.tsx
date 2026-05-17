@@ -1,8 +1,13 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
+import { PROVIDER_DEFAULTS, DEFAULT_PAGE_SIZE } from "@/lib/client-config";
+import { STATUS_VARIANT } from "@/lib/constants";
+import { FormError } from "@/components/form-error";
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, TestTube, Check, Loader2, ExternalLink, Trash2, Key, Globe, ChevronDown, ChevronRight, Star, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +21,7 @@ interface ProviderModel {
   id: string;
   modelId: string;
   displayName: string;
+  capabilities: string[];
   contextWindow: number | null;
   maxOutputTokens: number | null;
 }
@@ -33,17 +39,12 @@ interface Provider {
 }
 
 const PROVIDER_TYPES = [
-  { id: "anthropic", name: "Anthropic", description: "Claude Sonnet, Opus, Haiku" },
-  { id: "openai", name: "OpenAI", description: "GPT-4o, o1, o3, o4-mini" },
-  { id: "ollama", name: "Ollama", description: "Local models via Ollama" },
-  { id: "openai_compatible", name: "OpenAI Compatible", description: "LM Studio, Together, Groq, vLLM" },
+  { id: "anthropic", name: "Anthropic", description: "Claude Sonnet, Opus, Haiku (chat only, no embeddings)" },
+  { id: "openai", name: "OpenAI", description: "GPT-4o, o1, o3 + embedding models" },
+  { id: "ollama", name: "Ollama", description: "Local chat + embedding models via Ollama" },
+  { id: "openai_compatible", name: "OpenAI Compatible", description: "Voyage AI, Cohere, NVIDIA, Groq, vLLM — chat, embedding, or reranking" },
 ];
 
-const STATUS_VARIANT: Record<string, "success" | "warning" | "error" | "secondary"> = {
-  active: "success",
-  inactive: "warning",
-  error: "error",
-};
 
 export default function ProvidersPage() {
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -53,7 +54,7 @@ export default function ProvidersPage() {
 
   const fetchProviders = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/providers?page=1&pageSize=50");
+    const res = await fetch(`/api/providers?page=1&pageSize=${DEFAULT_PAGE_SIZE}`);
     if (res.ok) {
       const d = await res.json();
       setProviders(d.data);
@@ -74,8 +75,8 @@ export default function ProvidersPage() {
   const hasAvailableTypes = PROVIDER_TYPES.length > 0;
 
   return (
-    <>
-      <PageHeader title="Providers" description="Manage LLM providers and model configurations.">
+    <RequirePermission module="PROVIDERS"><>
+      <PageHeader title="Providers" description="Manage AI providers — chat models, embedding models, and re-ranking services.">
         {hasAvailableTypes && (
           <Button onClick={() => setShowAdd(true)}>
             <Plus className="h-4 w-4" /> Add Provider
@@ -87,7 +88,7 @@ export default function ProvidersPage() {
         <EmptyState
           icon={ExternalLink}
           title="No providers configured"
-          description="Connect an LLM provider to start using AI models."
+          description="Connect AI providers for chat, embeddings, and re-ranking. Supports Anthropic, OpenAI, Ollama, Voyage AI, Cohere, and any OpenAI-compatible endpoint."
           actionLabel="Add Provider"
           onAction={() => setShowAdd(true)}
         />
@@ -103,8 +104,28 @@ export default function ProvidersPage() {
         </div>
       )}
 
-      <Dialog open={showAdd} onOpenChange={setShowAdd}>
-        <DialogContent onClose={() => setShowAdd(false)} className="max-w-xl">
+      {!loading && providers.length > 0 && (
+        <Card className="p-4 mt-2 bg-muted/30 border-dashed">
+          <p className="text-xs font-medium mb-2">Provider Capabilities</p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-muted-foreground">
+            <div>
+              <p className="font-medium text-foreground mb-0.5">Chat Models</p>
+              <p>Used by agents for conversation. Anthropic, OpenAI, Ollama, and compatible endpoints.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground mb-0.5">Embedding Models</p>
+              <p>Used by Knowledge Bases to vectorize documents. OpenAI, Ollama, Voyage AI, NVIDIA. Models tagged automatically on Test Connection.</p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground mb-0.5">Re-ranking Models</p>
+              <p>Used by Knowledge Bases to improve search precision. Cohere, Voyage AI, Jina. Add as OpenAI Compatible provider.</p>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      <Dialog open={showAdd} onOpenChange={setShowAdd} size="xl">
+        <DialogContent onClose={() => setShowAdd(false)}>
           <DialogHeader>
             <DialogTitle>Add Provider</DialogTitle>
           </DialogHeader>
@@ -115,7 +136,7 @@ export default function ProvidersPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </></RequirePermission>
   );
 }
 
@@ -138,7 +159,7 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
 
   async function handleSave() {
@@ -181,7 +202,7 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
       setMessage({ text: "Failed to delete", ok: false });
     }
     setDeleting(false);
-    setConfirmDelete(false);
+    setShowDeleteDialog(false);
   }
 
   async function handleTest() {
@@ -210,7 +231,7 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand text-sm font-bold">
-            {typeInfo?.name.charAt(0) || "?"}
+            {provider.name.charAt(0).toUpperCase()}
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -225,18 +246,21 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
             {testing ? <Loader2 className="h-3 w-3 animate-spin" /> : <TestTube className="h-3 w-3" />}
             {testing ? "Testing..." : "Test"}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => { setShowConfig(!showConfig); setConfirmDelete(false); }}>
+          <Button variant="outline" size="sm" onClick={() => { setShowConfig(!showConfig); setShowDeleteDialog(false); }}>
             {showConfig ? "Cancel" : "Edit"}
           </Button>
-          {!confirmDelete ? (
-            <Button variant="outline" size="sm" onClick={() => setConfirmDelete(true)}>
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          ) : (
-            <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
-              {deleting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Confirm?"}
-            </Button>
-          )}
+          <Button variant="outline" size="sm" onClick={() => setShowDeleteDialog(true)} aria-label="Delete provider">
+            <Trash2 className="h-3 w-3" />
+          </Button>
+          <ConfirmDialog
+            open={showDeleteDialog}
+            onOpenChange={setShowDeleteDialog}
+            onConfirm={handleDelete}
+            title="Delete provider"
+            description={`Are you sure you want to delete "${provider.name}"? Agents using this provider will stop working.`}
+            confirmLabel="Delete"
+            loading={deleting}
+          />
         </div>
       </div>
 
@@ -264,7 +288,16 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
           >
             {showModels ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
             <Check className="h-3 w-3 text-green-600" />
-            {provider.models.length} model{provider.models.length !== 1 ? "s" : ""} available
+            {provider.models.length} model{provider.models.length !== 1 ? "s" : ""}
+            {(() => {
+              const caps = provider.models.reduce<Record<string, number>>((acc, m) => {
+                const cap = (m.capabilities as string[])?.[0] || "chat";
+                acc[cap] = (acc[cap] || 0) + 1;
+                return acc;
+              }, {});
+              const parts = Object.entries(caps).map(([k, v]) => `${v} ${k}`);
+              return parts.length > 1 ? ` (${parts.join(", ")})` : "";
+            })()}
           </button>
           {showModels && (
             <div className="mt-2 space-y-1">
@@ -360,12 +393,9 @@ function ProviderCard({ provider, onUpdated, defaultModelId, onSetDefault }: { p
   );
 }
 
-const DEFAULT_URLS: Record<string, string> = {
-  anthropic: "https://api.anthropic.com",
-  openai: "https://api.openai.com/v1",
-  ollama: "http://localhost:11434",
-  openai_compatible: "",
-};
+const DEFAULT_URLS: Record<string, string> = Object.fromEntries(
+  Object.entries(PROVIDER_DEFAULTS).map(([k, v]) => [k, v.baseUrl])
+);
 
 const KEY_PLACEHOLDERS: Record<string, string> = {
   anthropic: "sk-ant-...",
@@ -449,9 +479,7 @@ function AddProviderForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">{error}</div>
-      )}
+      <FormError message={error} />
 
       <div className="space-y-2">
         <Label>Provider Type</Label>
@@ -573,16 +601,26 @@ function ModelRow({ model, providerId, providerType, isDefault, onSetDefault }: 
         <div className="flex items-center gap-2">
           <span className="font-medium">{model.displayName}</span>
           <span className="font-mono text-muted-foreground">{model.modelId}</span>
+          {(model.capabilities as string[])?.includes("embedding") && (
+            <Badge variant="secondary" className="text-[9px] px-1 py-0">embedding</Badge>
+          )}
+          {(model.capabilities as string[])?.includes("reranking") && (
+            <Badge variant="secondary" className="text-[9px] px-1 py-0">reranking</Badge>
+          )}
         </div>
         <div className="flex items-center gap-2 text-muted-foreground">
           {model.contextWindow && <span>{(model.contextWindow / 1000).toFixed(0)}K ctx</span>}
           {model.maxOutputTokens && <span>{(model.maxOutputTokens / 1000).toFixed(0)}K out</span>}
-          <Button variant="ghost" size="sm" onClick={() => setShowChat(!showChat)} className="h-6 px-2 text-[10px]">
-            <Send className="h-3 w-3" /> Try
-          </Button>
-          <button onClick={onSetDefault} className="p-0.5 transition-colors" title={isDefault ? "Default model" : "Set as default"}>
-            <Star className={`h-3.5 w-3.5 ${isDefault ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400"}`} />
-          </button>
+          {(model.capabilities as string[])?.includes("chat") && (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => setShowChat(!showChat)} className="h-6 px-2 text-[10px]">
+                <Send className="h-3 w-3" /> Try
+              </Button>
+              <button onClick={onSetDefault} className="p-0.5 transition-colors" title={isDefault ? "Default model" : "Set as default"}>
+                <Star className={`h-3.5 w-3.5 ${isDefault ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-400"}`} />
+              </button>
+            </>
+          )}
         </div>
       </div>
 

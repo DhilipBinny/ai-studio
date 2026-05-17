@@ -1,8 +1,8 @@
 import type { GatewayConfig, ProviderInterface, ProviderResponse, ChatArgs, AgwLogger } from '@ais/types';
 import { noopLogger } from '@ais/types';
-import { AnthropicProvider } from './anthropic.js';
-import { OpenAIProvider } from './openai.js';
-import { classifyError, logClassifiedError } from './errors.js';
+import { AnthropicProvider } from './anthropic';
+import { OpenAIProvider } from './openai';
+import { classifyError, logClassifiedError } from './errors';
 
 export interface SecretsResolver {
   get(namespace: string, key: string): string | undefined;

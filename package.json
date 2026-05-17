@@ -1,0 +1,25 @@
+{
+  "name": "ai-studio",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter web dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "db:migrate": "pnpm --filter @ais-app/database migrate",
+    "db:seed": "pnpm --filter @ais-app/database seed"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "onnxruntime-node",
+      "protobufjs"
+    ]
+  },
+  "dependencies": {
+    "@qdrant/js-client-rest": "^1.18.0"
+  }
+}

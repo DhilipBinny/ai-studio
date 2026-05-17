@@ -2,7 +2,7 @@ import { pgTable, uuid, text, timestamp, integer, numeric, bigserial, index } fr
 import { tenants } from "./tenants";
 import { users } from "./users";
 import { agents } from "./agents";
-import { agentRuns } from "./agent-runs";
+import { agentSessions } from "./agent-sessions";
 import { providerModels } from "./providers";
 
 export const usageRecords = pgTable(
@@ -12,7 +12,7 @@ export const usageRecords = pgTable(
     tenantId: uuid("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     agentId: uuid("agent_id").references(() => agents.id, { onDelete: "set null" }),
-    agentRunId: uuid("agent_run_id").references(() => agentRuns.id, { onDelete: "set null" }),
+    agentSessionId: uuid("agent_session_id").references(() => agentSessions.id, { onDelete: "set null" }),
     providerModelId: uuid("provider_model_id").references(() => providerModels.id, { onDelete: "set null" }),
     model: text("model").notNull(),
     provider: text("provider").notNull(),

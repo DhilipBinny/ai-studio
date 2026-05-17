@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { providers, providerModels } from "@ais-app/database";
 import { updateProviderSchema } from "@ais-app/validation";
+import { encryptSecret } from "@ais-app/auth";
 import { eq, and } from "drizzle-orm";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
+import { validateProviderUrl } from "@/lib/services/validate-provider-url";
 
 export const GET = withRBAC("PROVIDERS", 10, async (_request, auth, params) => {
   const id = params?.id;
@@ -25,14 +27,15 @@ export const GET = withRBAC("PROVIDERS", 10, async (_request, auth, params) => {
     .from(providerModels)
     .where(and(eq(providerModels.providerId, id), eq(providerModels.tenantId, auth.tenantId)));
 
-  return NextResponse.json({ ...provider, models });
+  return NextResponse.json({ ...provider, apiKeyRef: provider.apiKeyRef ? "****" : null, models });
 });
 
 export const PATCH = withRBAC("PROVIDERS", 20, async (request, auth, params) => {
   const id = params?.id;
   if (!id) return errorResponse("Provider ID required", "MISSING_ID", 400);
 
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = updateProviderSchema.safeParse(body);
   if (!parsed.success) {
     return errorResponse("Invalid input", "VALIDATION_ERROR", 400, { issues: parsed.error.issues });
@@ -48,10 +51,21 @@ export const PATCH = withRBAC("PROVIDERS", 20, async (request, auth, params) => 
 
   if (!existing) return errorResponse("Provider not found", "NOT_FOUND", 404);
 
+  if (parsed.data.baseUrl) {
+    try { validateProviderUrl(parsed.data.baseUrl); } catch (e) {
+      return errorResponse((e as Error).message, "SSRF_BLOCKED", 400);
+    }
+  }
+
+  const updateData = { ...parsed.data };
+  if (updateData.apiKeyRef) {
+    updateData.apiKeyRef = encryptSecret(updateData.apiKeyRef);
+  }
+
   const [updated] = await db
     .update(providers)
-    .set(parsed.data)
-    .where(eq(providers.id, id))
+    .set(updateData)
+    .where(and(eq(providers.id, id), eq(providers.tenantId, auth.tenantId)))
     .returning();
 
   await createAuditEntry({
@@ -63,5 +77,5 @@ export const PATCH = withRBAC("PROVIDERS", 20, async (request, auth, params) => 
     details: { fields: Object.keys(parsed.data) },
   });
 
-  return NextResponse.json(updated);
+  return NextResponse.json({ ...updated, apiKeyRef: updated.apiKeyRef ? "****" : null });
 });

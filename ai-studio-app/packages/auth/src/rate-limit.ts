@@ -9,6 +9,7 @@ export class RateLimiter {
   private windows = new Map<string, WindowEntry>();
   private maxRequests: number;
   private windowMs: number;
+  private checkCount = 0;
 
   constructor(maxRequests: number, windowMs: number) {
     this.maxRequests = maxRequests;
@@ -17,7 +18,12 @@ export class RateLimiter {
 
   check(key: string): { allowed: boolean; remaining: number; resetAt: number } {
     const now = Date.now();
-    this.evictExpired(now);
+    this.checkCount++;
+    if (this.checkCount % 1000 === 0) {
+      this.forceEvict(now);
+    } else {
+      this.evictExpired(now);
+    }
 
     const entry = this.windows.get(key);
 
@@ -52,6 +58,10 @@ export class RateLimiter {
 
   private evictExpired(now: number): void {
     if (this.windows.size <= MAX_ENTRIES) return;
+    this.forceEvict(now);
+  }
+
+  private forceEvict(now: number): void {
     for (const [key, entry] of this.windows) {
       if (now - entry.windowStart >= this.windowMs) {
         this.windows.delete(key);

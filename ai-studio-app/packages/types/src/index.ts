@@ -1,16 +1,12 @@
-export type Module =
-  | "DASHBOARD"
-  | "AGENTS"
-  | "TOOLS"
-  | "KNOWLEDGE"
-  | "WORKFLOWS"
-  | "CONNECTORS"
-  | "RUNS"
-  | "PROVIDERS"
-  | "USERS"
-  | "PROFILES"
-  | "AUDIT"
-  | "SETTINGS";
+export { MODULES, MODULE_IDS, SECTION_LABELS, type Module, type Section } from "./modules";
+export { SYSTEM_CONFIG_SCHEMA, getConfigDefaults, validateConfigValue, type ConfigFieldDef, type ConfigSectionDef } from "./system-config-schema";
+export { BRAND_NAME, BRAND_COMPANY, BRAND_HEX, BRAND_EMAIL_FROM, BRAND_USER_AGENT } from "./branding";
+export type { Agent, AgentSummary, Persona, AgentRule } from "./domain/agent";
+export type { ProviderModel } from "./domain/provider";
+export type { Workflow, WorkflowNode, WorkflowEdge, WorkflowRun, RunStep } from "./domain/workflow";
+export type { Session, SessionDetail, SessionMessage, SessionToolCall } from "./domain/session";
+
+import type { Module } from "./modules";
 
 export type PermissionLevel = 0 | 10 | 20;
 
@@ -24,6 +20,7 @@ export interface JWTPayload {
   pid: string;
   rol: UserRole;
   arh: string;
+  jti?: string;
   iat: number;
   exp: number;
 }

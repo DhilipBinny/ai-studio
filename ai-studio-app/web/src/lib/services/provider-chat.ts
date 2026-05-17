@@ -9,6 +9,8 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
+import { decryptSecret, isEncrypted } from "@ais-app/auth";
+import { validateProviderUrl } from "./validate-provider-url";
 
 interface QuickChatConfig {
   providerType: string;
@@ -30,12 +32,25 @@ interface QuickChatResult {
 
 export async function quickChat(cfg: QuickChatConfig): Promise<QuickChatResult> {
   const start = Date.now();
+  const resolvedCfg = {
+    ...cfg,
+    apiKeyRef: cfg.apiKeyRef && isEncrypted(cfg.apiKeyRef) ? decryptSecret(cfg.apiKeyRef) : cfg.apiKeyRef,
+  };
+
+  // SSRF check: validate user-supplied base URL before any outbound request
+  if (resolvedCfg.baseUrl) {
+    try {
+      validateProviderUrl(resolvedCfg.baseUrl);
+    } catch (e) {
+      return { success: false, response: null, latencyMs: 0, inputTokens: 0, outputTokens: 0, error: (e as Error).message };
+    }
+  }
 
   try {
-    if (cfg.providerType === "anthropic") {
-      return await chatAnthropic(cfg, start);
+    if (resolvedCfg.providerType === "anthropic") {
+      return await chatAnthropic(resolvedCfg, start);
     }
-    return await chatOpenAI(cfg, start);
+    return await chatOpenAI(resolvedCfg, start);
   } catch (e) {
     return { success: false, response: null, latencyMs: Date.now() - start, inputTokens: 0, outputTokens: 0, error: (e as Error).message };
   }

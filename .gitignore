@@ -2,8 +2,11 @@
 .data/
 AiStudio-App/.data/
 
-# Local reference docs (research, audits — not for git)
+# Local reference docs (research, design history — not for git)
 _local_reference/
+docs/_local_research/
+docs/_local_design-history/
+docs/_local_reference_angularaistudio/
 
 # Node
 node_modules/
@@ -22,6 +25,9 @@ dist/
 CLAUDE.md
 CLAUDE.local.md
 .mcp.json
+
+# Playwright MCP artifacts
+.playwright-mcp/
 
 # OS
 .DS_Store

@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { BRAND } from "@/lib/branding";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
+import { MODULES, SECTION_LABELS, type Module, type Section } from "@ais-app/types";
 import {
   LayoutDashboard,
   Bot,
@@ -11,35 +14,42 @@ import {
   BookOpen,
   GitBranch,
   Plug,
-  Play,
+  MessageSquare,
   Server,
   Settings,
   PanelLeftClose,
   PanelLeft,
   Users,
+  Shield,
+  FileText,
+  Clock,
+  FolderOpen,
+  BookText,
 } from "lucide-react";
 
-const mainNav = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-];
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  DASHBOARD: LayoutDashboard,
+  AGENTS: Bot,
+  TOOLS: Wrench,
+  KNOWLEDGE: BookOpen,
+  WORKFLOWS: GitBranch,
+  RUNS: MessageSquare,
+  SCHEDULED: Clock,
+  CONNECTORS: Plug,
+  PROVIDERS: Server,
+  WORKSPACE: FolderOpen,
+  USERS: Users,
+  PROFILES: Shield,
+  AUDIT: FileText,
+  SETTINGS: Settings,
+  DOCS: BookText,
+};
 
-const buildNav = [
-  { name: "Agents", href: "/agents", icon: Bot },
-  { name: "Tools", href: "/tools", icon: Wrench },
-  { name: "Knowledge Bases", href: "/knowledge", icon: BookOpen },
-  { name: "Workflows", href: "/workflows", icon: GitBranch },
-];
+const SIDEBAR_MODULES = MODULES.filter((m) =>
+  m.section !== "hidden"
+);
 
-const operateNav = [
-  { name: "Runs", href: "/runs", icon: Play },
-  { name: "Connectors", href: "/connectors", icon: Plug },
-  { name: "Providers", href: "/providers", icon: Server },
-];
-
-const adminNav = [
-  { name: "Users", href: "/users", icon: Users },
-  { name: "Settings", href: "/settings", icon: Settings },
-];
+const SECTIONS = ["main", "build", "operate", "admin"] as const;
 
 interface AppSidebarProps {
   collapsed: boolean;
@@ -65,7 +75,12 @@ function NavItem({ item, collapsed, isActive }: { item: { name: string; href: st
   );
 }
 
-function NavSection({ label, items, collapsed, pathname }: { label: string; items: typeof mainNav; collapsed: boolean; pathname: string }) {
+function NavSection({ section, collapsed, pathname, canView }: { section: Section; collapsed: boolean; pathname: string; canView: (m: Module) => boolean }) {
+  const items = SIDEBAR_MODULES.filter((m) => m.section === section && canView(m.id));
+  if (items.length === 0) return null;
+
+  const label = SECTION_LABELS[section];
+
   return (
     <div className="space-y-0.5">
       {!collapsed && label && (
@@ -74,20 +89,24 @@ function NavSection({ label, items, collapsed, pathname }: { label: string; item
         </p>
       )}
       {collapsed && label && <div className="my-2 mx-2 border-t border-sidebar-border" />}
-      {items.map((item) => (
-        <NavItem
-          key={item.href}
-          item={item}
-          collapsed={collapsed}
-          isActive={pathname === item.href || pathname.startsWith(item.href + "/")}
-        />
-      ))}
+      {items.map((mod) => {
+        const Icon = ICON_MAP[mod.id] || Settings;
+        return (
+          <NavItem
+            key={mod.href}
+            item={{ name: mod.label, href: mod.href, icon: Icon }}
+            collapsed={collapsed}
+            isActive={pathname === mod.href || pathname.startsWith(mod.href + "/")}
+          />
+        );
+      })}
     </div>
   );
 }
 
 export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
   const pathname = usePathname();
+  const { canView } = useAuth();
 
   return (
     <aside
@@ -98,20 +117,19 @@ export function AppSidebar({ collapsed, onToggle }: AppSidebarProps) {
     >
       <div className={cn("flex h-14 shrink-0 items-center border-b border-sidebar-border", collapsed ? "justify-center px-2" : "gap-2.5 px-4")}>
         <img
-          src="/branding/echol-icon.png"
-          alt="Echol"
+          src={BRAND.icon}
+          alt={BRAND.logoAlt}
           className={cn("shrink-0 rounded-lg", collapsed ? "h-7 w-7" : "h-8 w-8")}
         />
         {!collapsed && (
-          <span className="text-base font-semibold text-sidebar-foreground">AI Studio</span>
+          <span className="text-base font-semibold text-sidebar-foreground">{BRAND.shortName}</span>
         )}
       </div>
 
       <nav className="flex-1 overflow-y-auto px-2 py-2">
-        <NavSection label="" items={mainNav} collapsed={collapsed} pathname={pathname} />
-        <NavSection label="Build" items={buildNav} collapsed={collapsed} pathname={pathname} />
-        <NavSection label="Operate" items={operateNav} collapsed={collapsed} pathname={pathname} />
-        <NavSection label="Admin" items={adminNav} collapsed={collapsed} pathname={pathname} />
+        {SECTIONS.map((section) => (
+          <NavSection key={section} section={section} collapsed={collapsed} pathname={pathname} canView={canView} />
+        ))}
       </nav>
 
       <div className="shrink-0 border-t border-sidebar-border px-2 py-2">

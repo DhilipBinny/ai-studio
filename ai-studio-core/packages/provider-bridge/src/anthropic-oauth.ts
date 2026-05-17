@@ -21,7 +21,7 @@ import type {
   ThinkingConfig,
   ToolCall,
   ToolDefinition,
-} from './types.js';
+} from './types';
 
 /** Streaming timeout: max wait for first chunk (ms). */
 const TTFT_TIMEOUT_MS = 60_000;

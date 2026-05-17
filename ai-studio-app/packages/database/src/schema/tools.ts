@@ -15,6 +15,7 @@ export const tools = pgTable(
     category: text("category").default("general"),
     parametersSchema: jsonb("parameters_schema").notNull().default({}),
     returnsSchema: jsonb("returns_schema").default({}),
+    riskLevel: text("risk_level").notNull().default("safe"),
     config: jsonb("config").notNull().default({}),
     version: integer("version").notNull().default(1),
     isActive: boolean("is_active").notNull().default(true),

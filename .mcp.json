@@ -3,6 +3,10 @@
     "drawio": {
       "command": "npx",
       "args": ["@drawio/mcp"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
     }
   }
 }

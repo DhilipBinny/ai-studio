@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { providers, providerModels } from "@ais-app/database";
 import { createProviderSchema, paginationSchema } from "@ais-app/validation";
+import { encryptSecret } from "@ais-app/auth";
 import { eq, and, count, desc, sql } from "drizzle-orm";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
+import { validateProviderUrl } from "@/lib/services/validate-provider-url";
 
 export const GET = withRBAC("PROVIDERS", 10, async (request, auth) => {
   const db = getDb();
@@ -43,6 +45,7 @@ export const GET = withRBAC("PROVIDERS", 10, async (request, auth) => {
           providerId: providerModels.providerId,
           modelId: providerModels.modelId,
           displayName: providerModels.displayName,
+          capabilities: providerModels.capabilities,
           contextWindow: providerModels.contextWindow,
           maxOutputTokens: providerModels.maxOutputTokens,
           isActive: providerModels.isActive,
@@ -70,15 +73,23 @@ export const GET = withRBAC("PROVIDERS", 10, async (request, auth) => {
 });
 
 export const POST = withRBAC("PROVIDERS", 20, async (request, auth) => {
-  const body = await request.json();
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
   const parsed = createProviderSchema.safeParse(body);
 
   if (!parsed.success) {
     return errorResponse("Invalid input", "VALIDATION_ERROR", 400, { issues: parsed.error.issues });
   }
 
-  const db = getDb();
   const { name, providerType, baseUrl, apiKeyRef, config } = parsed.data;
+
+  if (baseUrl) {
+    try { validateProviderUrl(baseUrl); } catch (e) {
+      return errorResponse((e as Error).message, "SSRF_BLOCKED", 400);
+    }
+  }
+
+  const db = getDb();
 
   const [existing] = await db
     .select({ id: providers.id })
@@ -97,7 +108,7 @@ export const POST = withRBAC("PROVIDERS", 20, async (request, auth) => {
       name,
       providerType,
       baseUrl: baseUrl || null,
-      apiKeyRef: apiKeyRef || null,
+      apiKeyRef: apiKeyRef ? encryptSecret(apiKeyRef) : null,
       config: config || {},
     })
     .returning();
@@ -111,5 +122,5 @@ export const POST = withRBAC("PROVIDERS", 20, async (request, auth) => {
     details: { name, providerType },
   });
 
-  return NextResponse.json(provider, { status: 201 });
+  return NextResponse.json({ ...provider, apiKeyRef: provider.apiKeyRef ? "****" : null }, { status: 201 });
 });

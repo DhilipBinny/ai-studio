@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@ais-app/database";
 import { knowledgeBases } from "@ais-app/database";
-import { paginationSchema } from "@ais-app/validation";
+import { paginationSchema, createKnowledgeBaseSchema } from "@ais-app/validation";
 import { eq, and, count, desc } from "drizzle-orm";
-import { withRBAC, errorResponse } from "@/lib/api-utils";
+import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
 import { createAuditEntry } from "@/lib/services/audit";
 
 export const GET = withRBAC("KNOWLEDGE", 10, async (request, auth) => {
@@ -21,21 +21,44 @@ export const GET = withRBAC("KNOWLEDGE", 10, async (request, auth) => {
 });
 
 export const POST = withRBAC("KNOWLEDGE", 20, async (request, auth) => {
-  const body = await request.json();
-  const { name, description, embeddingModel, embeddingDimension, chunkConfig } = body;
-  if (!name) return errorResponse("Name required", "VALIDATION_ERROR", 400);
+  const body = await parseJsonBody(request);
+  if (!body) return errorResponse("Invalid JSON body", "INVALID_JSON", 400);
+  const parsed = createKnowledgeBaseSchema.safeParse(body);
+  if (!parsed.success) {
+    return errorResponse("Validation failed", "VALIDATION_ERROR", 400, { errors: parsed.error.flatten() });
+  }
+  const {
+    name, description, embeddingSource, embeddingProviderId, embeddingModel, embeddingDimension,
+    rerankSource, rerankProviderId, rerankModel, chunkConfig,
+    contextualEnrichment, contextualModel, queryExpansion, queryExpansionModel,
+    queryDecomposition, graphExtraction, graphExtractionModel, modalityType,
+  } = parsed.data;
 
   const db = getDb();
   const [existing] = await db.select({ id: knowledgeBases.id }).from(knowledgeBases).where(and(eq(knowledgeBases.tenantId, auth.tenantId), eq(knowledgeBases.name, name))).limit(1);
   if (existing) return errorResponse("Name already exists", "NAME_EXISTS", 409);
 
+  const source = embeddingSource || "builtin";
   const [kb] = await db.insert(knowledgeBases).values({
     tenantId: auth.tenantId,
     name,
     description: description || "",
-    embeddingModel: embeddingModel || "text-embedding-3-small",
-    embeddingDimension: embeddingDimension || 1536,
-    chunkConfig: chunkConfig || { method: "recursive", chunk_size: 1000, chunk_overlap: 200 },
+    embeddingSource: source,
+    embeddingProviderId: source === "provider" ? embeddingProviderId : null,
+    embeddingModel: embeddingModel || (source === "builtin" ? "Xenova/bge-small-en-v1.5" : "text-embedding-3-small"),
+    embeddingDimension: embeddingDimension || (source === "builtin" ? 384 : 1536),
+    rerankSource: rerankSource || null,
+    rerankProviderId: rerankSource === "provider" ? rerankProviderId : null,
+    rerankModel: rerankModel || null,
+    chunkConfig: chunkConfig || { method: "recursive", chunk_size: 2048, chunk_overlap: 200 },
+    contextualEnrichment: contextualEnrichment || "static",
+    contextualModel: contextualModel || null,
+    queryExpansion: queryExpansion || "none",
+    queryExpansionModel: queryExpansionModel || null,
+    queryDecomposition: queryDecomposition ?? false,
+    graphExtraction: graphExtraction ?? false,
+    graphExtractionModel: graphExtractionModel || null,
+    modalityType: modalityType || "text",
     createdBy: auth.userId,
   }).returning();
 

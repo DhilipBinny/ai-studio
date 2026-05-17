@@ -1,11 +1,40 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
 
 import { useState, useEffect } from "react";
-import { Bot, Wrench, Play, GitBranch, TrendingUp, CheckCircle } from "lucide-react";
+import {
+  Bot, Wrench, MessageSquare, AlertTriangle,
+  Database, Plug, DollarSign,
+} from "lucide-react";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { PageHeader } from "@/components/page-header";
+import { formatRelativeTime, formatNumber, formatCost } from "@/lib/utils";
+import { STATUS_VARIANT, CHANNEL_LABEL } from "@/lib/constants";
+
+interface TopAgent {
+  agentId: string;
+  agentName: string;
+  sessions: number;
+  tokens: string | number;
+  toolCalls: string | number;
+  costUsd: number;
+}
+
+interface RecentSession {
+  id: string;
+  agentName: string;
+  status: string;
+  channel: string;
+  totalTurns: number;
+  totalToolCalls: number;
+  tokens: number;
+  costUsd: number;
+  createdAt: string;
+}
 
 interface Stats {
   agents: number;
@@ -13,111 +42,161 @@ interface Stats {
   knowledgeBases: number;
   connectors: number;
   workflows: number;
-  totalRuns: number;
-  runsToday: number;
-  successRate: number;
+  totalSessions: number;
+  sessionsToday: number;
+  failedToday: number;
+  costToday: number;
+  totalCostUsd: number;
+  avgCostPerSession: number;
+  topAgents: TopAgent[];
+  recentSessions: RecentSession[];
 }
 
-interface Activity {
-  id: number;
-  action: string;
-  resourceType: string | null;
-  createdAt: string;
-}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
-  const [activity, setActivity] = useState<Activity[]>([]);
 
   useEffect(() => {
     fetch("/api/dashboard/stats").then((r) => r.ok ? r.json() : null).then(setStats);
-    fetch("/api/dashboard/activity").then((r) => r.ok ? r.json() : null).then((d) => setActivity(d?.data || []));
   }, []);
 
-  const statCards = [
-    { label: "Agents", value: stats?.agents, icon: Bot },
-    { label: "Tools", value: stats?.tools, icon: Wrench },
-    { label: "Runs Today", value: stats?.runsToday, icon: Play },
-    { label: "Success Rate", value: stats ? `${stats.successRate}%` : undefined, icon: CheckCircle },
-  ];
-
   return (
-    <>
-      <PageHeader title="Dashboard" description="Overview of your AI agents, runs, and usage metrics." />
+    <RequirePermission module="DASHBOARD"><>
+      <PageHeader title="Dashboard" description="Platform overview and agent performance." />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((card) => (
-          <Card key={card.label}>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-secondary">
-                  <card.icon className="h-5 w-5 text-muted-foreground" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">{card.label}</p>
-                  {card.value !== undefined ? (
-                    <p className="text-2xl font-semibold tracking-tight">{card.value}</p>
-                  ) : (
-                    <Skeleton className="mt-1 h-7 w-16" />
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <StatCard icon={MessageSquare} label="Sessions Today" value={stats?.sessionsToday} />
+        <StatCard icon={AlertTriangle} label="Failed Today" value={stats?.failedToday} variant={stats && stats.failedToday > 0 ? "error" : "default"} />
+        <StatCard icon={DollarSign} label="Cost Today" value={stats ? formatCost(stats.costToday) : undefined} />
+        <StatCard icon={MessageSquare} label="Total Sessions" value={stats?.totalSessions} />
+        <StatCard icon={DollarSign} label="Total Cost" value={stats ? formatCost(stats.totalCostUsd) : undefined} />
+        <StatCard icon={DollarSign} label="Avg / Session" value={stats ? formatCost(stats.avgCostPerSession) : undefined} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <MiniStat label="Agents" value={stats?.agents} icon={Bot} />
+        <MiniStat label="Tools" value={stats?.tools} icon={Wrench} />
+        <MiniStat label="Knowledge Bases" value={stats?.knowledgeBases} icon={Database} />
+        <MiniStat label="Connectors" value={stats?.connectors} icon={Plug} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Recent Activity</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Top Agents</CardTitle>
           </CardHeader>
-          <CardContent>
-            {activity.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No activity yet.</p>
+          <CardContent className="pt-0">
+            {!stats ? (
+              <div className="space-y-3">{[1, 2, 3].map((i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+            ) : stats.topAgents.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No agent sessions yet.</p>
             ) : (
-              <div className="space-y-3">
-                {activity.slice(0, 10).map((a) => (
-                  <div key={a.id} className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{a.action}</span>
-                      {a.resourceType && <Badge variant="secondary">{a.resourceType}</Badge>}
-                    </div>
-                    <span className="text-xs text-muted-foreground">{new Date(a.createdAt).toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Agent</TableHead>
+                    <TableHead className="text-right">Sessions</TableHead>
+                    <TableHead className="text-right">Tokens</TableHead>
+                    <TableHead className="text-right">Cost</TableHead>
+                    <TableHead className="text-right">Tool Calls</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stats.topAgents.map((a) => (
+                    <TableRow key={a.agentId}>
+                      <TableCell className="font-medium">{a.agentName}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{Number(a.sessions)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground font-mono text-xs">{formatNumber(Number(a.tokens || 0))}</TableCell>
+                      <TableCell className="text-right text-muted-foreground font-mono text-xs">{formatCost(a.costUsd)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{Number(a.toolCalls || 0)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Platform Summary</CardTitle>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Recent Sessions</CardTitle>
           </CardHeader>
-          <CardContent>
-            {stats ? (
-              <div className="space-y-3">
-                {[
-                  { label: "Knowledge Bases", value: stats.knowledgeBases },
-                  { label: "Connectors", value: stats.connectors },
-                  { label: "Workflows", value: stats.workflows },
-                  { label: "Total Runs", value: stats.totalRuns },
-                ].map((item) => (
-                  <div key={item.label} className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">{item.label}</span>
-                    <span className="font-medium">{item.value}</span>
+          <CardContent className="pt-0">
+            {!stats ? (
+              <div className="space-y-3">{[1, 2, 3, 4, 5].map((i) => <Skeleton key={i} className="h-8 w-full" />)}</div>
+            ) : stats.recentSessions.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">No sessions yet. Chat with an agent to get started.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {stats.recentSessions.map((s) => (
+                  <div key={s.id} className="flex items-center gap-2 py-1.5 border-b border-border/50 last:border-0">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium truncate">{s.agentName}</span>
+                        <Badge variant={STATUS_VARIANT[s.status] || "secondary"} className="text-[9px] shrink-0">{s.status}</Badge>
+                      </div>
+                      <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
+                        <span>{CHANNEL_LABEL[s.channel] || s.channel}</span>
+                        <span>{s.totalTurns} turn{s.totalTurns !== 1 ? "s" : ""}</span>
+                        {s.totalToolCalls > 0 && <span>{s.totalToolCalls} tool{s.totalToolCalls !== 1 ? "s" : ""}</span>}
+                        <span>{formatNumber(s.tokens)} tokens</span>
+                        {s.costUsd > 0 && <span className="font-mono">{formatCost(s.costUsd)}</span>}
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground shrink-0">{formatRelativeTime(s.createdAt)}</span>
                   </div>
                 ))}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-5 w-full" />)}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
-    </>
+
+    </></RequirePermission>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, variant }: { icon: React.ComponentType<{ className?: string }>; label: string; value?: string | number; variant?: "success" | "error" | "default" }) {
+  const colorClass = variant === "success" ? "text-green-600" : variant === "error" ? "text-red-600" : "";
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 mb-1.5">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">{label}</span>
+        </div>
+        {value !== undefined ? (
+          <p className={`text-2xl font-semibold tracking-tight ${colorClass}`}>
+            {typeof value === "number" ? (
+              <AnimatedCounter value={value} />
+            ) : (
+              value
+            )}
+          </p>
+        ) : (
+          <Skeleton className="mt-1 h-8 w-16" />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function MiniStat({ label, value, icon: Icon }: { label: string; value?: number; icon: React.ComponentType<{ className?: string }> }) {
+  return (
+    <div className="flex items-center gap-3 rounded-lg border border-border px-3 py-2.5">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-secondary">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </div>
+      <div>
+        <p className="text-xs text-muted-foreground">{label}</p>
+        {value !== undefined ? (
+          <p className="text-sm font-semibold">
+            <AnimatedCounter value={value} />
+          </p>
+        ) : (
+          <Skeleton className="h-4 w-8" />
+        )}
+      </div>
+    </div>
   );
 }

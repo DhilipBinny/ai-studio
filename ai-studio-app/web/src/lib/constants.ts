@@ -1,0 +1,30 @@
+export const STATUS_VARIANT: Record<string, "info" | "success" | "error" | "warning" | "secondary"> = {
+  pending: "secondary",
+  running: "info",
+  waiting: "info",
+  waiting_approval: "warning",
+  completed: "success",
+  failed: "error",
+  cancelled: "warning",
+  timeout: "error",
+  draft: "warning",
+  active: "success",
+  disabled: "secondary",
+  archived: "error",
+  error: "error",
+  connected: "success",
+  disconnected: "error",
+  ready: "success",
+  processing: "warning",
+  uploaded: "secondary",
+  inactive: "warning",
+  testing: "secondary",
+};
+
+export const CHANNEL_LABEL: Record<string, string> = {
+  studio: "Studio",
+  api: "API",
+  embedded: "Embedded",
+  workflow: "Workflow",
+  connector: "Connector",
+};

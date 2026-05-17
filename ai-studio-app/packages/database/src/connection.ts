@@ -8,10 +8,13 @@ const globalForDb = globalThis as unknown as {
 };
 
 export function getConnectionString(): string {
-  return (
-    process.env.DATABASE_URL ||
-    "postgres://aistudio:aistudio_dev_2026@localhost:5480/aistudio"
-  );
+  if (!process.env.DATABASE_URL) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("DATABASE_URL is required in production");
+    }
+    return "postgres://aistudio:aistudio_dev_2026@localhost:5480/aistudio";
+  }
+  return process.env.DATABASE_URL;
 }
 
 export function getDb() {

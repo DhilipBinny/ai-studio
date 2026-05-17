@@ -74,7 +74,7 @@ export interface ChatResponse {
     outputTokens: number;
   };
   /** Media attachments from tool results. */
-  media?: import('./message.js').MediaAttachment[];
+  media?: import('./message').MediaAttachment[];
 }
 
 /**

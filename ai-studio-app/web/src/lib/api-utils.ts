@@ -2,9 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken } from "@ais-app/auth";
 import { hasPermission } from "@ais-app/auth";
 import { getDb } from "@ais-app/database";
-import { users, profiles } from "@ais-app/database";
+import { users, profiles, revokedTokens } from "@ais-app/database";
 import { eq } from "drizzle-orm";
 import type { Module, PermissionLevel, AccessRights, AuthContext } from "@ais-app/types";
+
+/** Escape LIKE/ILIKE wildcards so user input is treated as literal text. */
+export function escapeLike(input: string): string {
+  return input.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+}
 
 export function errorResponse(
   error: string,
@@ -13,6 +18,14 @@ export function errorResponse(
   details?: Record<string, unknown>
 ) {
   return NextResponse.json({ error, code, details }, { status });
+}
+
+export async function parseJsonBody(request: Request): Promise<Record<string, unknown> | null> {
+  try {
+    return await request.json();
+  } catch {
+    return null;
+  }
 }
 
 export async function getAuthContext(
@@ -24,6 +37,15 @@ export async function getAuthContext(
   try {
     const payload = await verifyAccessToken(token);
     const db = getDb();
+
+    if (payload.jti) {
+      const [revoked] = await db
+        .select({ id: revokedTokens.id })
+        .from(revokedTokens)
+        .where(eq(revokedTokens.jti, payload.jti))
+        .limit(1);
+      if (revoked) return null;
+    }
 
     const [user] = await db
       .select({
@@ -39,11 +61,12 @@ export async function getAuthContext(
       .limit(1);
 
     if (!user || !user.isActive || user.isLocked) return null;
+    if (user.tenantId !== (payload.tid as string)) return null;
 
     let accessRights: AccessRights = {
       DASHBOARD: 0, AGENTS: 0, TOOLS: 0, KNOWLEDGE: 0, WORKFLOWS: 0,
-      CONNECTORS: 0, RUNS: 0, PROVIDERS: 0, USERS: 0, PROFILES: 0,
-      AUDIT: 0, SETTINGS: 0,
+      CONNECTORS: 0, RUNS: 0, SCHEDULED: 0, PROVIDERS: 0, WORKSPACE: 0, USERS: 0, PROFILES: 0,
+      AUDIT: 0, SETTINGS: 0, DOCS: 0,
     };
 
     if (user.profileId) {
@@ -86,7 +109,12 @@ export function withAuth(handler: RouteHandler) {
       return errorResponse("Authentication required", "UNAUTHENTICATED", 401);
     }
     const params = await context.params;
-    return handler(request, auth, params);
+    try {
+      return await handler(request, auth, params);
+    } catch (err) {
+      console.error("Route handler error:", err);
+      return errorResponse("Internal server error", "INTERNAL_ERROR", 500);
+    }
   };
 }
 

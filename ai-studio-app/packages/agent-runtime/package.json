@@ -1,0 +1,34 @@
+{
+  "name": "@ais-app/agent-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@ais-app/auth": "workspace:*",
+    "@ais-app/database": "workspace:*",
+    "@ais-app/types": "workspace:*",
+    "@ais/agent-core": "workspace:*",
+    "@ais/mcp-client": "workspace:*",
+    "@ais/memory-engine": "workspace:*",
+    "@ais/provider-bridge": "workspace:*",
+    "@ais/rag-engine": "workspace:*",
+    "@ais/security": "workspace:*",
+    "@ais/tool-platform": "workspace:*",
+    "@ais/tools-common": "workspace:*",
+    "@ais/types": "workspace:*",
+    "@anthropic-ai/sdk": "^0.95.2",
+    "@huggingface/transformers": "^3.4.0",
+    "@qdrant/js-client-rest": "^1.18.0",
+    "drizzle-orm": "^0.44.2",
+    "openai": "^6.37.0"
+  },
+  "devDependencies": {
+    "vitest": "^3.2.4"
+  }
+}

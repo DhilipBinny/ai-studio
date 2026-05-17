@@ -1,9 +1,9 @@
 import OpenAI from 'openai';
-import type { ProviderInterface, ProviderResponse, ChatArgs } from './types.js';
-import type { ProviderOptions } from './types.js';
+import type { ProviderInterface, ProviderResponse, ChatArgs } from './types';
+import type { ProviderOptions } from './types';
 import type { GatewayConfig, ToolCall, AgwLogger } from '@ais/types';
 import { noopLogger } from '@ais/types';
-import { createStreamingTimeout } from './streaming-timeout.js';
+import { createStreamingTimeout } from './streaming-timeout';
 
 export class OpenAIProvider implements ProviderInterface {
   readonly name: string;
@@ -88,6 +88,12 @@ export class OpenAIProvider implements ProviderInterface {
       messages: apiMessages,
       stream: true,
     };
+    if (args.maxTokens !== undefined) {
+      params.max_tokens = args.maxTokens;
+    }
+    if (args.temperature !== undefined) {
+      params.temperature = args.temperature;
+    }
     if (openaiTools.length > 0) {
       params.tools = openaiTools;
     }

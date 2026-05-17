@@ -6,8 +6,8 @@
  * receives a uniform `ProviderResponse`.
  */
 
-import type { Message } from './message.js';
-import type { ToolDefinition } from './tool.js';
+import type { Message } from './message';
+import type { ToolDefinition } from './tool';
 
 /**
  * Token usage information returned by a provider.
@@ -29,13 +29,13 @@ export interface ProviderResponse {
   /** The assistant's text reply, or `null` if the response is tool-only. */
   text: string | null;
   /** Tool calls the assistant wants to execute, or `null` if none. */
-  toolCalls: import('./message.js').ToolCall[] | null;
+  toolCalls: import('./message').ToolCall[] | null;
   /** Token usage for this request. */
   usage: TokenUsage;
   /** Accumulated thinking text from extended thinking, if any. */
   thinkingText?: string | null;
   /** Structured thinking blocks with signatures (Anthropic only). */
-  thinkingBlocks?: import('./message.js').ThinkingBlock[];
+  thinkingBlocks?: import('./message').ThinkingBlock[];
 }
 
 /**
@@ -89,6 +89,10 @@ export interface ChatArgs {
   _executeTool?: (name: string, args: Record<string, unknown>) => Promise<string>;
   /** Maximum tool rounds — passed to SDK provider for maxTurns. */
   _maxToolRounds?: number;
+  /** Maximum tokens to generate (overrides model default when set). */
+  maxTokens?: number;
+  /** Sampling temperature (0 = deterministic, higher = more creative). */
+  temperature?: number;
 }
 
 /**

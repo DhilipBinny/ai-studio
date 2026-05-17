@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BRAND } from "@/lib/branding";
+import { AuthBackground } from "../auth-background";
 
 type LoginState = "credentials" | "otp" | "loading";
 
@@ -76,11 +78,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 p-6 md:p-10">
-      <div className="w-full max-w-[420px] space-y-8">
+    <div className="relative flex min-h-svh flex-col items-center justify-center p-6 md:p-10">
+      <AuthBackground />
+
+      <div className="relative z-10 w-full max-w-[420px] space-y-8">
         <div className="flex flex-col items-center space-y-3 text-center">
-          <img src="/branding/echollogo.png" alt="Echol" className="h-14 w-auto" />
-          <h1 className="text-2xl font-semibold tracking-tight text-brand">Echol AI Studio</h1>
+          <img src={BRAND.logo} alt={BRAND.logoAlt} className="h-14 w-auto" />
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{BRAND.name}</h1>
           {state === "otp" && (
             <p className="text-sm text-muted-foreground">
               Enter the 6-digit code sent to your email
@@ -88,7 +92,7 @@ export default function LoginPage() {
           )}
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.1)]">
+        <div className="rounded-xl border border-border bg-card/90 backdrop-blur-sm p-8 shadow-[0_2px_8px_rgba(0,0,0,0.06),0_0_1px_rgba(0,0,0,0.1)]">
           {error && (
             <div className="mb-5 rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
               {error}
@@ -104,10 +108,10 @@ export default function LoginPage() {
                   type="text"
                   value={email}
                   onChange={(e) => { setEmail(e.target.value); setFieldErrors((p) => ({ ...p, email: undefined })); }}
-                  placeholder="you@echoltech.com"
+                  placeholder={BRAND.emailPlaceholder}
                   autoComplete="username"
                   autoFocus
-                  className={`h-11 px-4 text-sm focus-visible:ring-brand/30 ${fieldErrors.email ? "border-destructive focus-visible:ring-destructive/30" : "border-slate-300"}`}
+                  className={`h-11 px-4 text-sm focus-visible:ring-brand/30 ${fieldErrors.email ? "border-destructive focus-visible:ring-destructive/30" : "border-input"}`}
                 />
                 {fieldErrors.email && (
                   <p className="text-xs text-destructive">{fieldErrors.email}</p>
@@ -121,7 +125,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => { setPassword(e.target.value); setFieldErrors((p) => ({ ...p, password: undefined })); }}
                   autoComplete="current-password"
-                  className={`h-11 px-4 text-sm focus-visible:ring-brand/30 ${fieldErrors.password ? "border-destructive focus-visible:ring-destructive/30" : "border-slate-300"}`}
+                  className={`h-11 px-4 text-sm focus-visible:ring-brand/30 ${fieldErrors.password ? "border-destructive focus-visible:ring-destructive/30" : "border-input"}`}
                 />
                 {fieldErrors.password && (
                   <p className="text-xs text-destructive">{fieldErrors.password}</p>
@@ -137,9 +141,9 @@ export default function LoginPage() {
                 {state === "loading" ? "Signing in..." : "Sign in"}
               </Button>
               <div className="text-center">
-                <button type="button" className="text-xs text-muted-foreground hover:text-brand transition-colors">
+                <a href="/forgot-password" className="text-xs text-muted-foreground hover:text-brand transition-colors">
                   Forgot password?
-                </button>
+                </a>
               </div>
             </form>
           ) : (
@@ -155,7 +159,7 @@ export default function LoginPage() {
                   value={otp}
                   onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                   required
-                  className="h-11 border-slate-300 text-center text-2xl tracking-[0.5em] font-mono focus-visible:ring-brand/30"
+                  className="h-11 border-input text-center text-2xl tracking-[0.5em] font-mono focus-visible:ring-brand/30"
                   placeholder="000000"
                   autoFocus
                 />
@@ -176,7 +180,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground/50">
-          &copy; {new Date().getFullYear()} Echol Technology. All rights reserved.
+          {BRAND.copyright(new Date().getFullYear())}
         </p>
       </div>
     </div>

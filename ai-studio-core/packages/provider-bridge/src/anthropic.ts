@@ -1,10 +1,15 @@
 import Anthropic from '@anthropic-ai/sdk';
-import type { ProviderInterface, ProviderResponse, ChatArgs } from './types.js';
-import type { ProviderOptions } from './types.js';
+import type { ProviderInterface, ProviderResponse, ChatArgs } from './types';
+import type { ProviderOptions } from './types';
 import type { GatewayConfig, ToolCall, ThinkingBlock, StructuredSystemPrompt, AgwLogger } from '@ais/types';
 import { noopLogger } from '@ais/types';
-import { getModelCapabilities } from './models.js';
-import { createStreamingTimeout } from './streaming-timeout.js';
+import { getModelCapabilities } from './models';
+import { createStreamingTimeout } from './streaming-timeout';
+
+export interface AnthropicProviderConfig {
+  defaultHeaders?: Record<string, string>;
+  systemPromptPrefix?: string;
+}
 
 export class AnthropicProvider implements ProviderInterface {
   readonly name = 'anthropic';
@@ -12,16 +17,29 @@ export class AnthropicProvider implements ProviderInterface {
   private defaultModel: string;
   readonly authType: string;
   private config?: GatewayConfig;
+  private providerConfig?: AnthropicProviderConfig;
   private log: AgwLogger;
 
-  constructor(options: ProviderOptions, config?: GatewayConfig, logger?: AgwLogger) {
-    const { apiKey, baseUrl, defaultModel } = options;
-    this.config = config;
+  constructor(options: ProviderOptions, config?: GatewayConfig | AnthropicProviderConfig, logger?: AgwLogger) {
+    const { apiKey, authToken, baseUrl, defaultModel } = options;
     this.log = logger ?? noopLogger;
+
+    if (config && 'gateway' in (config as Record<string, unknown>)) {
+      this.config = config as GatewayConfig;
+    } else if (config) {
+      this.providerConfig = config as AnthropicProviderConfig;
+    }
 
     const clientOpts: Record<string, unknown> = {};
 
-    if (apiKey) {
+    if (authToken) {
+      clientOpts.apiKey = '';
+      clientOpts.authToken = authToken;
+      this.authType = 'oauth';
+      if (this.providerConfig?.defaultHeaders) {
+        clientOpts.defaultHeaders = this.providerConfig.defaultHeaders;
+      }
+    } else if (apiKey) {
       clientOpts.apiKey = apiKey;
       this.authType = 'api-key';
     } else {
@@ -106,8 +124,14 @@ export class AnthropicProvider implements ProviderInterface {
       : null;
 
     let systemContent: string | Anthropic.TextBlockParam[];
+    const prefixBlocks: Anthropic.TextBlockParam[] = [];
+    if (this.providerConfig?.systemPromptPrefix) {
+      prefixBlocks.push({ type: 'text' as const, text: this.providerConfig.systemPromptPrefix });
+    }
+
     if (structured) {
       const blocks: Anthropic.TextBlockParam[] = [
+        ...prefixBlocks,
         { type: 'text' as const, text: structured.cached, cache_control: { type: 'ephemeral' as const } },
       ];
       if (structured.dynamic) {
@@ -116,18 +140,24 @@ export class AnthropicProvider implements ProviderInterface {
       systemContent = blocks;
     } else if (systemPrompt) {
       systemContent = [
+        ...prefixBlocks,
         { type: 'text' as const, text: systemPrompt as string, cache_control: { type: 'ephemeral' as const } },
       ];
+    } else if (prefixBlocks.length > 0) {
+      systemContent = prefixBlocks;
     } else {
       systemContent = '';
     }
 
     const params: Anthropic.MessageCreateParams = {
       model: modelId,
-      max_tokens: caps.maxOutputTokens,
+      max_tokens: args.maxTokens ?? caps.maxOutputTokens,
       system: systemContent,
       messages: apiMessages,
     };
+    if (args.temperature !== undefined) {
+      params.temperature = args.temperature;
+    }
     if (anthropicTools.length > 0) {
       params.tools = anthropicTools;
     }
@@ -199,6 +229,15 @@ export class AnthropicProvider implements ProviderInterface {
         } else if (event.type === 'message_delta') {
           if (event.usage) {
             outputTokens = event.usage.output_tokens || 0;
+          }
+          if ((event as any).delta?.stop_reason === 'max_tokens') {
+            if (toolCalls.length > 0) {
+              const lastTc = toolCalls[toolCalls.length - 1];
+              try { JSON.parse(lastTc._rawArgs || '{}'); } catch {
+                toolCalls.pop();
+                text = (text || '') + '\n[Output truncated — max_tokens reached. Retry with shorter content or write in parts.]';
+              }
+            }
           }
         } else if (event.type === 'message_start') {
           if (event.message?.usage) {

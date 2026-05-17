@@ -1,7 +1,9 @@
 "use client";
+import { RequirePermission } from "@/components/require-permission";
+import { DEFAULT_PAGE_SIZE } from "@/lib/client-config";
 
 import { useState, useEffect, useCallback } from "react";
-import { Play } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/select";
@@ -10,65 +12,106 @@ import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Pagination } from "@/components/pagination";
 import { TableSkeleton } from "@/components/table-skeleton";
+import type { Session } from "@ais-app/types";
+import { SessionDetailView } from "./components/session-detail";
+import { formatCost, formatDuration, formatRelativeTime } from "@/lib/utils";
+import { STATUS_VARIANT, CHANNEL_LABEL } from "@/lib/constants";
 
-interface Run { id: string; agentName: string; status: string; triggerType: string; totalInputTokens: number; totalOutputTokens: number; totalCostUsd: string; startedAt: string | null; createdAt: string; }
-
-const STATUS_VARIANT: Record<string, "info" | "success" | "error" | "warning" | "secondary"> = {
-  pending: "secondary", running: "info", completed: "success", failed: "error", cancelled: "warning", timeout: "error",
-};
-
-export default function RunsPage() {
-  const [runs, setRuns] = useState<Run[]>([]);
+export default function SessionsPage() {
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
+  const [agentFilter, setAgentFilter] = useState("");
+  const [agents, setAgents] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
-  const fetchRuns = useCallback(async () => {
+  const fetchAgents = useCallback(async () => {
+    const res = await fetch("/api/agents?pageSize=100");
+    if (res.ok) { const d = await res.json(); setAgents(d.data.map((a: Record<string, string>) => ({ id: a.id, name: a.name }))); }
+  }, []);
+
+  const fetchSessions = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), pageSize: "20" });
+    const params = new URLSearchParams({ page: String(page), pageSize: String(DEFAULT_PAGE_SIZE) });
     if (statusFilter) params.set("status", statusFilter);
+    if (agentFilter) params.set("agentId", agentFilter);
     const res = await fetch(`/api/runs?${params}`);
-    if (res.ok) { const d = await res.json(); setRuns(d.data); setTotal(d.total); setTotalPages(d.totalPages); }
+    if (res.ok) { const d = await res.json(); setSessions(d.data); setTotal(d.total); setTotalPages(d.totalPages); }
     setLoading(false);
-  }, [page, statusFilter]);
+  }, [page, statusFilter, agentFilter]);
 
-  useEffect(() => { fetchRuns(); }, [fetchRuns]);
+  useEffect(() => { fetchAgents(); }, [fetchAgents]);
+  useEffect(() => { fetchSessions(); }, [fetchSessions]);
+
+  if (selectedSessionId) {
+    return (
+      <RequirePermission module="RUNS">
+        <SessionDetailView sessionId={selectedSessionId} onBack={() => setSelectedSessionId(null)} />
+      </RequirePermission>
+    );
+  }
 
   return (
-    <>
-      <PageHeader title="Runs" description="View agent execution history and results." />
+    <RequirePermission module="RUNS"><>
+      <PageHeader title="Sessions" description="Agent conversation sessions, tool calls, and usage analytics." />
 
-      <div className="flex items-center gap-3">
-        <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="w-40">
+      <div className="flex items-center gap-3 flex-wrap">
+        <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }} className="w-36">
           <option value="">All statuses</option>
-          <option value="running">Running</option><option value="completed">Completed</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option>
+          <option value="running">Running</option>
+          <option value="waiting">Waiting</option>
+          <option value="completed">Completed</option>
+          <option value="failed">Failed</option>
+          <option value="cancelled">Cancelled</option>
         </Select>
+        <Select value={agentFilter} onChange={(e) => { setAgentFilter(e.target.value); setPage(1); }} className="w-48">
+          <option value="">All agents</option>
+          {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </Select>
+        {(statusFilter || agentFilter) && (
+          <button onClick={() => { setStatusFilter(""); setAgentFilter(""); setPage(1); }} className="text-xs text-muted-foreground hover:text-foreground">
+            Clear filters
+          </button>
+        )}
+        <span className="text-xs text-muted-foreground ml-auto">{total} session{total !== 1 ? "s" : ""}</span>
       </div>
 
-      {!loading && runs.length === 0 ? (
-        <EmptyState icon={Play} title="No agent runs yet" description="Run an agent to see execution history here." />
+      {!loading && sessions.length === 0 ? (
+        <EmptyState icon={MessageSquare} title="No sessions found" description={statusFilter || agentFilter ? "Try adjusting your filters." : "Chat with an agent or call the API to create sessions."} />
       ) : (
         <Card>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Agent</TableHead>
+                <TableHead>Channel</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Turns</TableHead>
+                <TableHead>Tool Calls</TableHead>
                 <TableHead>Tokens</TableHead>
                 <TableHead>Cost</TableHead>
+                <TableHead>Duration</TableHead>
                 <TableHead>Started</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {loading ? <TableSkeleton columns={5} /> : runs.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="font-medium">{r.agentName}</TableCell>
-                  <TableCell><Badge variant={STATUS_VARIANT[r.status] || "secondary"}>{r.status}</Badge></TableCell>
-                  <TableCell className="text-muted-foreground">{(r.totalInputTokens + r.totalOutputTokens).toLocaleString()}</TableCell>
-                  <TableCell className="text-muted-foreground">${Number(r.totalCostUsd).toFixed(4)}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.startedAt ? new Date(r.startedAt).toLocaleString() : "—"}</TableCell>
+              {loading ? <TableSkeleton columns={9} /> : sessions.map((s) => (
+                <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setSelectedSessionId(s.id)}>
+                  <TableCell>
+                    <div className="font-medium">{s.agentName}</div>
+                    {s.modelUsed && <div className="text-xs text-muted-foreground">{s.modelUsed}</div>}
+                  </TableCell>
+                  <TableCell><Badge variant="outline">{CHANNEL_LABEL[s.channel] || s.channel}</Badge></TableCell>
+                  <TableCell><Badge variant={STATUS_VARIANT[s.status] || "secondary"}>{s.status}</Badge></TableCell>
+                  <TableCell className="text-muted-foreground">{s.totalTurns}</TableCell>
+                  <TableCell className="text-muted-foreground">{s.totalToolCalls || 0}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs font-mono">{(s.totalInputTokens + s.totalOutputTokens).toLocaleString()}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs font-mono">{formatCost(parseFloat(s.totalCostUsd))}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">{formatDuration(s.startedAt, s.completedAt)}</TableCell>
+                  <TableCell className="text-muted-foreground text-xs">{formatRelativeTime(s.startedAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -76,7 +119,7 @@ export default function RunsPage() {
         </Card>
       )}
 
-      <Pagination page={page} pageSize={20} total={total} totalPages={totalPages} onPageChange={setPage} />
-    </>
+      <Pagination page={page} pageSize={DEFAULT_PAGE_SIZE} total={total} totalPages={totalPages} onPageChange={setPage} />
+    </></RequirePermission>
   );
 }
