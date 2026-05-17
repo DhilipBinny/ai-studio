@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTextStream } from "@/hooks/use-text-stream";
 import { ChatAssistantFab } from "./chat-assistant-fab";
 import { ChatAssistantPanel } from "./chat-assistant-panel";
 import type { ChatMessage } from "./chat-assistant-messages";
@@ -48,6 +49,7 @@ export function ChatAssistant() {
   const sendingRef = useRef(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastMessageRef = useRef<string>("");
+  const { streamingText, reset: resetStream } = useTextStream(sessionId, sending);
 
   useEffect(() => {
     async function loadData() {
@@ -280,8 +282,9 @@ export function ChatAssistant() {
 
   const handleNewSession = useCallback(() => {
     setSessionId(null); setMessages([]); setWaitingApproval(false); setPendingToolCalls([]); stopPolling();
+    resetStream();
     sessionStorage.removeItem(STORAGE_KEY);
-  }, []);
+  }, [resetStream]);
 
   if (loadingAgents || agents.length === 0) return null;
 
@@ -309,6 +312,7 @@ export function ChatAssistant() {
           onClose={() => setOpen(false)}
           onSend={handleSend}
           onNewSession={handleNewSession}
+          streamingText={streamingText}
         />
       )}
     </>

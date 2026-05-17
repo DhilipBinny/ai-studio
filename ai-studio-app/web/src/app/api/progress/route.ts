@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getAuthContext, errorResponse } from "@/lib/api-utils";
 import { progressBus, BACKPRESSURE_LIMIT } from "@ais-app/agent-runtime/src/progress-bus";
+import { textDeltaBus } from "@ais-app/agent-runtime/src/text-delta-bus";
 import type { ProgressSpan } from "@ais-app/agent-runtime/src/progress-types";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ export async function GET(request: NextRequest) {
 
   let closed = false;
   let unsubscribe: (() => void) | null = null;
+  let unsubscribeDelta: (() => void) | null = null;
   let keepaliveTimer: ReturnType<typeof setInterval> | null = null;
   let buffered = 0;
 
@@ -47,6 +49,7 @@ export async function GET(request: NextRequest) {
         if (closed) return;
         closed = true;
         if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+        if (unsubscribeDelta) { unsubscribeDelta(); unsubscribeDelta = null; }
         if (keepaliveTimer) { clearInterval(keepaliveTimer); keepaliveTimer = null; }
         try { controller.close(); } catch { /* already closed */ }
       }
@@ -77,6 +80,11 @@ export async function GET(request: NextRequest) {
       };
 
       unsubscribe = progressBus.subscribe(traceId, auth.tenantId, onSpan);
+
+      unsubscribeDelta = textDeltaBus.subscribe(traceId, auth.tenantId, (delta: string) => {
+        if (closed) return;
+        write(`event: text_delta\ndata: ${JSON.stringify({ delta })}\n\n`);
+      });
 
       const history = progressBus.getHistory(traceId, afterSeq);
       if (history.length > 0) {
@@ -109,6 +117,7 @@ export async function GET(request: NextRequest) {
     cancel() {
       closed = true;
       if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+      if (unsubscribeDelta) { unsubscribeDelta(); unsubscribeDelta = null; }
       if (keepaliveTimer) { clearInterval(keepaliveTimer); keepaliveTimer = null; }
     },
   });

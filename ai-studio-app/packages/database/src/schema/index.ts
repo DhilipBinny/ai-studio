@@ -22,3 +22,4 @@ export * from "./api-keys";
 export * from "./progress-spans";
 export * from "./revoked-tokens";
 export * from "./projects";
+export * from "./agent-memories";

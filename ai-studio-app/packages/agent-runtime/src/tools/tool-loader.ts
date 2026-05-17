@@ -1,5 +1,5 @@
 import { getDb } from "@ais-app/database";
-import { agentTools, tools, agentKnowledgeBases } from "@ais-app/database";
+import { agentTools, tools, agentKnowledgeBases, agents } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
 import { LoopDetector } from "@ais/tool-platform";
 import { loadMCPTools } from "../mcp-executor";
@@ -10,7 +10,7 @@ import {
 } from "@ais/tools-common";
 import type { ToolRegistration } from "@ais/tool-platform";
 import type { ToolDefinition, LoadedTools } from "./types";
-import { KNOWLEDGE_SEARCH_DEFINITION, KNOWLEDGE_REFINE_SEARCH_DEFINITION, INVOKE_AGENT_DEFINITION, LIST_AGENTS_DEFINITION } from "./context-executors";
+import { KNOWLEDGE_SEARCH_DEFINITION, KNOWLEDGE_REFINE_SEARCH_DEFINITION, INVOKE_AGENT_DEFINITION, LIST_AGENTS_DEFINITION, REMEMBER_DEFINITION, RECALL_DEFINITION, FORGET_DEFINITION, CREATE_AGENT_DEFINITION, CREATE_WORKFLOW_DEFINITION, TRIGGER_WORKFLOW_DEFINITION, GET_CONFIG_DEFINITION, SET_CONFIG_DEFINITION } from "./context-executors";
 import { BUILTIN_TOOL_RISK, BUILTIN_TOOL_CATEGORY } from "./risk-map";
 
 export const builtinToolMap = new Map<string, ToolRegistration>();
@@ -149,6 +149,20 @@ export async function loadToolDefinitions(
   if (!isSubAgent) {
     defs.push(LIST_AGENTS_DEFINITION);
     defs.push(INVOKE_AGENT_DEFINITION);
+  }
+
+  defs.push(REMEMBER_DEFINITION);
+  defs.push(RECALL_DEFINITION);
+  defs.push(FORGET_DEFINITION);
+
+  // Meta-tools: only for trusted agents
+  const [agentTrust] = await db.select({ trustLevel: agents.trustLevel }).from(agents).where(and(eq(agents.id, agentId), eq(agents.tenantId, tenantId))).limit(1);
+  if (agentTrust?.trustLevel === "trusted") {
+    defs.push(CREATE_AGENT_DEFINITION);
+    defs.push(CREATE_WORKFLOW_DEFINITION);
+    defs.push(TRIGGER_WORKFLOW_DEFINITION);
+    defs.push(GET_CONFIG_DEFINITION);
+    defs.push(SET_CONFIG_DEFINITION);
   }
 
   const { tools: mcpTools, connectorMap } = await loadMCPTools(agentId, tenantId);

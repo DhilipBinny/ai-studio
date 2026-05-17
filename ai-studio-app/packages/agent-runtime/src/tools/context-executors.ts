@@ -1,6 +1,6 @@
 import type { ContextAwareExecutorFn, ToolDefinition, SearchSessionState } from "./types";
-import { getDb, agentTasks, agents } from "@ais-app/database";
-import { eq, and } from "drizzle-orm";
+import { getDb, agentTasks, agents, agentMemories, workflows, cronJobs, systemConfig } from "@ais-app/database";
+import { eq, and, sql } from "drizzle-orm";
 
 export const CONTEXT_EXECUTORS: Record<string, ContextAwareExecutorFn> = {
   list_agents: async (_args, ctx) => {
@@ -208,6 +208,152 @@ export const CONTEXT_EXECUTORS: Record<string, ContextAwareExecutorFn> = {
       `[${i + 1}] (score: ${r.score.toFixed(3)}) [${r.knowledgeBaseName} / ${r.documentName}]\n${r.content}`
     ).join("\n\n---\n\n");
   },
+
+  remember: async (args, ctx) => {
+    const db = getDb();
+    const key = (args.key as string || "").trim();
+    const content = (args.content as string || "").trim();
+    const category = (args.category as string) || "general";
+    if (!key || !content) return "Error: key and content are required.";
+    if (content.length > 50_000) return "Error: content too large (max 50KB).";
+    if (key.length > 200) return "Error: key too long (max 200 chars).";
+
+    await db.insert(agentMemories).values({
+      tenantId: ctx.tenantId,
+      agentId: ctx.agentId,
+      key,
+      content,
+      category,
+    }).onConflictDoUpdate({
+      target: [agentMemories.tenantId, agentMemories.agentId, agentMemories.key],
+      set: { content, category, updatedAt: new Date() },
+    });
+
+    return `Remembered "${key}" (${category}).`;
+  },
+
+  recall: async (args, ctx) => {
+    const db = getDb();
+    const query = (args.query as string || "").trim();
+    const category = args.category as string | undefined;
+    const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 20);
+    if (!query) return "Error: query is required.";
+
+    let rows;
+    if (category) {
+      rows = await db.select({ key: agentMemories.key, content: agentMemories.content, category: agentMemories.category, updatedAt: agentMemories.updatedAt })
+        .from(agentMemories)
+        .where(and(eq(agentMemories.agentId, ctx.agentId), eq(agentMemories.tenantId, ctx.tenantId), eq(agentMemories.category, category)))
+        .orderBy(sql`${agentMemories.updatedAt} DESC`)
+        .limit(limit);
+    } else {
+      rows = await db.select({ key: agentMemories.key, content: agentMemories.content, category: agentMemories.category, updatedAt: agentMemories.updatedAt })
+        .from(agentMemories)
+        .where(and(eq(agentMemories.agentId, ctx.agentId), eq(agentMemories.tenantId, ctx.tenantId)))
+        .orderBy(sql`${agentMemories.updatedAt} DESC`)
+        .limit(limit);
+    }
+
+    if (rows.length === 0) return `No memories found${category ? ` in category "${category}"` : ""}.`;
+
+    return rows.map((r, i) => `[${i + 1}] (${r.category}) ${r.key}: ${r.content}`).join("\n");
+  },
+
+  forget: async (args, ctx) => {
+    const db = getDb();
+    const key = (args.key as string || "").trim();
+    if (!key) return "Error: key is required.";
+
+    const result = await db.delete(agentMemories)
+      .where(and(eq(agentMemories.agentId, ctx.agentId), eq(agentMemories.tenantId, ctx.tenantId), eq(agentMemories.key, key)));
+
+    return `Forgot "${key}".`;
+  },
+
+  create_agent: async (args, ctx) => {
+    const db = getDb();
+    const name = (args.name as string || "").trim();
+    const slug = (args.slug as string || "").trim();
+    if (!name || !slug) return "Error: name and slug are required.";
+    if (!/^[a-z][a-z0-9-]*$/.test(slug)) return "Error: slug must be lowercase with hyphens.";
+
+    try {
+      const [row] = await db.insert(agents).values({
+        tenantId: ctx.tenantId,
+        name,
+        slug,
+        description: (args.description as string) || "",
+        systemPrompt: (args.system_prompt as string) || "",
+        status: "active",
+        createdBy: null,
+      }).returning({ id: agents.id, name: agents.name, slug: agents.slug });
+      return `Created agent "${row.name}" (slug: ${row.slug}, id: ${row.id})`;
+    } catch (e) {
+      return `Error creating agent: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  },
+
+  create_workflow: async (args, ctx) => {
+    const db = getDb();
+    const name = (args.name as string || "").trim();
+    if (!name) return "Error: name is required.";
+
+    try {
+      const [row] = await db.insert(workflows).values({
+        tenantId: ctx.tenantId,
+        name,
+        description: (args.description as string) || "",
+        createdBy: null,
+      }).returning({ id: workflows.id, name: workflows.name });
+      return `Created workflow "${row.name}" (id: ${row.id}). Add nodes and edges via the workflow canvas.`;
+    } catch (e) {
+      return `Error creating workflow: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  },
+
+  trigger_workflow: async (args, ctx) => {
+    const db = getDb();
+    const workflowId = (args.workflow_id as string || "").trim();
+    if (!workflowId) return "Error: workflow_id is required.";
+    const [wf] = await db.select({ id: workflows.id }).from(workflows)
+      .where(and(eq(workflows.id, workflowId), eq(workflows.tenantId, ctx.tenantId))).limit(1);
+    if (!wf) return "Error: workflow not found or does not belong to your tenant.";
+    try {
+      const { triggerWorkflow } = await import("../workflow-engine");
+      const result = await triggerWorkflow(workflowId, ctx.tenantId, null, (args.input as Record<string, unknown>) || {});
+      return `Workflow triggered. Run ID: ${result.runId}, status: ${result.status}`;
+    } catch (e) {
+      return `Error triggering workflow: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  },
+
+  get_config: async (_args, ctx) => {
+    const db = getDb();
+    const rows = await db.select({ key: systemConfig.key, value: systemConfig.value })
+      .from(systemConfig)
+      .where(eq(systemConfig.tenantId, ctx.tenantId));
+    if (rows.length === 0) return "No configuration entries found.";
+    return rows.map((r) => `${r.key}: ${JSON.stringify(r.value)}`).join("\n");
+  },
+
+  set_config: async (args, ctx) => {
+    const db = getDb();
+    const key = (args.key as string || "").trim();
+    const value = args.value;
+    if (!key) return "Error: key is required.";
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(key)) return "Error: key must be alphanumeric with underscores.";
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return "Error: value must be a JSON object.";
+
+    await db.insert(systemConfig).values({
+      tenantId: ctx.tenantId,
+      key,
+      value: value as Record<string, unknown>,
+    }).onConflictDoUpdate({
+      target: [systemConfig.tenantId, systemConfig.key],
+      set: { value: value as Record<string, unknown> },
+    });
+    return `Config "${key}" updated.`;
+  },
 };
 
 export const KNOWLEDGE_SEARCH_DEFINITION: ToolDefinition = {
@@ -267,5 +413,105 @@ export const INVOKE_AGENT_DEFINITION: ToolDefinition = {
       timeout_ms: { type: "number", description: "Max wait in ms (default: 600000 = 10 min)" },
     },
     required: ["message"],
+  },
+};
+
+export const REMEMBER_DEFINITION: ToolDefinition = {
+  name: "remember",
+  description: "Save a fact, preference, or decision to persistent memory. Survives across sessions. Use for things worth remembering long-term.",
+  input_schema: {
+    type: "object",
+    properties: {
+      key: { type: "string", description: "Short unique identifier (e.g. 'user-db-preference', 'project-stack')" },
+      content: { type: "string", description: "The information to remember" },
+      category: { type: "string", description: "Category: user, project, preference, fact (default: general)" },
+    },
+    required: ["key", "content"],
+  },
+};
+
+export const RECALL_DEFINITION: ToolDefinition = {
+  name: "recall",
+  description: "Search persistent memory for relevant information. Returns memories matching the query.",
+  input_schema: {
+    type: "object",
+    properties: {
+      query: { type: "string", description: "What to search for in memory" },
+      category: { type: "string", description: "Filter by category (optional)" },
+      limit: { type: "number", description: "Max results (default 5, max 20)" },
+    },
+    required: ["query"],
+  },
+};
+
+export const FORGET_DEFINITION: ToolDefinition = {
+  name: "forget",
+  description: "Delete a specific memory by key.",
+  input_schema: {
+    type: "object",
+    properties: {
+      key: { type: "string", description: "The memory key to delete" },
+    },
+    required: ["key"],
+  },
+};
+
+export const CREATE_AGENT_DEFINITION: ToolDefinition = {
+  name: "create_agent",
+  description: "Create a new agent on the platform. Returns the agent ID and slug.",
+  input_schema: {
+    type: "object",
+    properties: {
+      name: { type: "string", description: "Agent name" },
+      slug: { type: "string", description: "URL-safe slug (lowercase, hyphens)" },
+      description: { type: "string", description: "What this agent does" },
+      system_prompt: { type: "string", description: "System prompt for the agent" },
+    },
+    required: ["name", "slug"],
+  },
+};
+
+export const CREATE_WORKFLOW_DEFINITION: ToolDefinition = {
+  name: "create_workflow",
+  description: "Create a new workflow on the platform. Returns the workflow ID.",
+  input_schema: {
+    type: "object",
+    properties: {
+      name: { type: "string", description: "Workflow name" },
+      description: { type: "string", description: "What this workflow does" },
+    },
+    required: ["name"],
+  },
+};
+
+export const TRIGGER_WORKFLOW_DEFINITION: ToolDefinition = {
+  name: "trigger_workflow",
+  description: "Trigger an existing workflow to run. Returns the run ID.",
+  input_schema: {
+    type: "object",
+    properties: {
+      workflow_id: { type: "string", description: "Workflow UUID to trigger" },
+      input: { type: "object", description: "Input data for the workflow" },
+    },
+    required: ["workflow_id"],
+  },
+};
+
+export const GET_CONFIG_DEFINITION: ToolDefinition = {
+  name: "get_config",
+  description: "Read platform configuration settings.",
+  input_schema: { type: "object", properties: {}, required: [] },
+};
+
+export const SET_CONFIG_DEFINITION: ToolDefinition = {
+  name: "set_config",
+  description: "Update a platform configuration setting.",
+  input_schema: {
+    type: "object",
+    properties: {
+      key: { type: "string", description: "Config key" },
+      value: { type: "object", description: "Config value (JSON)" },
+    },
+    required: ["key", "value"],
   },
 };

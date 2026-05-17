@@ -37,14 +37,15 @@ function CopyMessageButton({ text }: { text: string }) {
 interface ChatAssistantMessagesProps {
   messages: ChatMessage[];
   sending: boolean;
+  streamingText?: string;
 }
 
-export function ChatAssistantMessages({ messages, sending }: ChatAssistantMessagesProps) {
+export function ChatAssistantMessages({ messages, sending, streamingText }: ChatAssistantMessagesProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length, sending]);
+  }, [messages.length, sending, streamingText]);
 
   if (messages.length === 0 && !sending) {
     return (
@@ -80,7 +81,15 @@ export function ChatAssistantMessages({ messages, sending }: ChatAssistantMessag
           )}
         </div>
       ))}
-      {sending && (
+      {sending && streamingText && (
+        <div className="flex justify-start">
+          <div className="max-w-[88%] rounded-lg bg-muted px-3 py-2 text-sm">
+            <Markdown content={streamingText} className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0" />
+            <span className="inline-block w-1.5 h-4 bg-foreground/70 animate-pulse ml-0.5 align-text-bottom" />
+          </div>
+        </div>
+      )}
+      {sending && !streamingText && (
         <div className="flex justify-start">
           <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

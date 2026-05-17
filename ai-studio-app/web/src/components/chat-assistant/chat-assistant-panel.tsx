@@ -30,13 +30,14 @@ interface ChatAssistantPanelProps {
   onClose: () => void;
   onSend: (message: string) => void;
   onNewSession: () => void;
+  streamingText?: string;
 }
 
 export function ChatAssistantPanel({
   isMobile, agents, projects, selectedAgentId, selectedProjectId,
   onAgentChange, onProjectChange, autoApprove, onAutoApproveChange,
   messages, sending, sessionId, waitingApproval, pendingToolCalls, approving,
-  onApprovalDecision, onClose, onSend, onNewSession,
+  onApprovalDecision, onClose, onSend, onNewSession, streamingText,
 }: ChatAssistantPanelProps) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -102,7 +103,7 @@ export function ChatAssistantPanel({
       </div>
 
       {/* Messages */}
-      <ChatAssistantMessages messages={messages} sending={sending} />
+      <ChatAssistantMessages messages={messages} sending={sending} streamingText={streamingText} />
 
       {/* Approval card */}
       {waitingApproval && !autoApprove && (

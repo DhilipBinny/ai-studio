@@ -8,6 +8,7 @@ import { checkAndCompact } from "./compaction";
 import { sanitizeInput, detectPromptInjection } from "@ais/security";
 import { getModelPricing, calculateCost } from "./model-pricing";
 import { progressBus, truncatePreview } from "./progress-bus";
+import { textDeltaBus } from "./text-delta-bus";
 import type { SessionInput, SessionResult, AgentConfig, ProviderConfig } from "./types";
 import type { ToolCall, ToolContext } from "./tool-executor";
 
@@ -325,6 +326,7 @@ async function executeToolLoop(
       temperature: parseFloat(agentConfig.temperature),
       maxTokens: agentConfig.maxTokensPerTurn,
       tools: toolDefs.length > 0 ? toolDefs : undefined,
+      onDelta: (delta) => textDeltaBus.emit(traceId, input.tenantId, delta),
     });
 
     totalInputTokens += response.inputTokens;
