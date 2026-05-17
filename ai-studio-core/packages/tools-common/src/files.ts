@@ -31,10 +31,13 @@ export const fileTools: ToolRegistration[] = [
     executor: async (args, context) => {
       const ctx = getCtx(context as Record<string, unknown>);
       const filePath = resolveTenantPath(args.path as string, ctx.workspace);
-      if (!fs.existsSync(filePath)) return { error: `File not found: ${args.path}` };
+      if (!fs.existsSync(filePath)) return textEnvelope(`File does not exist: ${args.path}\nYou may need to create it with write_file, or check the correct path with list_directory or glob.`);
 
       const stat = fs.statSync(filePath);
-      if (stat.isDirectory()) return { error: `"${args.path}" is a directory, not a file. Use list_directory instead.` };
+      if (stat.isDirectory()) {
+        const entries = fs.readdirSync(filePath).slice(0, 50);
+        return textEnvelope(`"${args.path}" is a directory. Contents:\n${entries.join("\n")}\n\nUse list_directory for full listing, or read a specific file from above.`);
+      }
 
       const fullContent = fs.readFileSync(filePath, "utf8");
       const lines = fullContent.split("\n");
@@ -134,7 +137,11 @@ export const fileTools: ToolRegistration[] = [
         return { error: "old_string and new_string are identical — nothing to do." };
       }
       if (!content.includes(oldStr)) {
-        return { error: "old_string not found in file. Make sure it matches exactly." };
+        const lines = content.split("\n");
+        const preview = lines.length <= 100
+          ? content
+          : lines.slice(0, 100).join("\n") + `\n... (${lines.length} lines total)`;
+        return { error: `old_string not found in file. Here is the actual file content:\n\n${preview}\n\nRetry with text that matches exactly from above.` };
       }
 
       if (replaceAll) {
@@ -150,7 +157,10 @@ export const fileTools: ToolRegistration[] = [
 
       const firstIdx = content.indexOf(oldStr);
       if (content.indexOf(oldStr, firstIdx + 1) !== -1) {
-        return { error: "old_string matches more than once in the file. Include more surrounding context so the match is unique, or pass replace_all: true." };
+        const matchCount = content.split(oldStr).length - 1;
+        const lines = content.split("\n");
+        const matchLines = lines.reduce((acc, line, i) => line.includes(oldStr) ? [...acc, i + 1] : acc, [] as number[]);
+        return { error: `old_string matches ${matchCount} times (lines: ${matchLines.join(", ")}). Include more surrounding context so the match is unique, or pass replace_all: true.` };
       }
 
       content = content.replace(oldStr, newStr);
