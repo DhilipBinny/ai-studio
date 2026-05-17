@@ -3,20 +3,57 @@ import { getDb, agentTasks, agents } from "@ais-app/database";
 import { eq, and } from "drizzle-orm";
 
 export const CONTEXT_EXECUTORS: Record<string, ContextAwareExecutorFn> = {
+  list_agents: async (_args, ctx) => {
+    const db = getDb();
+    const rows = await db.select({ id: agents.id, name: agents.name, slug: agents.slug, description: agents.description })
+      .from(agents)
+      .where(and(eq(agents.tenantId, ctx.tenantId), eq(agents.isActive, true), eq(agents.status, "active")));
+
+    if (rows.length === 0) return "No active agents found.";
+    return rows.map(a => `• ${a.slug} (${a.name}): ${a.description || "No description"}`).join("\n");
+  },
+
   invoke_agent: async (args, ctx) => {
-    const agentId = args.agent_id as string;
     const message = args.message as string;
     const projectId = args.project_id as string | undefined;
     const timeoutMs = Math.min(Number(args.timeout_ms) || 600000, 600000);
 
-    if (!agentId) return "Error: agent_id is required";
     if (!message) return "Error: message is required";
 
     const db = getDb();
+    let resolvedAgentId: string;
 
-    const [targetAgent] = await db.select({ id: agents.id }).from(agents)
-      .where(and(eq(agents.id, agentId), eq(agents.tenantId, ctx.tenantId))).limit(1);
-    if (!targetAgent) return "Error: agent not found or belongs to another tenant";
+    // Mode 1: by agent_id (UUID)
+    // Mode 2: by agent_slug (human-readable)
+    // Mode 3: inline (create ephemeral agent on-the-fly)
+    const agentId = args.agent_id as string | undefined;
+    const agentSlug = args.agent_slug as string | undefined;
+    const inline = args.inline as { system_prompt?: string; tools?: string[] } | undefined;
+
+    if (agentId) {
+      const [target] = await db.select({ id: agents.id }).from(agents)
+        .where(and(eq(agents.id, agentId), eq(agents.tenantId, ctx.tenantId))).limit(1);
+      if (!target) return "Error: agent_id not found in this tenant. Use list_agents to see available agents.";
+      resolvedAgentId = target.id;
+    } else if (agentSlug) {
+      const [target] = await db.select({ id: agents.id }).from(agents)
+        .where(and(eq(agents.slug, agentSlug), eq(agents.tenantId, ctx.tenantId), eq(agents.isActive, true))).limit(1);
+      if (!target) return `Error: agent with slug "${agentSlug}" not found. Use list_agents to see available agents.`;
+      resolvedAgentId = target.id;
+    } else if (inline?.system_prompt) {
+      const [ephemeral] = await db.insert(agents).values({
+        tenantId: ctx.tenantId,
+        name: `Ephemeral sub-agent`,
+        slug: `ephemeral-${Date.now()}`,
+        systemPrompt: inline.system_prompt,
+        status: "active",
+        isActive: false,
+        metadata: { ephemeral: true, parentSessionId: ctx.sessionId, createdAt: new Date().toISOString() },
+      }).returning();
+      resolvedAgentId = ephemeral.id;
+    } else {
+      return "Error: provide agent_id, agent_slug, or inline.system_prompt. Use list_agents to see available agents.";
+    }
 
     const { runSession } = await import("../session-runner");
     const startTime = Date.now();
@@ -25,7 +62,7 @@ export const CONTEXT_EXECUTORS: Record<string, ContextAwareExecutorFn> = {
       tenantId: ctx.tenantId,
       projectId: projectId || null,
       parentSessionId: ctx.sessionId,
-      agentId,
+      agentId: resolvedAgentId,
       status: "running",
       description: message.slice(0, 200),
       prompt: message,
@@ -34,7 +71,7 @@ export const CONTEXT_EXECUTORS: Record<string, ContextAwareExecutorFn> = {
     let timer: ReturnType<typeof setTimeout> | null = null;
     try {
       const resultPromise = runSession({
-        agentId,
+        agentId: resolvedAgentId,
         tenantId: ctx.tenantId,
         userId: "",
         message,
@@ -198,17 +235,35 @@ export const KNOWLEDGE_REFINE_SEARCH_DEFINITION: ToolDefinition = {
   },
 };
 
+export const LIST_AGENTS_DEFINITION: ToolDefinition = {
+  name: "list_agents",
+  description: "List all available agents you can delegate work to. Returns their slug (for invoke_agent), name, and description.",
+  input_schema: {
+    type: "object",
+    properties: {},
+  },
+};
+
 export const INVOKE_AGENT_DEFINITION: ToolDefinition = {
   name: "invoke_agent",
-  description: "Spawn a sub-agent session and wait for it to complete. The sub-agent runs independently with its own tools and system prompt, then returns its final response. Use this to delegate specialized tasks to other agents.",
+  description: "Spawn a sub-agent and wait for completion. Three modes: (1) by agent_slug (preferred — use list_agents to find slugs), (2) by agent_id (UUID), (3) inline with custom system_prompt for ad-hoc tasks. The sub-agent runs independently with its own tools, then returns its response.",
   input_schema: {
     type: "object",
     properties: {
-      agent_id: { type: "string", description: "UUID of the agent to invoke" },
+      agent_slug: { type: "string", description: "Slug of an existing agent to invoke (use list_agents to find). Preferred over agent_id." },
+      agent_id: { type: "string", description: "UUID of an existing agent (alternative to slug)" },
+      inline: {
+        type: "object",
+        description: "Create an ad-hoc sub-agent with custom instructions (no pre-defined agent needed)",
+        properties: {
+          system_prompt: { type: "string", description: "System prompt for the ephemeral sub-agent" },
+          tools: { type: "array", items: { type: "string" }, description: "Tool names to give the sub-agent (default: read_file, glob, grep)" },
+        },
+      },
       message: { type: "string", description: "The task/prompt to send to the sub-agent" },
-      project_id: { type: "string", description: "Optional project ID for shared workspace access" },
-      timeout_ms: { type: "number", description: "Max wait time in ms (default: 600000 = 10 min, max: 600000)" },
+      project_id: { type: "string", description: "Project ID for shared workspace access" },
+      timeout_ms: { type: "number", description: "Max wait in ms (default: 600000 = 10 min)" },
     },
-    required: ["agent_id", "message"],
+    required: ["message"],
   },
 };

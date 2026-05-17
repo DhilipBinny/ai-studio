@@ -28,8 +28,25 @@ export async function register() {
         await db.delete(revokedTokens).where(lt(revokedTokens.expiresAt, new Date()));
       } catch (err: unknown) { console.warn("Revocation cleanup failed:", err); }
     }
+
+    async function cleanupEphemeralAgents() {
+      try {
+        const { getDb } = await import("@ais-app/database");
+        const { agents } = await import("@ais-app/database");
+        const { sql } = await import("drizzle-orm");
+        const db = getDb();
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        await db.delete(agents).where(
+          sql`${agents.isActive} = false AND ${agents.metadata}->>'ephemeral' = 'true' AND ${agents.createdAt} < ${cutoff.toISOString()}`
+        );
+      } catch (err: unknown) { console.warn("Ephemeral agent cleanup failed:", err); }
+    }
+
     if (!globalForInstrumentation.__revocationCleanupInterval) {
-      globalForInstrumentation.__revocationCleanupInterval = setInterval(() => { cleanupExpiredRevocations().catch((err: unknown) => console.warn("Revocation cleanup failed:", err)); }, 3600_000);
+      globalForInstrumentation.__revocationCleanupInterval = setInterval(() => {
+        cleanupExpiredRevocations().catch((err: unknown) => console.warn("Revocation cleanup failed:", err));
+        cleanupEphemeralAgents().catch((err: unknown) => console.warn("Ephemeral cleanup failed:", err));
+      }, 3600_000);
     }
   }
 }

@@ -10,7 +10,7 @@ import {
 } from "@ais/tools-common";
 import type { ToolRegistration } from "@ais/tool-platform";
 import type { ToolDefinition, LoadedTools } from "./types";
-import { KNOWLEDGE_SEARCH_DEFINITION, KNOWLEDGE_REFINE_SEARCH_DEFINITION, INVOKE_AGENT_DEFINITION } from "./context-executors";
+import { KNOWLEDGE_SEARCH_DEFINITION, KNOWLEDGE_REFINE_SEARCH_DEFINITION, INVOKE_AGENT_DEFINITION, LIST_AGENTS_DEFINITION } from "./context-executors";
 import { BUILTIN_TOOL_RISK, BUILTIN_TOOL_CATEGORY } from "./risk-map";
 
 export const builtinToolMap = new Map<string, ToolRegistration>();
@@ -147,6 +147,7 @@ export async function loadToolDefinitions(
   }
 
   if (!isSubAgent) {
+    defs.push(LIST_AGENTS_DEFINITION);
     defs.push(INVOKE_AGENT_DEFINITION);
   }
 
