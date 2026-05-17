@@ -1,6 +1,6 @@
 # 03 — Agents
 
-Comprehensive documentation for the Agents feature in Echol AI Studio. Everything below is based on implemented code.
+Comprehensive documentation for the Agents feature in Kairo Studio. Everything below is based on implemented code.
 
 ---
 

@@ -1,6 +1,6 @@
 # Authorization
 
-Comprehensive documentation of authorization in Echol AI Studio. Every feature described here is implemented and traceable to source code.
+Comprehensive documentation of authorization in Kairo Studio. Every feature described here is implemented and traceable to source code.
 
 ---
 
@@ -8,7 +8,7 @@ Comprehensive documentation of authorization in Echol AI Studio. Every feature d
 
 ### What It Does
 
-Echol AI Studio uses a dual-layer authorization system:
+Kairo Studio uses a dual-layer authorization system:
 
 1. **User roles** -- a hierarchical enum (`super_admin > admin > member > viewer`) stored on the `users` table.
 2. **Profiles with access rights** -- a module-level permission matrix stored as JSONB on the `profiles` table, linked to users via `profile_id`.

@@ -1,6 +1,6 @@
 # 09 - Connectors
 
-Comprehensive documentation for the Connector system in Echol AI Studio, covering connector types, CRUD operations, credentials encryption, connection testing, MCP integration, and agent-connector assignments.
+Comprehensive documentation for the Connector system in Kairo Studio, covering connector types, CRUD operations, credentials encryption, connection testing, MCP integration, and agent-connector assignments.
 
 ---
 

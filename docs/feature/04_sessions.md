@@ -1,6 +1,6 @@
 # 04 — Agent Sessions
 
-Comprehensive documentation for the Agent Sessions (Runs) feature in Echol AI Studio. Everything below is based on implemented code.
+Comprehensive documentation for the Agent Sessions (Runs) feature in Kairo Studio. Everything below is based on implemented code.
 
 ---
 

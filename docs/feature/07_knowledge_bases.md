@@ -1,6 +1,6 @@
 # 07 - Knowledge Bases & RAG
 
-Comprehensive documentation for the Knowledge Base system in Echol AI Studio, covering document ingestion, chunking, embedding, hybrid search, re-ranking, RAGAS evaluation, 8 RAG enhancement strategies (contextual enrichment, HyDE, query decomposition, GraphRAG, late chunking, multimodal), and dual-store architecture (PostgreSQL + Qdrant).
+Comprehensive documentation for the Knowledge Base system in Kairo Studio, covering document ingestion, chunking, embedding, hybrid search, re-ranking, RAGAS evaluation, 8 RAG enhancement strategies (contextual enrichment, HyDE, query decomposition, GraphRAG, late chunking, multimodal), and dual-store architecture (PostgreSQL + Qdrant).
 
 ---
 

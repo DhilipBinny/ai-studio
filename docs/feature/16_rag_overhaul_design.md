@@ -1,6 +1,6 @@
 # 16 - RAG Overhaul Design
 
-Comprehensive redesign of the Retrieval-Augmented Generation pipeline in Echol AI Studio. Covers Contextual Retrieval, HyDE, RAGAS evaluation, Agentic RAG, Query Decomposition, GraphRAG, Late Chunking, and Multimodal RAG across three implementation phases (P0/P1/P2).
+Comprehensive redesign of the Retrieval-Augmented Generation pipeline in Kairo Studio. Covers Contextual Retrieval, HyDE, RAGAS evaluation, Agentic RAG, Query Decomposition, GraphRAG, Late Chunking, and Multimodal RAG across three implementation phases (P0/P1/P2).
 
 ---
 

@@ -1,6 +1,6 @@
 # Authentication
 
-Comprehensive documentation of authentication in Echol AI Studio. Every feature described here is implemented and traceable to source code.
+Comprehensive documentation of authentication in Kairo Studio. Every feature described here is implemented and traceable to source code.
 
 ---
 

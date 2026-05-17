@@ -1,4 +1,4 @@
-# Echol AI Studio — Master Feature Index
+# Kairo Studio — Master Feature Index
 
 **Generated:** 2026-05-15
 **Verified:** 3-iteration process (draft → cross-verify against code → fix inaccuracies)
@@ -8,7 +8,7 @@
 
 ## Platform Overview
 
-Echol AI Studio is an enterprise agentic AI platform for configuring, deploying, and monitoring AI agents. It supports multi-tenant isolation, visual workflow orchestration, RAG-powered knowledge bases, real-time observability, and a comprehensive admin console.
+Kairo Studio is an enterprise agentic AI platform for configuring, deploying, and monitoring AI agents. It supports multi-tenant isolation, visual workflow orchestration, RAG-powered knowledge bases, real-time observability, and a comprehensive admin console.
 
 **Tech Stack:** Next.js 16 + TypeScript + Tailwind CSS v4 + shadcn/ui + PostgreSQL 17 + pgvector + Qdrant (optional) + Drizzle ORM
 

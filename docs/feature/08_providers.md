@@ -1,6 +1,6 @@
 # 08 - LLM Providers
 
-Comprehensive documentation for the LLM Provider system in Echol AI Studio, covering provider configuration, API key encryption, model discovery, connectivity testing, quick chat, embedding/rerank models, OAuth support, and SSRF protection.
+Comprehensive documentation for the LLM Provider system in Kairo Studio, covering provider configuration, API key encryption, model discovery, connectivity testing, quick chat, embedding/rerank models, OAuth support, and SSRF protection.
 
 ---
 
