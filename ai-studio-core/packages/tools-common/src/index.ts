@@ -5,6 +5,8 @@ export { grepTools } from "./grep";
 export { globTools } from "./glob";
 export { patchTools } from "./patch";
 export { pdfTools } from "./pdf";
+export { batchReplaceTools } from "./batch-replace";
+export { multiEditTools } from "./multi-edit";
 
 export {
   resolveTenantPath,
@@ -29,6 +31,8 @@ import { grepTools } from "./grep";
 import { globTools } from "./glob";
 import { patchTools } from "./patch";
 import { pdfTools } from "./pdf";
+import { batchReplaceTools } from "./batch-replace";
+import { multiEditTools } from "./multi-edit";
 
 export const allBuiltinTools: ToolRegistration[] = [
   ...fileTools,
@@ -38,4 +42,6 @@ export const allBuiltinTools: ToolRegistration[] = [
   ...globTools,
   ...patchTools,
   ...pdfTools,
+  ...batchReplaceTools,
+  ...multiEditTools,
 ];

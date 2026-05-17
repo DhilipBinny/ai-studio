@@ -9,6 +9,7 @@ import { z } from "zod";
 const sendMessageSchema = z.object({
   message: z.string().min(1).max(100000),
   metadata: z.record(z.unknown()).optional(),
+  async: z.boolean().optional(),
 });
 
 export const POST = withRBAC("AGENTS", 10, async (request, auth, params) => {
@@ -37,16 +38,26 @@ export const POST = withRBAC("AGENTS", 10, async (request, auth, params) => {
     return errorResponse(parsed.error.errors[0].message, "VALIDATION_ERROR", 400);
   }
 
-  const { message } = parsed.data;
+  const { message, async: isAsync } = parsed.data;
 
-  const result = await runSession({
+  const sessionInput = {
     agentId,
     tenantId: auth.tenantId,
     userId: auth.userId,
     message: message.trim(),
     sessionId,
-    channel: "studio",
-  });
+    channel: "studio" as const,
+  };
+
+  if (isAsync) {
+    runSession(sessionInput).catch((err) => {
+      db.update(agentSessions).set({ status: "failed", errorMessage: (err as Error).message, completedAt: new Date() })
+        .where(eq(agentSessions.id, sessionId)).catch(() => {});
+    });
+    return NextResponse.json({ sessionId, status: "accepted", async: true }, { status: 202 });
+  }
+
+  const result = await runSession(sessionInput);
 
   if (result.error) {
     return errorResponse(result.error, "SESSION_ERROR", 400);

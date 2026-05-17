@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/app-header";
 import { AuthProvider } from "@/lib/auth-context";
+import { ChatAssistant } from "@/components/chat-assistant";
 
 export default function PlatformLayout({
   children,
@@ -23,6 +24,7 @@ export default function PlatformLayout({
           </main>
         </div>
       </div>
+      <ChatAssistant />
     </AuthProvider>
   );
 }

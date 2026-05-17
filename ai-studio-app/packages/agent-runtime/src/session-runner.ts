@@ -265,6 +265,15 @@ async function executeToolLoop(
   let totalCost = 0;
   let finalText = "";
 
+  // Heartbeat: update last_heartbeat_at every 30s so recovery sweep knows we're alive
+  const heartbeatInterval = setInterval(async () => {
+    try {
+      await db.update(agentSessions).set({ lastHeartbeatAt: new Date() }).where(eq(agentSessions.id, sessionId));
+    } catch { /* non-fatal */ }
+  }, 30_000);
+  // Initial heartbeat immediately
+  await db.update(agentSessions).set({ lastHeartbeatAt: new Date() }).where(eq(agentSessions.id, sessionId));
+
   const skipCompaction = ["sub_agent", "workflow", "cron"].includes(input.channel || "");
   for (let round = 0; round < getConfigSync().MAX_TOOL_ROUNDS; round++) {
     if (agent.providerModelId && !skipCompaction) {
@@ -426,6 +435,7 @@ async function executeToolLoop(
     break;
   }
 
+  clearInterval(heartbeatInterval);
   return { totalInputTokens, totalOutputTokens, totalToolCalls, totalCost, finalText };
 }
 

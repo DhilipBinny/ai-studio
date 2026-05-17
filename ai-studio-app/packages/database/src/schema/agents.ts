@@ -23,6 +23,7 @@ export const agents = pgTable(
     maxTokensPerTurn: integer("max_tokens_per_turn").default(4096),
     temperature: numeric("temperature", { precision: 3, scale: 2 }).default("0.7"),
     status: agentStatusEnum("status").notNull().default("draft"),
+    trustLevel: text("trust_level").notNull().default("supervised"),
     tags: text("tags").array().default([]),
     metadata: jsonb("metadata").notNull().default({}),
     version: integer("version").notNull().default(1),

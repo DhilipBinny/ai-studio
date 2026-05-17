@@ -19,6 +19,7 @@ export interface Agent {
   persona: Persona;
   rules: AgentRule[];
   status: string;
+  trustLevel: string;
   version: number;
   tags: string[];
   providerModelId: string | null;

@@ -32,6 +32,7 @@ export const agentSessions = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true }),
     expiresAt: timestamp("expires_at", { withTimezone: true }),
     triggeredBy: uuid("triggered_by").references(() => users.id, { onDelete: "set null" }),
+    lastHeartbeatAt: timestamp("last_heartbeat_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

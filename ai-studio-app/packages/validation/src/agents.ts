@@ -18,6 +18,7 @@ export const createAgentSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTurns: z.number().int().positive().optional(),
   maxTokensPerTurn: z.number().int().positive().optional(),
+  trustLevel: z.enum(["supervised", "trusted", "restricted"]).optional(),
   tags: z.array(z.string()).optional(),
 });
 
@@ -33,6 +34,7 @@ export const updateAgentSchema = z.object({
   maxTurns: z.number().int().positive().optional(),
   maxTokensPerTurn: z.number().int().positive().optional(),
   status: z.enum(["draft", "active", "disabled", "archived"]).optional(),
+  trustLevel: z.enum(["supervised", "trusted", "restricted"]).optional(),
   tags: z.array(z.string()).optional(),
 });
 

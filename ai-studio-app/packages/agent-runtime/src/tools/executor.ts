@@ -1,5 +1,5 @@
 import { getDb } from "@ais-app/database";
-import { tools, agentSessionToolCalls, agentSessions } from "@ais-app/database";
+import { tools, agentSessionToolCalls, agentSessions, agents } from "@ais-app/database";
 import { eq, and, desc } from "drizzle-orm";
 import { LoopDetector } from "@ais/tool-platform";
 import { executeMCPTool } from "../mcp-executor";
@@ -60,45 +60,53 @@ export async function executeTool(
   }
 
   if (toolRisk === "dangerous") {
-    const [sessionRow] = await db.select({ channel: agentSessions.channel }).from(agentSessions)
+    const [sessionRow] = await db.select({ channel: agentSessions.channel, agentId: agentSessions.agentId }).from(agentSessions)
       .where(eq(agentSessions.id, sessionId)).limit(1);
     const autoApproveChannels = ["sub_agent", "workflow", "cron"];
     const isAutoApproved = sessionRow && autoApproveChannels.includes(sessionRow.channel || "");
 
-    if (!isAutoApproved) {
-      const argsHash = JSON.stringify(call.input);
-      const [pendingCall] = await db
-        .select({ id: agentSessionToolCalls.id, approvalStatus: agentSessionToolCalls.approvalStatus, arguments: agentSessionToolCalls.arguments })
-        .from(agentSessionToolCalls)
-        .where(and(
-          eq(agentSessionToolCalls.agentSessionId, sessionId),
-          eq(agentSessionToolCalls.toolName, call.name),
-          eq(agentSessionToolCalls.requiresApproval, true),
-        ))
-        .orderBy(desc(agentSessionToolCalls.createdAt))
-        .limit(1);
+    if (!isAutoApproved && sessionRow) {
+      const [agentRow] = await db.select({ trustLevel: agents.trustLevel }).from(agents)
+        .where(eq(agents.id, sessionRow.agentId)).limit(1);
+      if (agentRow?.trustLevel === "trusted") {
+        // Trusted agent: skip approval for dangerous tools
+      } else if (agentRow?.trustLevel === "restricted") {
+        return { tool_use_id: call.id, content: "This agent has restricted trust level. Dangerous tools are not allowed.", is_error: true };
+      } else {
+        const argsHash = JSON.stringify(call.input);
+        const [pendingCall] = await db
+          .select({ id: agentSessionToolCalls.id, approvalStatus: agentSessionToolCalls.approvalStatus, arguments: agentSessionToolCalls.arguments })
+          .from(agentSessionToolCalls)
+          .where(and(
+            eq(agentSessionToolCalls.agentSessionId, sessionId),
+            eq(agentSessionToolCalls.toolName, call.name),
+            eq(agentSessionToolCalls.requiresApproval, true),
+          ))
+          .orderBy(desc(agentSessionToolCalls.createdAt))
+          .limit(1);
 
-      const argsMatch = pendingCall && JSON.stringify(pendingCall.arguments) === argsHash;
+        const argsMatch = pendingCall && JSON.stringify(pendingCall.arguments) === argsHash;
 
-      if (!pendingCall || !argsMatch || pendingCall.approvalStatus !== "approved") {
-        await db.insert(agentSessionToolCalls).values({
-          tenantId,
-          agentSessionId: sessionId,
-          toolName: call.name,
-          arguments: call.input,
-          result: "Awaiting human approval",
-          status: "pending",
-          requiresApproval: true,
-          durationMs: 0,
-        });
+        if (!pendingCall || !argsMatch || pendingCall.approvalStatus !== "approved") {
+          await db.insert(agentSessionToolCalls).values({
+            tenantId,
+            agentSessionId: sessionId,
+            toolName: call.name,
+            arguments: call.input,
+            result: "Awaiting human approval",
+            status: "pending",
+            requiresApproval: true,
+            durationMs: 0,
+          });
 
-        await db.update(agentSessions).set({ status: "waiting_approval" }).where(eq(agentSessions.id, sessionId));
+          await db.update(agentSessions).set({ status: "waiting_approval" }).where(eq(agentSessions.id, sessionId));
 
-        return {
-          tool_use_id: call.id,
-          content: "This tool requires human approval before execution. The session is paused until an admin approves or denies this tool call. Tell the user their request needs admin approval for the dangerous operation.",
-          is_error: false,
-        };
+          return {
+            tool_use_id: call.id,
+            content: "This tool requires human approval before execution. The session is paused until an admin approves or denies this tool call. Tell the user their request needs admin approval for the dangerous operation.",
+            is_error: false,
+          };
+        }
       }
     }
   }

@@ -488,6 +488,7 @@ export function EditAgentForm({ agent, models, onSaved }: { agent: Agent; models
     maxTurns: String(agent.maxTurns || 25),
     maxTokensPerTurn: String(agent.maxTokensPerTurn || 4096),
     status: agent.status,
+    trustLevel: agent.trustLevel || "supervised",
   });
   const [persona, setPersona] = useState<Persona>(agent.persona || {});
   const [rules, setRules] = useState<AgentRule[]>(agent.rules || []);
@@ -508,6 +509,7 @@ export function EditAgentForm({ agent, models, onSaved }: { agent: Agent; models
     if (form.description !== (agent.description || "")) body.description = form.description;
     if (form.providerModelId !== (agent.providerModelId || "")) body.providerModelId = form.providerModelId || null;
     if (form.status !== agent.status) body.status = form.status;
+    if (form.trustLevel !== (agent.trustLevel || "supervised")) body.trustLevel = form.trustLevel;
 
     if (JSON.stringify(persona) !== JSON.stringify(agent.persona || {})) body.persona = persona;
     if (JSON.stringify(rules) !== JSON.stringify(agent.rules || [])) body.rules = rules;
@@ -566,6 +568,14 @@ export function EditAgentForm({ agent, models, onSaved }: { agent: Agent; models
             <option value="draft">Draft</option>
             <option value="active">Active</option>
             <option value="disabled">Disabled</option>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Trust Level</Label>
+          <Select value={form.trustLevel || "supervised"} onChange={(e) => setForm((f) => ({ ...f, trustLevel: e.target.value }))}>
+            <option value="supervised">Supervised — tools need approval</option>
+            <option value="trusted">Trusted — auto-approve tools</option>
+            <option value="restricted">Restricted — block dangerous tools</option>
           </Select>
         </div>
       </div>

@@ -6,6 +6,7 @@ AiStudio-App/.data/
 _local_reference/
 docs/_local_research/
 docs/_local_design-history/
+docs/_local_reference_angularaistudio/
 
 # Node
 node_modules/
