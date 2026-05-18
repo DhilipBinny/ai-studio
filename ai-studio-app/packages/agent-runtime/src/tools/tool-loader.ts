@@ -155,14 +155,24 @@ export async function loadToolDefinitions(
   defs.push(RECALL_DEFINITION);
   defs.push(FORGET_DEFINITION);
 
-  // Meta-tools: only for trusted agents
-  const [agentTrust] = await db.select({ trustLevel: agents.trustLevel }).from(agents).where(and(eq(agents.id, agentId), eq(agents.tenantId, tenantId))).limit(1);
-  if (agentTrust?.trustLevel === "trusted") {
+  // Meta-tools: only for agents with metadata.platformTools enabled
+  const [agentMeta] = await db.select({ trustLevel: agents.trustLevel, metadata: agents.metadata }).from(agents).where(and(eq(agents.id, agentId), eq(agents.tenantId, tenantId))).limit(1);
+  const platformTools = (agentMeta?.metadata as Record<string, unknown>)?.platformTools === true;
+  if (agentMeta?.trustLevel === "trusted" && platformTools) {
     defs.push(CREATE_AGENT_DEFINITION);
     defs.push(CREATE_WORKFLOW_DEFINITION);
     defs.push(TRIGGER_WORKFLOW_DEFINITION);
     defs.push(GET_CONFIG_DEFINITION);
     defs.push(SET_CONFIG_DEFINITION);
+  }
+
+  const toolBlacklist = Array.isArray((agentMeta?.metadata as Record<string, unknown>)?.toolBlacklist)
+    ? (agentMeta!.metadata as Record<string, string[]>).toolBlacklist
+    : [];
+  if (toolBlacklist.length > 0) {
+    const blocked = new Set(toolBlacklist);
+    const before = defs.length;
+    defs.splice(0, defs.length, ...defs.filter((d) => !blocked.has(d.name)));
   }
 
   const { tools: mcpTools, connectorMap } = await loadMCPTools(agentId, tenantId);
