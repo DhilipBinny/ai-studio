@@ -281,6 +281,7 @@ export class OAuthProvider implements EnterpriseProvider {
       let currentThinkingBlock: { thinking: string; signature: string } | null = null;
       let inputTokens = 0;
       let outputTokens = 0;
+      let stopReason = '';
 
       for await (const event of stream) {
         resetIdleTimer();
@@ -323,6 +324,8 @@ export class OAuthProvider implements EnterpriseProvider {
           if ((event as any).usage) {
             outputTokens = (event as any).usage.output_tokens || 0;
           }
+          const deltaStopReason = (event as any).delta?.stop_reason as string | undefined;
+          if (deltaStopReason) stopReason = deltaStopReason;
         } else if (event.type === 'message_start') {
           if ((event as any).message?.usage) {
             inputTokens = (event as any).message.usage.input_tokens || 0;
@@ -342,6 +345,7 @@ export class OAuthProvider implements EnterpriseProvider {
         usage: { inputTokens, outputTokens },
         thinkingText: thinkingText || null,
         thinkingBlocks: thinkingBlocks.length > 0 ? thinkingBlocks : undefined,
+        stopReason: stopReason || undefined,
       };
     } catch (e: unknown) {
       const err = e as Error & { status?: number };

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { withRBAC, errorResponse, parseJsonBody } from "@/lib/api-utils";
+import { invalidateConfigCache } from "@ais-app/agent-runtime";
 import {
   getSettings,
   updateSettings,
@@ -31,6 +32,7 @@ export const PATCH = withRBAC("SETTINGS", 20, async (request, auth) => {
 
   try {
     const result = await updateSettings(auth.tenantId, entries, auth.userId);
+    if (entries.some((e) => e.key === "agent_runtime")) invalidateConfigCache();
     return NextResponse.json(result);
   } catch (e) {
     if (e instanceof ValidationError) {

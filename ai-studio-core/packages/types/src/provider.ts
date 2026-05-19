@@ -36,6 +36,8 @@ export interface ProviderResponse {
   thinkingText?: string | null;
   /** Structured thinking blocks with signatures (Anthropic only). */
   thinkingBlocks?: import('./message').ThinkingBlock[];
+  /** Why the model stopped: "end_turn", "tool_use", "max_tokens", or provider-specific. */
+  stopReason?: string;
 }
 
 /**

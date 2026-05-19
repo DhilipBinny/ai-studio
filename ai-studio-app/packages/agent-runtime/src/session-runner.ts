@@ -1,6 +1,6 @@
 import { getDb } from "@ais-app/database";
-import { agents, agentSessions, agentSessionMessages, providers, providerModels, usageRecords } from "@ais-app/database";
-import { eq, and, asc, sql } from "drizzle-orm";
+import { agents, agentSessions, agentSessionMessages, agentMemories, providers, providerModels, usageRecords } from "@ais-app/database";
+import { eq, and, asc, desc, sql } from "drizzle-orm";
 import { buildSystemPrompt } from "./prompt-builder";
 import { callLLM } from "./llm-caller";
 import { loadToolDefinitions, executeTool, createLoopDetector } from "./tool-executor";
@@ -202,7 +202,22 @@ async function prepareSession(
     ? { ...rawWorkspaceConfig, projectId, execTimeoutMs: (agentConfig as unknown as Record<string, unknown>).execTimeoutMs as number | undefined }
     : null;
   const timezone = (agentModelConfig as Record<string, unknown>)?.timezone as string || "UTC";
-  const systemPrompt = buildSystemPrompt(agentConfig, { timezone });
+  let systemPrompt = buildSystemPrompt(agentConfig, { timezone });
+
+  const memories = await db
+    .select({ key: agentMemories.key, content: agentMemories.content, category: agentMemories.category })
+    .from(agentMemories)
+    .where(and(eq(agentMemories.agentId, input.agentId), eq(agentMemories.tenantId, input.tenantId)))
+    .orderBy(desc(agentMemories.updatedAt))
+    .limit(10);
+
+  if (memories.length > 0) {
+    const memoryLines = memories.map((m) => {
+      const truncated = m.content.length > 500 ? m.content.slice(0, 500) + "..." : m.content;
+      return `- [${m.category}] ${m.key}: ${truncated}`;
+    });
+    systemPrompt += `\n\n## Memory\nYou remember the following from previous sessions:\n${memoryLines.join("\n")}`;
+  }
   const loopDetector = createLoopDetector();
   const toolContext: ToolContext = { agentId: input.agentId, tenantId: input.tenantId, sessionId };
 
@@ -361,6 +376,13 @@ async function executeToolLoop(
       requestType: "chat",
     });
 
+    // Incremental token update — survives crashes, prevents 0-token sessions
+    await db.update(agentSessions).set({
+      totalInputTokens: sql`${agentSessions.totalInputTokens} + ${response.inputTokens}`,
+      totalOutputTokens: sql`${agentSessions.totalOutputTokens} + ${response.outputTokens}`,
+      totalCostUsd: sql`${agentSessions.totalCostUsd} + ${roundCost.toFixed(6)}::numeric`,
+    }).where(eq(agentSessions.id, sessionId));
+
     if (response.toolCalls.length > 0) {
       const toolCallBlocks: ToolCallBlock[] = [];
       if (response.text) {
@@ -427,6 +449,23 @@ async function executeToolLoop(
       continue;
     }
 
+    // Auto-continue: if output was truncated at max_tokens, save partial and prompt continuation
+    if (response.stopReason === "max_tokens") {
+      await db.insert(agentSessionMessages).values({
+        tenantId: input.tenantId,
+        agentSessionId: sessionId,
+        role: "assistant",
+        content: response.text,
+      });
+      await db.insert(agentSessionMessages).values({
+        tenantId: input.tenantId,
+        agentSessionId: sessionId,
+        role: "user",
+        content: "Continue from where you left off.",
+      });
+      continue;
+    }
+
     finalText = response.text;
     await db.insert(agentSessionMessages).values({
       tenantId: input.tenantId,
@@ -468,13 +507,12 @@ async function finalizeSession(
     ? "waiting_approval"
     : isOneShot ? "completed" : "waiting";
 
+  // Tokens and cost are already written incrementally per-round in executeToolLoop,
+  // so finalizeSession only updates status, turns, and tool call count.
   const updates: Record<string, unknown> = {
     status: nextStatus,
-    totalInputTokens: sql`${agentSessions.totalInputTokens} + ${totals.totalInputTokens}`,
-    totalOutputTokens: sql`${agentSessions.totalOutputTokens} + ${totals.totalOutputTokens}`,
     totalTurns: sql`${agentSessions.totalTurns} + 1`,
     totalToolCalls: sql`${agentSessions.totalToolCalls} + ${totals.totalToolCalls}`,
-    totalCostUsd: sql`${agentSessions.totalCostUsd} + ${totals.totalCost.toFixed(6)}::numeric`,
   };
   if (isOneShot) {
     updates.completedAt = new Date();

@@ -109,6 +109,7 @@ export class OpenAIProvider implements ProviderInterface {
       let inputTokens = 0;
       let outputTokens = 0;
       let thinkingText = '';
+      let stopReason = '';
 
       for await (const chunk of stream) {
         streamTimeout.onActivity();
@@ -143,6 +144,14 @@ export class OpenAIProvider implements ProviderInterface {
           inputTokens = chunk.usage.prompt_tokens || 0;
           outputTokens = chunk.usage.completion_tokens || 0;
         }
+
+        const finishReason = chunk.choices?.[0]?.finish_reason;
+        if (finishReason) {
+          stopReason = finishReason === 'length' ? 'max_tokens'
+            : finishReason === 'tool_calls' ? 'tool_use'
+            : finishReason === 'stop' ? 'end_turn'
+            : finishReason;
+        }
       }
 
       streamTimeout.clear();
@@ -152,6 +161,7 @@ export class OpenAIProvider implements ProviderInterface {
         toolCalls: toolCalls.length > 0 ? toolCalls : null,
         usage: { inputTokens, outputTokens },
         thinkingText: thinkingText || null,
+        stopReason: stopReason || undefined,
       };
     } catch (e: unknown) {
       streamTimeout.clear();

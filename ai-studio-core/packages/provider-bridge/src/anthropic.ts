@@ -33,11 +33,11 @@ export class AnthropicProvider implements ProviderInterface {
     const clientOpts: Record<string, unknown> = {};
 
     if (authToken) {
-      clientOpts.apiKey = '';
       clientOpts.authToken = authToken;
       this.authType = 'oauth';
-      if (this.providerConfig?.defaultHeaders) {
-        clientOpts.defaultHeaders = this.providerConfig.defaultHeaders;
+      const betaFlags = this.providerConfig?.defaultHeaders?.["anthropic-beta"] as string || "";
+      if (betaFlags) {
+        clientOpts.defaultHeaders = { "anthropic-beta": betaFlags };
       }
     } else if (apiKey) {
       clientOpts.apiKey = apiKey;
@@ -192,6 +192,7 @@ export class AnthropicProvider implements ProviderInterface {
       const toolCalls: (ToolCall & { _rawArgs?: string })[] = [];
       let inputTokens = 0;
       let outputTokens = 0;
+      let stopReason = '';
 
       let thinkingText = '';
       const thinkingBlocks: ThinkingBlock[] = [];
@@ -230,7 +231,9 @@ export class AnthropicProvider implements ProviderInterface {
           if (event.usage) {
             outputTokens = event.usage.output_tokens || 0;
           }
-          if ((event as any).delta?.stop_reason === 'max_tokens') {
+          const deltaStopReason = (event as any).delta?.stop_reason as string | undefined;
+          if (deltaStopReason) stopReason = deltaStopReason;
+          if (deltaStopReason === 'max_tokens') {
             if (toolCalls.length > 0) {
               const lastTc = toolCalls[toolCalls.length - 1];
               try { JSON.parse(lastTc._rawArgs || '{}'); } catch {
@@ -271,6 +274,7 @@ export class AnthropicProvider implements ProviderInterface {
         usage: { inputTokens, outputTokens },
         thinkingText: thinkingText || null,
         thinkingBlocks: thinkingBlocks.length > 0 ? thinkingBlocks : undefined,
+        stopReason: stopReason || undefined,
       };
     } catch (e: unknown) {
       streamTimeout.clear();

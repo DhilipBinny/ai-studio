@@ -7,6 +7,7 @@ import { ChatAssistantFab } from "./chat-assistant-fab";
 import { ChatAssistantPanel } from "./chat-assistant-panel";
 import type { ChatMessage } from "./chat-assistant-messages";
 import type { PendingToolCall } from "./chat-assistant-approval";
+import type { ChatAttachment } from "./chat-assistant-input";
 
 export interface AgentOption {
   id: string;
@@ -46,6 +47,7 @@ export function ChatAssistant() {
   const [waitingApproval, setWaitingApproval] = useState(false);
   const [pendingToolCalls, setPendingToolCalls] = useState<PendingToolCall[]>([]);
   const [approving, setApproving] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const sendingRef = useRef(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastMessageRef = useRef<string>("");
@@ -211,20 +213,41 @@ export function ChatAssistant() {
     setAutoApprove(agent?.trustLevel === "trusted");
   }, [agents]);
 
-  const handleSend = useCallback(async (text: string) => {
+  const handleSend = useCallback(async (text: string, attachments?: ChatAttachment[]) => {
     if (!selectedAgentId || sendingRef.current) return;
     sendingRef.current = true;
     setSending(true);
     lastMessageRef.current = text;
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
+
+    const displayContent = attachments?.length
+      ? `${text}\n\n📎 ${attachments.map((a) => a.fileName).join(", ")}`
+      : text;
+    setMessages((prev) => [...prev, { role: "user", content: displayContent }]);
+
+    let expandedMessage = text;
+    if (attachments?.length) {
+      const parts: string[] = [];
+      for (const a of attachments) {
+        if (a.category === "text" && a.textContent) {
+          parts.push(`\n\n---\nAttached file: ${a.fileName}\n\`\`\`\n${a.textContent}\n\`\`\``);
+        } else {
+          parts.push(`\n\n[Attached: ${a.fileName} (${a.category}, ${a.fileSizeBytes} bytes)]`);
+        }
+      }
+      expandedMessage = text + parts.join("");
+    }
 
     try {
       const url = sessionId
         ? `/api/agents/${selectedAgentId}/sessions/${sessionId}/messages`
         : `/api/agents/${selectedAgentId}/sessions`;
+
+      const metadata: Record<string, unknown> = {};
+      if (selectedProjectId) metadata.projectId = selectedProjectId;
+
       const body = sessionId
-        ? { message: text, async: true }
-        : { message: text, channel: "studio", async: true, metadata: selectedProjectId ? { projectId: selectedProjectId } : undefined };
+        ? { message: expandedMessage, async: true }
+        : { message: expandedMessage, channel: "studio", async: true, metadata: Object.keys(metadata).length > 0 ? metadata : undefined };
 
       const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
@@ -283,8 +306,24 @@ export function ChatAssistant() {
   const handleNewSession = useCallback(() => {
     setSessionId(null); setMessages([]); setWaitingApproval(false); setPendingToolCalls([]); stopPolling();
     resetStream();
+    setShowHistory(false);
     sessionStorage.removeItem(STORAGE_KEY);
   }, [resetStream]);
+
+  const handleLoadSession = useCallback((sid: string) => {
+    setSessionId(sid);
+    setMessages([]);
+    setWaitingApproval(false);
+    setPendingToolCalls([]);
+    stopPolling();
+    resetStream();
+    setShowHistory(false);
+    fetchHistory(selectedAgentId, sid);
+  }, [selectedAgentId, resetStream]);
+
+  const handleToggleHistory = useCallback(() => {
+    setShowHistory((v) => !v);
+  }, []);
 
   if (loadingAgents || agents.length === 0) return null;
 
@@ -312,7 +351,10 @@ export function ChatAssistant() {
           onClose={() => setOpen(false)}
           onSend={handleSend}
           onNewSession={handleNewSession}
+          onLoadSession={handleLoadSession}
           streamingText={streamingText}
+          showHistory={showHistory}
+          onToggleHistory={handleToggleHistory}
         />
       )}
     </>

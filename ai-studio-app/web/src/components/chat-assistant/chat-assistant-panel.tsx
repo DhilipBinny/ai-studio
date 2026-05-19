@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { RotateCcw, X } from "lucide-react";
+import { RotateCcw, X, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ChatAssistantMessages, type ChatMessage } from "./chat-assistant-messages";
 import { ChatAssistantInput } from "./chat-assistant-input";
 import { ChatAssistantActivity } from "./chat-assistant-activity";
 import { ChatAssistantApproval, type PendingToolCall } from "./chat-assistant-approval";
+import { ChatAssistantHistory } from "./chat-assistant-history";
 import type { AgentOption, ProjectOption } from "./chat-assistant";
 
 interface ChatAssistantPanelProps {
@@ -28,16 +29,20 @@ interface ChatAssistantPanelProps {
   approving: boolean;
   onApprovalDecision: (toolCallId: string, action: "approve" | "deny") => void;
   onClose: () => void;
-  onSend: (message: string) => void;
+  onSend: (message: string, attachments?: import("./chat-assistant-input").ChatAttachment[]) => void;
   onNewSession: () => void;
+  onLoadSession: (sessionId: string) => void;
   streamingText?: string;
+  showHistory: boolean;
+  onToggleHistory: () => void;
 }
 
 export function ChatAssistantPanel({
   isMobile, agents, projects, selectedAgentId, selectedProjectId,
   onAgentChange, onProjectChange, autoApprove, onAutoApproveChange,
   messages, sending, sessionId, waitingApproval, pendingToolCalls, approving,
-  onApprovalDecision, onClose, onSend, onNewSession, streamingText,
+  onApprovalDecision, onClose, onSend, onNewSession, onLoadSession, streamingText,
+  showHistory, onToggleHistory,
 }: ChatAssistantPanelProps) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) { if (e.key === "Escape") onClose(); }
@@ -68,6 +73,9 @@ export function ChatAssistantPanel({
             {agents.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
           <div className="flex items-center gap-1 ml-2">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onToggleHistory} aria-label="Session history" disabled={sending}>
+              <History className="h-3.5 w-3.5" />
+            </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onNewSession} aria-label="New session" disabled={sending}>
               <RotateCcw className="h-3.5 w-3.5" />
             </Button>
@@ -102,19 +110,30 @@ export function ChatAssistantPanel({
         </div>
       </div>
 
-      {/* Messages */}
-      <ChatAssistantMessages messages={messages} sending={sending} streamingText={streamingText} />
+      {showHistory ? (
+        <ChatAssistantHistory
+          agentId={selectedAgentId}
+          currentSessionId={sessionId}
+          onSelectSession={onLoadSession}
+          onBack={onToggleHistory}
+        />
+      ) : (
+        <>
+          {/* Messages */}
+          <ChatAssistantMessages messages={messages} sending={sending} streamingText={streamingText} />
 
-      {/* Approval card */}
-      {waitingApproval && !autoApprove && (
-        <ChatAssistantApproval pendingCalls={pendingToolCalls} onDecision={onApprovalDecision} disabled={approving} />
+          {/* Approval card */}
+          {waitingApproval && !autoApprove && (
+            <ChatAssistantApproval pendingCalls={pendingToolCalls} onDecision={onApprovalDecision} disabled={approving} />
+          )}
+
+          {/* Activity indicator */}
+          <ChatAssistantActivity sessionId={sessionId} sending={sending} />
+
+          {/* Input */}
+          <ChatAssistantInput sending={sending || waitingApproval} onSend={onSend} />
+        </>
       )}
-
-      {/* Activity indicator */}
-      <ChatAssistantActivity sessionId={sessionId} sending={sending} />
-
-      {/* Input */}
-      <ChatAssistantInput sending={sending || waitingApproval} onSend={onSend} />
     </div>
   );
 }

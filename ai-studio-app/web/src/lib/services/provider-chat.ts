@@ -61,12 +61,10 @@ function buildAnthropicClient(cfg: QuickChatConfig): Anthropic {
   const opts: Record<string, unknown> = {};
 
   if (isOAuth) {
-    opts.apiKey = "";
     opts.authToken = cfg.apiKeyRef;
     const betaFlags = (cfg.config?.betaFlags as string) || "";
-    const headers = (cfg.config?.defaultHeaders as Record<string, string>) || {};
-    if (betaFlags || Object.keys(headers).length > 0) {
-      opts.defaultHeaders = { ...headers, ...(betaFlags ? { "anthropic-beta": betaFlags } : {}) };
+    if (betaFlags) {
+      opts.defaultHeaders = { "anthropic-beta": betaFlags };
     }
   } else {
     opts.apiKey = cfg.apiKeyRef || "";

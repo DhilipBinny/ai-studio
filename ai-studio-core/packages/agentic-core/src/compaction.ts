@@ -318,7 +318,7 @@ function evictToolResults(messages: MessageRow[]): MessageRow[] {
     if (content.length <= 200) return msg; // Already short, keep as-is
 
     // Extract first meaningful line
-    const firstLine = content.split('\n').find((l) => l.trim())?.trim() || '';
+    const firstLine = content.split('\n').find((l: string) => l.trim())?.trim() || '';
     const toolName = msg.tool_call_id ? `tool_call:${msg.tool_call_id}` : 'tool';
     const evicted = `[${toolName}] ${firstLine.slice(0, 200)}`;
 
@@ -372,7 +372,7 @@ async function softCompact(
     const content = msg.content || '';
     if (content.length <= 200) continue;
 
-    const firstLine = content.split('\n').find((l) => l.trim())?.trim() || '';
+    const firstLine = content.split('\n').find((l: string) => l.trim())?.trim() || '';
     const toolName = msg.tool_call_id ? `tool_call:${msg.tool_call_id}` : 'tool';
     const evicted = `[${toolName}] ${firstLine.slice(0, 200)}`;
 
@@ -566,7 +566,7 @@ export async function checkAndCompact(
 
   // Stage 2: Hard compaction at 75% (full LLM summarization)
   if (tokens > contextWindow * hardThreshold) {
-    let resolvedTenantId = tenantId;
+    let resolvedTenantId: string = tenantId || '';
     if (!resolvedTenantId) {
       const firstMsg = await messageStore.listBySession(sessionId, 1);
       resolvedTenantId = firstMsg[0]?.tenant_id ?? 'default';

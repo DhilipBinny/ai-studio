@@ -29,6 +29,11 @@ let cachedConfig: Record<string, unknown> | null = null;
 let cacheTimestamp = 0;
 const CACHE_TTL_MS = 60_000;
 
+export function invalidateConfigCache(): void {
+  cachedConfig = null;
+  cacheTimestamp = 0;
+}
+
 export async function getAgentRuntimeConfig(tenantId?: string): Promise<typeof DEFAULTS> {
   const now = Date.now();
   if (cachedConfig && now - cacheTimestamp < CACHE_TTL_MS) {
