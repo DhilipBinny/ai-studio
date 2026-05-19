@@ -57,6 +57,10 @@ export const CONTEXT_EXECUTORS: Record<string, ContextAwareExecutorFn> = {
       return "Error: provide agent_id, agent_slug, or inline.system_prompt. Use list_agents to see available agents.";
     }
 
+    if (resolvedAgentId === ctx.agentId) {
+      return "Error: an agent cannot invoke itself. Use a different agent or create an inline sub-agent.";
+    }
+
     const { runSession } = await import("../session-runner");
     const startTime = Date.now();
 

@@ -376,6 +376,13 @@ async function executeToolLoop(
       requestType: "chat",
     });
 
+    // Incremental token update — survives crashes, prevents 0-token sessions
+    await db.update(agentSessions).set({
+      totalInputTokens: sql`${agentSessions.totalInputTokens} + ${response.inputTokens}`,
+      totalOutputTokens: sql`${agentSessions.totalOutputTokens} + ${response.outputTokens}`,
+      totalCostUsd: sql`${agentSessions.totalCostUsd} + ${roundCost.toFixed(6)}::numeric`,
+    }).where(eq(agentSessions.id, sessionId));
+
     if (response.toolCalls.length > 0) {
       const toolCallBlocks: ToolCallBlock[] = [];
       if (response.text) {
@@ -442,6 +449,23 @@ async function executeToolLoop(
       continue;
     }
 
+    // Auto-continue: if output was truncated at max_tokens, save partial and prompt continuation
+    if (response.stopReason === "max_tokens") {
+      await db.insert(agentSessionMessages).values({
+        tenantId: input.tenantId,
+        agentSessionId: sessionId,
+        role: "assistant",
+        content: response.text,
+      });
+      await db.insert(agentSessionMessages).values({
+        tenantId: input.tenantId,
+        agentSessionId: sessionId,
+        role: "user",
+        content: "Continue from where you left off.",
+      });
+      continue;
+    }
+
     finalText = response.text;
     await db.insert(agentSessionMessages).values({
       tenantId: input.tenantId,
@@ -483,13 +507,12 @@ async function finalizeSession(
     ? "waiting_approval"
     : isOneShot ? "completed" : "waiting";
 
+  // Tokens and cost are already written incrementally per-round in executeToolLoop,
+  // so finalizeSession only updates status, turns, and tool call count.
   const updates: Record<string, unknown> = {
     status: nextStatus,
-    totalInputTokens: sql`${agentSessions.totalInputTokens} + ${totals.totalInputTokens}`,
-    totalOutputTokens: sql`${agentSessions.totalOutputTokens} + ${totals.totalOutputTokens}`,
     totalTurns: sql`${agentSessions.totalTurns} + 1`,
     totalToolCalls: sql`${agentSessions.totalToolCalls} + ${totals.totalToolCalls}`,
-    totalCostUsd: sql`${agentSessions.totalCostUsd} + ${totals.totalCost.toFixed(6)}::numeric`,
   };
   if (isOneShot) {
     updates.completedAt = new Date();
