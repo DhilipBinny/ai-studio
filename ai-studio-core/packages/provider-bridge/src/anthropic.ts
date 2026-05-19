@@ -33,11 +33,11 @@ export class AnthropicProvider implements ProviderInterface {
     const clientOpts: Record<string, unknown> = {};
 
     if (authToken) {
-      clientOpts.apiKey = '';
       clientOpts.authToken = authToken;
       this.authType = 'oauth';
-      if (this.providerConfig?.defaultHeaders) {
-        clientOpts.defaultHeaders = this.providerConfig.defaultHeaders;
+      const betaFlags = this.providerConfig?.defaultHeaders?.["anthropic-beta"] as string || "";
+      if (betaFlags) {
+        clientOpts.defaultHeaders = { "anthropic-beta": betaFlags };
       }
     } else if (apiKey) {
       clientOpts.apiKey = apiKey;
